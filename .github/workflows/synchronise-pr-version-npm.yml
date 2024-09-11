@@ -1,4 +1,4 @@
-name: Synchronise Version
+name: Synchronise PR Version
 
 on:
   workflow_call:

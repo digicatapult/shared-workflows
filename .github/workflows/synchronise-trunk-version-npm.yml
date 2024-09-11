@@ -1,4 +1,4 @@
-name: Mark Stale Versions
+name: Synchronise all PR versions
 
 on:
   workflow_call:
