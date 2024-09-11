@@ -1,0 +1,41 @@
+name: Mark Stale Versions
+
+on:
+  workflow_call:
+    inputs:
+      trunk-branch:
+        required: true
+        type: string
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  find-pull-requests:
+    runs-on: ubuntu-latest
+    outputs:
+      pr_list: ${{ steps.find.outputs.pr_list }}
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TRUNK_BRANCH: ${{ inputs.trunk-branch }}
+    steps:
+      - name: Checkout ${{ inputs.trunk-branch }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.trunk-branch }}
+      - name: find pull requests
+        id: find
+        run: |
+          PR_LIST=$(gh pr list --base $TRUNK_BRANCH --search "label:v:major,v:minor,v:patch" --json number --jq "map(.number)")
+          echo "pr_list=$PR_LIST" >> $GITHUB_OUTPUT
+  synchronise-pull-requests:
+    needs: find-pull-requests
+    strategy:
+      matrix:
+        pr_number: ${{ fromJSON(needs.find-pull-requests.outputs.pr_list) }}
+    uses: ./.github/workflows/synchronise-pr-version-npm.yml
+    with:
+      pr-number: ${{ matrix.pr_number }}
+      trunk-branch: ${{ inputs.trunk-branch }}

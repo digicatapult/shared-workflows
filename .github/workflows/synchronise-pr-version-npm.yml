@@ -1,0 +1,109 @@
+name: Synchronise Version
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        required: true
+        type: number
+      trunk-branch:
+        required: true
+        type: string
+        default: main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.pr-number }}
+  cancel-in-progress: true
+
+jobs:
+  synchronise-version:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PR_NUMBER: ${{ inputs.pr-number }}
+      TRUNK_BRANCH: ${{ inputs.trunk-branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.trunk-branch }}
+      - name: Retrieve PR details
+        id: pr-details
+        run: |
+          VERSION_LABEL=$(gh pr view $PR_NUMBER --json labels --jq '.labels | map(select(.name == "v:major" or .name == "v:minor" or .name == "v:patch")) | sort_by(.name) | .[0].name')
+          PR_BRANCH=$(gh pr view $PR_NUMBER --json headRefName --jq .headRefName)
+          echo "Pull request branch: $PR_BRANCH"
+          echo "Pull Request Version label: $VERSION_LABEL"
+          echo "pr_branch=$PR_BRANCH" >> $GITHUB_OUTPUT
+          echo "version_label=$VERSION_LABEL" >> $GITHUB_OUTPUT
+      - name: Retrieve ${{ inputs.trunk-branch }} branch version
+        id: trunk-details
+        run: |
+          TRUNK_VERSION=$(jq -r .version package.json)
+          echo "Version on `$TRUNK_BRANCH`: $TRUNK_VERSION"
+          echo "trunk_version=$TRUNK_VERSION" >> $GITHUB_OUTPUT
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.pr-details.outputs.pr_branch }}
+      - name: Update version
+        id: update
+        if: ${{ steps.pr-details.outputs.version_label }}
+        env:
+          TRUNK_VERSION: ${{ steps.trunk-details.outputs.trunk_version }}
+          VERSION_LABEL: ${{ steps.pr-details.outputs.version_label }}
+        run: |
+          get_next_version() {
+            local base="$1"
+            local increment_type="$2"
+            local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)'
+
+            local MAJOR=$(echo $base | sed -e "s#$RE#\1#")
+            local MINOR=$(echo $base | sed -e "s#$RE#\2#")
+            local PATCH=$(echo $base | sed -e "s#$RE#\3#")
+
+            case "$increment_type" in
+            major)
+              ((MAJOR += 1))
+              ((MINOR = 0))
+              ((PATCH = 0))
+              ;;
+            minor)
+              ((MINOR += 1))
+              ((PATCH = 0))
+              ;;
+            patch)
+              ((PATCH += 1))
+              ;;
+            esac
+
+            local NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
+            echo "$NEXT_VERSION"
+          }
+
+          next_version=$(get_next_version $TRUNK_VERSION ${VERSION_LABEL:2})
+          current_version=$(jq -r .version package.json)
+
+          if [ "$next_version" != "$current_version" ]; then
+            npm version $next_version --allow-same-version=true --git-tag-version=false
+            echo "new_version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
+          else
+            echo "Version does not need updating"
+          fi
+      - name: Commit and Push
+        uses: planetscale/ghcommit-action@v0.1.6
+        if: ${{ steps.update.outputs.new_version }}
+        with:
+          commit_message: "Updating version to ${{ steps.update.outputs.new_version }}"
+          repo: ${{ github.repository }}
+          branch: ${{ steps.pr-details.outputs.pr_branch }}
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Remove stale
+        run: |
+          gh pr edit $PR_NUMBER --remove-label v:stale || true
