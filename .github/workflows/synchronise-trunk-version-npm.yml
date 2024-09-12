@@ -7,6 +7,11 @@ on:
         required: true
         type: string
         default: main
+    secrets:
+      bot-id:
+        required: true
+      bot-key:
+        required: true
 
 permissions:
   contents: write
@@ -39,3 +44,6 @@ jobs:
     with:
       pr-number: ${{ matrix.pr_number }}
       trunk-branch: ${{ inputs.trunk-branch }}
+    secrets:
+      bot-id: ${{ secrets.BOT_ID }}
+      bot-key: ${{ secrets.BOT_KEY }}
