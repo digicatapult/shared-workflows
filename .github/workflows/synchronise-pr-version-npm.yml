@@ -10,6 +10,11 @@ on:
         required: true
         type: string
         default: main
+    secrets:
+      bot-id:
+        required: true
+      bot-key:
+        required: true
 
 permissions:
   contents: write
@@ -95,15 +100,19 @@ jobs:
           else
             echo "Version does not need updating"
           fi
-      - name: Commit and Push
-        uses: planetscale/ghcommit-action@v0.1.6
-        if: ${{ steps.update.outputs.new_version }}
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.bot-id }}
+          private-key: ${{ secrets.bot-key }}
+      - uses: planetscale/ghcommit-action@v0.1.6
         with:
           commit_message: "Updating version to ${{ steps.update.outputs.new_version }}"
           repo: ${{ github.repository }}
           branch: ${{ steps.pr-details.outputs.pr_branch }}
         env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
       - name: Remove stale
         run: |
           gh pr edit $PR_NUMBER --remove-label v:stale || true
