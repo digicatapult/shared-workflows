@@ -45,5 +45,5 @@ jobs:
       pr-number: ${{ matrix.pr_number }}
       trunk-branch: ${{ inputs.trunk-branch }}
     secrets:
-      bot-id: ${{ secrets.BOT_ID }}
-      bot-key: ${{ secrets.BOT_KEY }}
+      bot-id: ${{ secrets.bot-id }}
+      bot-key: ${{ secrets.bot-key }}
