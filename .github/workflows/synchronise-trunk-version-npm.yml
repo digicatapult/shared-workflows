@@ -37,6 +37,7 @@ jobs:
           echo "pr_list=$PR_LIST" >> $GITHUB_OUTPUT
   synchronise-pull-requests:
     needs: find-pull-requests
+    if: ${{ join(fromJSON(needs.find-pull-requests.outputs.pr_list), '') != '' }}
     strategy:
       matrix:
         pr_number: ${{ fromJSON(needs.find-pull-requests.outputs.pr_list) }}
