@@ -34,9 +34,6 @@ on:
       db_migrate:
         required: false
         type: boolean
-    secrets:
-      github_token:
-        required: true
 
 
 permissions:
