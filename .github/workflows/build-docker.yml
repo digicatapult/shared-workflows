@@ -49,6 +49,7 @@ jobs:
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
   build-docker:
     name: 'Build docker image'
+    needs: repo_ids
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
