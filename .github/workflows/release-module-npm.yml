@@ -2,9 +2,6 @@ name: Release Module NPM
 on:
   workflow_call:
     inputs:
-      environment:
-        required: false
-        type: environment
       registry_url:
         required: false
         type: string

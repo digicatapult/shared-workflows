@@ -1,10 +1,6 @@
 name: Check version
 on:
   workflow_call:
-    inputs:
-      environment:
-        required: false
-        type: environment
 permissions:
   contents: write
 jobs:

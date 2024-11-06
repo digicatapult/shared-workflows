@@ -2,9 +2,6 @@ name: Build Docker
 on:
   workflow_call:
     inputs:
-      environment:
-        required: false
-        type: environment
       push_dockerhub:
         required: false
         type: boolean
@@ -28,6 +25,7 @@ on:
         required: false
 permissions:
   contents: write
+  packages: write
 jobs:
   repo_ids:
     name: Repo IDs

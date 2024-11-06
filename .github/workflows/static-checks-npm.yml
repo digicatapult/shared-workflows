@@ -1,12 +1,6 @@
 name: NPM Static checks
 on:
   workflow_call:
-    inputs:
-      environment:
-        required: false
-        type: environment
-permissions:
-  contents: write
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}

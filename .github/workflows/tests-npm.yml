@@ -2,9 +2,6 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
-      environment:
-        required: false
-        type: environment
       build_tsoa:
         required: false
         type: boolean
@@ -15,8 +12,6 @@ on:
         required: false
         type: string
         default: docker-compose.yml
-permissions:
-  contents: write
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
