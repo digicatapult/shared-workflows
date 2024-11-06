@@ -1,0 +1,76 @@
+name: NPM Static checks
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: environment
+      build_tsoa:
+        required: false
+        type: boolean
+      db_migrate:
+        required: false
+        type: boolean
+      docker_compose_file:
+        required: false
+        type: string
+        default: docker-compose.yml
+permissions:
+  contents: write
+jobs:
+  repo_ids:
+    name: Repo IDs
+    runs-on: ubuntu-latest
+    outputs:
+      repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
+      org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get repository identifiers
+        id: repo_ids
+        run: |
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          ORG_NAME=$(echo "${{ github.event.repository.owner.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
+  tests:
+    name: Run tests - ${{ matrix.command }}
+    strategy:
+      fail-fast: false
+      matrix:
+        command: ['test:unit', 'test:integration']
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-node-
+            ${{ runner.OS }}-
+      - name: Install Packages
+        run: npm ci
+      - name: Build tsoa
+        run: npm run tsoa:build
+        if: inputs.build_tsoa == true
+      - name: Create environment file
+        run: touch .env
+      - name: Setup dependencies
+        run: docker compose -f ${{ inputs.docker_compose_file }} up -d
+      - name: Sleep
+        uses: kibertoad/wait-action@1.0.1
+        with:
+          time: '30s'
+      - name: Run database migrations
+        run: npm run db:migrate
+        if: inputs.db_migrate == true
+      - name: Run tests
+        run: npm run ${{ matrix.command }}

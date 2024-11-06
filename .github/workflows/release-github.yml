@@ -1,0 +1,51 @@
+name: Release Github
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: false
+        type: environment
+permissions:
+  contents: write
+jobs:
+  repo_ids:
+    name: Repo IDs
+    runs-on: ubuntu-latest
+    outputs:
+      repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
+      org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get repository identifiers
+        id: repo_ids
+        run: |
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          ORG_NAME=$(echo "${{ github.event.repository.owner.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
+  release:
+    name: 'Release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: get_version
+        uses: digicatapult/check-version@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build release version
+        uses: 'marvinpinto/action-automatic-releases@latest'
+        with:
+          repo_token: '${{ secrets.GITHUB_TOKEN }}'
+          automatic_release_tag: ${{ steps.get_version.outputs.version }}
+          prerelease: false
+          title: Release ${{ steps.get-version.outputs.version }}
+      - name: Build release latest
+        uses: 'marvinpinto/action-automatic-releases@latest'
+        with:
+          repo_token: '${{ secrets.GITHUB_TOKEN }}'
+          automatic_release_tag: latest
+          prerelease: false
+          title: Latest Release ${{ steps.get-version.outputs.version }}
