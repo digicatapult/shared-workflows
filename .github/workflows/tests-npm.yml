@@ -6,14 +6,14 @@ on:
         required: false
         type: string
         default: '{}'
-      build_tsoa:
+      npm_build_command:
         required: false
-        type: boolean
-        default: false
-      db_migrate:
+        type: string
+        default: ''
+      pre_test_command:
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ''
       docker_compose_file:
         required: false
         type: string
@@ -51,9 +51,9 @@ jobs:
             ${{ runner.OS }}-
       - name: Install Packages
         run: npm ci
-      - name: Build tsoa
-        run: npm run tsoa:build
-        if: inputs.build_tsoa == true
+      - name: Build
+        run: ${{ inputs.npm_build_command }}
+        if: inputs.npm_build_command == true
       - name: Create environment file
         run: touch .env
       - name: Setup dependencies
@@ -62,8 +62,8 @@ jobs:
         uses: kibertoad/wait-action@1.0.1
         with:
           time: '30s'
-      - name: Run database migrations
-        run: npm run db:migrate
-        if: inputs.db_migrate == true
+      - name: Run pre-test command
+        run: ${{ inputs.pre_test_command }}
+        if: inputs.pre_test_command == true
       - name: Run tests
         run: npm run ${{ matrix.command }}

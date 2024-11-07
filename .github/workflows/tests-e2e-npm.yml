@@ -1,4 +1,4 @@
-name: NPM Static checks
+name: NPM E2E tests
 on:
   workflow_call:
     inputs:
@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: docker-compose.yml
+      test_command:
+        required: false
+        type: string
+        default: 'docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull'
 permissions:
   contents: write
 jobs:
@@ -44,10 +48,10 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           files: ${{ inputs.docker_compose_file }}
       - name: Run e2e tests
-        run: docker compose -f ${{ inputs.docker_compose_file }} up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull
+        run: ${{ inputs.test_command }}
         if: ${{ github.event.repository.name != 'veritable-ui' }}
       - name: Run e2e tests - veritable UI
-        run: docker compose -f ${{ inputs.docker_compose_file }} up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull
+        run: ${{ inputs.test_command }}
         env:
           VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
           VERITABLE_E2E_OUT_DIR: ${{ runner.temp }}

@@ -1,4 +1,4 @@
-name: Release Module NPM
+name: NPM Release Module
 on:
   workflow_call:
     inputs:
@@ -23,7 +23,7 @@ on:
         type: string
         default: 'public'
     secrets:
-      AUTH_TOKEN:
+      REGISTRY_AUTH_TOKEN:
         required: true
 permissions:
   contents: write
@@ -57,4 +57,4 @@ jobs:
       - name: Publish to npmjs packages
         run: npm publish --access ${{ github.event.inputs.package_access }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.AUTH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.REGISTRY_AUTH_TOKEN }}

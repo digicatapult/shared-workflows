@@ -43,36 +43,50 @@ This workflow also requires two secrets in order to run
 
 ### [Build Docker](.github/workflows/build-docker.yml)
 
-Builds a Docker container and optionally pushes it to GitHub Container Registry (GHCR), DockerHub, or both, based on specified input parameters.
+Builds a Docker container and optionally pushes it to GitHub Container Registry (GHCR), DockerHub, or both. The workflow is configurable to support multi-platform builds and various tagging options.
 
 #### Inputs
 
 | Input            | Type    | Description                                                                                                             | Default                     | Required |
 |------------------|---------|-------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| env_vars         | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                        | false    |
-| push_dockerhub   | boolean | Specifies whether to push the built image to DockerHub                                                                  | `false`                     | false    |
-| push_ghcr        | boolean | Specifies whether to push the built image to GHCR                                                                       | `false`                     | false    |
-| docker_platforms | string  | Specifies the architectures to build containers for                                                                     | `"linux/amd64,linux/arm64"` | false    |
-| docker_file      | string  | Specifies the Dockerfile to be used for building the image                                                              | `Dockerfile`                | false    |
+| env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run  | `{}`                        | false    |
+| push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                            | `false`                     | false    |
+| push_ghcr        | boolean | Whether to push the built image to GHCR                                                                                 | `false`                     | false    |
+| docker_platforms | string  | Specifies architectures to build the container for                                                                      | `"linux/amd64,linux/arm64"` | false    |
+| docker_file      | string  | Dockerfile to be used for building the container                                                                        | `Dockerfile`                | false    |
 
 #### Secrets
 
-| Secret              | Description                                                                                           |
-|---------------------|-------------------------------------------------------------------------------------------------------|
-| GITHUB_TOKEN        | Token used for authenticating with GitHub to access and push images to GHCR                           |
-| DOCKERHUB_USERNAME  | DockerHub username used for authentication when pushing to DockerHub                                  |
-| DOCKERHUB_TOKEN     | DockerHub token (or password) used for authentication when pushing to DockerHub                       |
+| Secret             | Description                                                                                     |
+|--------------------|-------------------------------------------------------------------------------------------------|
+| DOCKERHUB_USERNAME | DockerHub username used for authentication when pushing to DockerHub                            |
+| DOCKERHUB_TOKEN    | DockerHub token (or password) used for authentication when pushing to DockerHub                 |
 
 #### Workflow Description
 
-This GitHub Actions workflow builds a Docker container based on the specified Dockerfile and configuration. It can push the built image to either GitHub Container Registry (GHCR) or DockerHub (or both) if the respective options (`push_dockerhub` and `push_ghcr`) are enabled. The workflow supports multi-platform builds and version tagging using the `digicatapult/check-version` action to manage version information. It also includes four main build/push cases:
+This GitHub Actions workflow is designed to build a Docker container, optionally pushing it to GHCR and/or DockerHub. It includes multi-platform support and customizable tagging for version management. Key steps are as follows:
 
-1. **GHCR Only**: Builds and pushes the Docker image only to GHCR.
-2. **DockerHub Only**: Builds and pushes the Docker image only to DockerHub.
-3. **Both GHCR and DockerHub**: Builds and pushes the Docker image to both registries.
-4. **Build Only**: Builds the Docker image without pushing it to any registry.
+1. **Repository Identifier Extraction**: Captures the repository and organization names, converting them to lowercase for consistency in tags.
+2. **Set Environment Variables**: Parses JSON `env_vars` and sets them in the workflow environment.
+3. **Version Management**: Uses `digicatapult/check-version` to determine the version and release type, which is then used in image tagging.
+4. **Docker Setup**:
+   - **QEMU Setup**: Enables emulation for multi-platform builds.
+   - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
+5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
 
-Additionally, the workflow applies Open Container Initiative (OCI) labels to the images for enhanced metadata tracking.
+#### Conditional Push Cases
+
+1. **Push to GHCR Only**: If `push_ghcr` is true and `push_dockerhub` is false, builds and pushes the image to GHCR.
+2. **Push to DockerHub Only**: If `push_dockerhub` is true and `push_ghcr` is false, builds and pushes the image to DockerHub.
+3. **Push to Both GHCR and DockerHub**: If both `push_ghcr` and `push_dockerhub` are true, builds and pushes the image to both registries.
+4. **Build Only**: If neither `push_ghcr` nor `push_dockerhub` are true, builds the image without pushing to any registry.
+
+#### Labels and Metadata
+
+For all images, the workflow adds OCI-compliant metadata labels to enrich the image with information about the repository source, version, and build date. This metadata provides valuable information for tracking the image’s origin and history.
+
+This workflow is versatile, offering a full pipeline for Docker image creation and optional registry publishing, adapting to a range of requirements from simple builds to multi-platform, multi-registry deployments.
+
 
 ### [Check Version](.github/workflows/check-version.yml)
 
@@ -130,7 +144,7 @@ Publishes an NPM package to the specified registry, optionally building the pack
 
 | Secret       | Description                                                                   |
 |--------------|-------------------------------------------------------------------------------|
-| AUTH_TOKEN   | Authentication token required to publish the package to the NPM registry      |
+| REGISTRY_AUTH_TOKEN   | Authentication token required to publish the package to the NPM registry      |
 
 #### Workflow Description
 
@@ -154,7 +168,7 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 | Input           | Type    | Description                                                                                                             | Default                         | Required |
 |-----------------|---------|-------------------------------------------------------------------------------------------------------------------------|---------------------------------|----------|
 | env_vars        | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                            | false    |
-| matrix_commands | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package     | `[lint,depcheck,xss-scan,check]` | false    |
+| matrix_commands | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package     | `[lint,depcheck,check]` | false    |
 
 #### Workflow Description
 
@@ -164,65 +178,67 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 2. **Node Setup**: Configures the Node.js environment.
 3. **Node Modules Caching**: Caches `node_modules` based on the `package-lock.json` hash to speed up dependency installation.
 4. **Install Packages**: Installs the necessary dependencies.
-5. **Run Static Checks**: Executes each specified command in the matrix (`lint`, `depcheck`, `xss-scan`, `check` or others as configured) as defined in the NPM scripts.
+5. **Run Static Checks**: Executes each specified command in the matrix (`lint`, `depcheck`, `check` or others as configured) as defined in the NPM scripts.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
 
-### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml)
+### [NPM E2E Tests](.github/workflows/e2e-tests-npm.yml)
 
-Runs end-to-end (e2e) tests for an NPM project using Docker Compose, with optional setup steps for TSOA build, database migration, and project-specific configurations.
+Executes end-to-end (E2E) tests for an NPM project within a Dockerized environment, supporting optional configurations for TSOA build, database migration, and custom test commands.
 
 #### Inputs
 
-| Input              | Type    | Description                                                                                                             | Default               | Required |
-|--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|-----------------------|----------|
-| env_vars           | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                  | false    |
-| build_tsoa         | boolean | Specifies if the TSOA build step should be included before running tests                                                | `false`               | false    |
-| db_migrate         | boolean | Indicates if database migrations should be executed before tests                                                        | `false`               | false    |
-| docker_compose_file| string  | The Docker Compose file to use for setting up the testing environment                                                   | `docker-compose.yml`  | false    |
+| Input              | Type    | Description                                                                                                             | Default                                                                                           | Required |
+|--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|----------|
+| env_vars           | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                                              | false    |
+| build_tsoa         | boolean | Specifies if the TSOA build step should be included before running tests                                                | `false`                                                                                           | false    |
+| db_migrate         | boolean | Indicates if database migrations should be executed before tests                                                        | `false`                                                                                           | false    |
+| docker_compose_file| string  | The Docker Compose file used for building the testing environment                                                       | `docker-compose.yml`                                                                              | false    |
+| test_command       | string  | Command used to run E2E tests, which can be customized as needed                                                        | `docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull` | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs end-to-end tests within a Dockerized environment, leveraging Docker Compose for test setup. The workflow is adaptable, providing tailored handling for the `veritable-ui` repository with additional environment variables.
+This GitHub Actions workflow runs end-to-end tests in a Dockerized environment. It includes custom configurations for TSOA build, database migrations, and specific handling for the `veritable-ui` repository with additional environment variables.
 
-1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
-2. **Docker Buildx Setup**: Configures Docker Buildx to support advanced Docker build functionality.
-3. **Build E2E Containers**: Builds the necessary Docker containers using Docker Bake based on the specified Docker Compose file.
+1. **Set Environment Variables**: Parses and applies environment variables from a JSON string.
+2. **Docker Buildx Setup**: Configures Docker Buildx to enable advanced Docker build features.
+3. **Build E2E Containers**: Builds the necessary containers using Docker Bake, based on the provided Docker Compose file.
 4. **Run E2E Tests**:
-   - For general repositories, runs e2e tests with the specified Docker Compose configuration.
-   - For the `veritable-ui` repository, sets additional environment variables specific to its requirements, such as `VERITABLE_COMPANY_PROFILE_API_KEY` and `VERITABLE_E2E_OUT_DIR`.
-5. **Upload Playwright Report**: Uploads the Playwright report as an artifact, available for 90 days, for test reporting and tracking.
-6. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for easy tracking and visibility.
+   - For general repositories, runs the specified E2E `test_command`.
+   - For the `veritable-ui` repository, runs the E2E `test_command` with additional environment variables such as `VERITABLE_COMPANY_PROFILE_API_KEY` and `VERITABLE_E2E_OUT_DIR`.
+5. **Upload Playwright Report**: Uploads the Playwright report as an artifact, available for 90 days.
+6. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for tracking.
 
-This workflow provides a robust, customizable e2e testing setup, supporting different configurations and dependency management to suit various project needs.
+This workflow is highly configurable, allowing users to adapt the E2E test setup for different project requirements while maintaining an efficient and streamlined testing environment.
 
 ### [NPM Tests](.github/workflows/tests-npm.yml)
 
-Executes specified NPM test commands (e.g., unit and integration tests) with optional steps for TSOA build, database migrations, and Docker-based dependency setup.
+Executes specified NPM test commands (e.g., unit and integration tests) with optional pre-test commands, build steps, and Docker-based dependency setup.
 
 #### Inputs
 
 | Input              | Type    | Description                                                                                                             | Default                          | Required |
 |--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------|----------|
-| env_vars           | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                             | false    |
-| build_tsoa         | boolean | Specifies if the TSOA build step should be run before tests                                                             | `false`                          | false    |
-| db_migrate         | boolean | Indicates if database migrations should be run before tests                                                             | `false`                          | false    |
-| docker_compose_file| string  | The Docker Compose file to use for setting up dependencies                                                              | `docker-compose.yml`             | false    |
-| tests              | string  | A JSON array of test commands to run as defined in the NPM scripts (e.g., `['test:unit', 'test:integration']`)         | `['test:unit', 'test:integration']` | false    |
+| env_vars           | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                             | false    |
+| npm_build_command  | string  | Optional NPM build command to execute before running tests                                                              | `''`                             | false    |
+| pre_test_command   | string  | Optional command to run before the main test commands                                                                  | `''`                             | false    |
+| docker_compose_file| string  | The Docker Compose file used to set up dependencies                                                                     | `docker-compose.yml`             | false    |
+| tests              | string  | JSON array of test commands defined in NPM scripts (e.g., `['test:unit', 'test:integration']`)                        | `['test:unit', 'test:integration']` | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs a configurable set of NPM test commands specified in the `tests` input. The commands execute in parallel through a matrix strategy, allowing multiple tests to run concurrently.
+This GitHub Actions workflow runs a series of NPM test commands as defined in the `tests` input. The commands are executed in parallel using a matrix strategy, allowing concurrent testing.
 
-1. **Setting Environment Variables**: Parses and applies environment variables from a JSON string.
-2. **Node Setup**: Configures the Node.js environment.
-3. **Node Modules Caching**: Caches `node_modules` based on the `package-lock.json` hash to speed up dependency installation.
+1. **Set Environment Variables**: Parses environment variables from a JSON string and sets them in the workflow environment.
+2. **Node Setup**: Installs the specified Node.js version.
+3. **Node Modules Caching**: Caches `node_modules` to speed up dependency installation, using `package-lock.json` as the cache key.
 4. **Install Packages**: Installs project dependencies with `npm ci`.
-5. **TSOA Build (Optional)**: Executes `tsoa:build` if `build_tsoa` is set to true.
-6. **Environment File Creation**: Creates a `.env` file if needed for configuration.
-7. **Setup Dependencies with Docker**: Brings up services defined in the specified Docker Compose file to support test dependencies.
-8. **Wait for Dependency Initialization**: Introduces a delay to ensure Docker services are fully initialized.
-9. **Database Migrations (Optional)**: Runs `db:migrate` if `db_migrate` is set to true.
-10. **Run Tests**: Executes each test command specified in the `tests` input matrix (e.g., `test:unit`, `test:integration`).
+5. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
+6. **Environment File Creation**: Creates a `.env` file for environment configuration.
+7. **Setup Docker Dependencies**: Brings up services defined in the Docker Compose file to support test dependencies.
+8. **Wait for Initialization**: Adds a delay to ensure Docker services are fully started.
+9. **Pre-Test Command (Optional)**: Executes the `pre_test_command` if specified.
+10. **Run Tests**: Executes each command in the `tests` input matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
 
-This workflow enables flexible and efficient testing setups, supporting custom configurations and dependencies to streamline project testing requirements.
+This workflow provides a flexible setup for running NPM tests, allowing custom commands and Docker-based dependencies to adapt to various testing requirements.
+
