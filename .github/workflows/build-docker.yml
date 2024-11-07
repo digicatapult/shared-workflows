@@ -61,7 +61,6 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-
       - id: get_version
         uses: digicatapult/check-version@v1
         with:
