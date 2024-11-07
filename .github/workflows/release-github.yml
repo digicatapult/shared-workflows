@@ -1,6 +1,11 @@
 name: Release Github
 on:
   workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
 permissions:
   contents: write
 jobs:
@@ -9,6 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - id: get_version
         uses: digicatapult/check-version@v1
         with:

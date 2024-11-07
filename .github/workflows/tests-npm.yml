@@ -2,6 +2,10 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
       build_tsoa:
         required: false
         type: boolean
@@ -22,6 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - uses: actions/setup-node@v4
         with:
           node-version: 20.x
