@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        command: ${{ github.event.inputs.matrix_commands }}
+        command: ${{ inputs.matrix_commands }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

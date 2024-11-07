@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        command: ${{ github.event.inputs.tests }}
+        command: ${{ inputs.tests }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
