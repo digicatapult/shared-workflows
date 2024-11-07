@@ -31,7 +31,6 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-          echo "VERITABLE_E2E_OUT_DIR=${VERITABLE_E2E_OUT_DIR}" >> $GITHUB_ENV
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
@@ -46,6 +45,7 @@ jobs:
         run: docker compose -f ${{ inputs.docker_compose_file }} up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull
         env:
           VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
+          VERITABLE_E2E_OUT_DIR: ${{ runner.temp }}
         if: ${{ github.event.repository.name == 'veritable-ui' }}
       - name: Run e2e tests
         run: docker compose -f ${{ inputs.docker_compose_file }} up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull
