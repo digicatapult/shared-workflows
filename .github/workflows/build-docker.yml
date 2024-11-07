@@ -22,11 +22,6 @@ on:
         required: false
         type: string
         default: Dockerfile
-    secrets:
-      DOCKERHUB_USERNAME:
-        required: false
-      DOCKERHUB_TOKEN:
-        required: false
 permissions:
   contents: write
   packages: write

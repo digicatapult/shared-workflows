@@ -1,4 +1,4 @@
-name: NPM Static checks
+name: NPM Tests
 on:
   workflow_call:
     inputs:
@@ -9,20 +9,26 @@ on:
       build_tsoa:
         required: false
         type: boolean
+        default: false
       db_migrate:
         required: false
         type: boolean
+        default: false
       docker_compose_file:
         required: false
         type: string
         default: docker-compose.yml
+      tests:
+        required: false
+        type: string
+        default: '[test:unit, test:integration]'
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
     strategy:
       fail-fast: false
       matrix:
-        command: ['test:unit', 'test:integration']
+        command: ${{ github.event.inputs.tests }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

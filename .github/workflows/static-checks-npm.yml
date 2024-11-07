@@ -6,13 +6,17 @@ on:
         required: false
         type: string
         default: '{}'
+      matrix_commands:
+        required: false
+        type: string
+        default: '[lint,depcheck,xss-scan,check]'
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
     strategy:
       fail-fast: false
       matrix:
-        command: [lint, depcheck, xss-scan, check]
+        command: ${{ github.event.inputs.matrix_commands }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
