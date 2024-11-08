@@ -21,7 +21,7 @@ on:
       tests:
         required: false
         type: string
-        default: '[test:unit, test:integration]'
+        default: '["test:unit", "test:integration"]'
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
