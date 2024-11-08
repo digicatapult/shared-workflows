@@ -15,7 +15,7 @@ jobs:
     name: Static Analysis Checks - ${{ matrix.command }}
     strategy:
       fail-fast: false
-      matrix: 
+      matrix:
         command: ${{ fromJson(inputs.matrix_commands) }}
     runs-on: ubuntu-latest
     steps:

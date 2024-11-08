@@ -1,5 +1,4 @@
 name: Synchronise all PR versions
-
 on:
   workflow_call:
     inputs:
@@ -12,11 +11,9 @@ on:
         required: true
       bot-key:
         required: true
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   find-pull-requests:
     runs-on: ubuntu-latest
