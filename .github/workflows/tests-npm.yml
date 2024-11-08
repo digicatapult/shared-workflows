@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        command: ${{ inputs.tests }}
+        command: ${{ fromJson(inputs.tests) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
