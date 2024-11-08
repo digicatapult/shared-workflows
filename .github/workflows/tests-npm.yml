@@ -53,7 +53,7 @@ jobs:
         run: npm ci
       - name: Build
         run: ${{ inputs.npm_build_command }}
-        if: inputs.npm_build_command == true
+        if: inputs.npm_build_command != ''
       - name: Create environment file
         run: touch .env
       - name: Setup dependencies
@@ -64,6 +64,6 @@ jobs:
           time: '30s'
       - name: Run pre-test command
         run: ${{ inputs.pre_test_command }}
-        if: inputs.pre_test_command == true
+        if: inputs.npm_build_command != ''
       - name: Run tests
         run: npm run ${{ matrix.command }}

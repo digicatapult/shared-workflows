@@ -184,61 +184,63 @@ This flexible workflow enables dynamic static analysis checks to maintain code q
 
 ### [NPM E2E Tests](.github/workflows/e2e-tests-npm.yml)
 
-Executes end-to-end (E2E) tests for an NPM project within a Dockerized environment, supporting optional configurations for TSOA build, database migration, and custom test commands.
+Executes end-to-end (E2E) tests for an NPM project using Docker Compose, supporting optional build commands and project-specific configurations.
 
 #### Inputs
 
 | Input              | Type    | Description                                                                                                             | Default                                                                                           | Required |
 |--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|----------|
 | env_vars           | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                                              | false    |
-| build_tsoa         | boolean | Specifies if the TSOA build step should be included before running tests                                                | `false`                                                                                           | false    |
-| db_migrate         | boolean | Indicates if database migrations should be executed before tests                                                        | `false`                                                                                           | false    |
+| npm_build_command  | string  | Optional command to build the application before running tests                                                          | `''`                                                                                              | false    |
+| pre_test_command   | string  | Optional command to execute before running the main test command                                                        | `''`                                                                                              | false    |
 | docker_compose_file| string  | The Docker Compose file used for building the testing environment                                                       | `docker-compose.yml`                                                                              | false    |
 | test_command       | string  | Command used to run E2E tests, which can be customized as needed                                                        | `docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull` | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs end-to-end tests in a Dockerized environment. It includes custom configurations for TSOA build, database migrations, and specific handling for the `veritable-ui` repository with additional environment variables.
+This GitHub Actions workflow is tailored for running end-to-end tests within a Dockerized environment, with customizable build and test steps. The workflow includes conditional handling for the `veritable-ui` repository, where additional environment variables are provided.
 
-1. **Set Environment Variables**: Parses and applies environment variables from a JSON string.
-2. **Docker Buildx Setup**: Configures Docker Buildx to enable advanced Docker build features.
-3. **Build E2E Containers**: Builds the necessary containers using Docker Bake, based on the provided Docker Compose file.
-4. **Run E2E Tests**:
-   - For general repositories, runs the specified E2E `test_command`.
-   - For the `veritable-ui` repository, runs the E2E `test_command` with additional environment variables such as `VERITABLE_COMPANY_PROFILE_API_KEY` and `VERITABLE_E2E_OUT_DIR`.
-5. **Upload Playwright Report**: Uploads the Playwright report as an artifact, available for 90 days.
-6. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for tracking.
+1. **Set Environment Variables**: Parses and applies environment variables from a JSON string to the workflow environment.
+2. **Docker Buildx Setup**: Configures Docker Buildx for advanced Docker build support.
+3. **Build E2E Containers**: Uses Docker Bake to build containers based on the provided Docker Compose file.
+4. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
+5. **Pre-Test Command (Optional)**: Executes `pre_test_command` before running tests if specified.
+6. **Run E2E Tests**:
+   - For general repositories, runs the E2E test using `test_command`.
+   - For the `veritable-ui` repository, additional environment variables, such as `VERITABLE_COMPANY_PROFILE_API_KEY` and `VERITABLE_E2E_OUT_DIR`, are set.
+7. **Upload Playwright Report**: Saves the Playwright report as an artifact, accessible for 90 days.
+8. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for comprehensive reporting.
 
-This workflow is highly configurable, allowing users to adapt the E2E test setup for different project requirements while maintaining an efficient and streamlined testing environment.
+This workflow is designed to accommodate different testing needs, offering flexibility with custom commands and environment-specific configurations for robust E2E testing.
 
-### [NPM Tests](.github/workflows/tests-npm.yml)
 
-Executes specified NPM test commands (e.g., unit and integration tests) with optional pre-test commands, build steps, and Docker-based dependency setup.
+### [NPM Tests](.github/workflows/npm-tests.yml)
+
+Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup.
 
 #### Inputs
 
-| Input              | Type    | Description                                                                                                             | Default                          | Required |
-|--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|----------------------------------|----------|
-| env_vars           | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                             | false    |
-| npm_build_command  | string  | Optional NPM build command to execute before running tests                                                              | `''`                             | false    |
-| pre_test_command   | string  | Optional command to run before the main test commands                                                                  | `''`                             | false    |
-| docker_compose_file| string  | The Docker Compose file used to set up dependencies                                                                     | `docker-compose.yml`             | false    |
-| tests              | string  | JSON array of test commands defined in NPM scripts (e.g., `['test:unit', 'test:integration']`)                        | `['test:unit', 'test:integration']` | false    |
+| Input              | Type    | Description                                                                                                             | Default                               | Required |
+|--------------------|---------|-------------------------------------------------------------------------------------------------------------------------|---------------------------------------|----------|
+| env_vars           | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run  | `{}`                                  | false    |
+| npm_build_command  | string  | Optional command to build the application before running tests                                                          | `''`                                  | false    |
+| pre_test_command   | string  | Optional command to execute before the main test command                                                                | `''`                                  | false    |
+| docker_compose_file| string  | The Docker Compose file to use for setting up dependencies                                                              | `docker-compose.yml`                  | false    |
+| tests              | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]`   | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs a series of NPM test commands as defined in the `tests` input. The commands are executed in parallel using a matrix strategy, allowing concurrent testing.
+This GitHub Actions workflow runs a series of NPM test commands, with each test command running as a separate job in parallel using a matrix strategy.
 
-1. **Set Environment Variables**: Parses environment variables from a JSON string and sets them in the workflow environment.
+1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
 2. **Node Setup**: Installs the specified Node.js version.
-3. **Node Modules Caching**: Caches `node_modules` to speed up dependency installation, using `package-lock.json` as the cache key.
-4. **Install Packages**: Installs project dependencies with `npm ci`.
-5. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
+3. **Node Modules Caching**: Caches `node_modules` based on `package-lock.json` for faster dependency installation.
+4. **Install Packages**: Installs project dependencies using `npm ci`.
+5. **Build Step (Optional)**: Executes `npm_build_command` if it is provided.
 6. **Environment File Creation**: Creates a `.env` file for environment configuration.
-7. **Setup Docker Dependencies**: Brings up services defined in the Docker Compose file to support test dependencies.
-8. **Wait for Initialization**: Adds a delay to ensure Docker services are fully started.
-9. **Pre-Test Command (Optional)**: Executes the `pre_test_command` if specified.
-10. **Run Tests**: Executes each command in the `tests` input matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
+7. **Setup Docker Dependencies**: Brings up services defined in the specified Docker Compose file to support test dependencies.
+8. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
+9. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
+10. **Run Tests**: Executes each command from the `tests` matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
 
-This workflow provides a flexible setup for running NPM tests, allowing custom commands and Docker-based dependencies to adapt to various testing requirements.
-
+This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, and Docker-based dependencies, making it adaptable for various test scenarios.
