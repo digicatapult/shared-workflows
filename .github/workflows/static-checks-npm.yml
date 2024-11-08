@@ -9,7 +9,7 @@ on:
       matrix_commands:
         required: false
         type: string
-        default: '["lint", "depcheck","check"]'
+        default: '["lint", "depcheck", "check"]'
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
