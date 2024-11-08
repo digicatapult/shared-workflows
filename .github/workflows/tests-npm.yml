@@ -57,7 +57,7 @@ jobs:
       - name: Create environment file
         run: touch .env
       - name: Setup dependencies
-        run: docker compose -f ${{ inputs.docker_compose_file }} up -d
+        run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
       - name: Sleep
         uses: kibertoad/wait-action@1.0.1
         with:
