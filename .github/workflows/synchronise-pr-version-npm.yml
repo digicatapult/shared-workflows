@@ -1,5 +1,4 @@
 name: Synchronise PR Version
-
 on:
   workflow_call:
     inputs:
@@ -15,15 +14,12 @@ on:
         required: true
       bot-key:
         required: true
-
 permissions:
   contents: write
   pull-requests: write
-
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.pr-number }}
   cancel-in-progress: true
-
 jobs:
   synchronise-version:
     runs-on: ubuntu-latest

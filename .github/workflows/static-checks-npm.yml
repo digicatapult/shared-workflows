@@ -1,0 +1,43 @@
+name: NPM Static checks
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
+      matrix_commands:
+        required: false
+        type: string
+        default: '["lint", "depcheck", "check"]'
+jobs:
+  static-checks:
+    name: Static Analysis Checks - ${{ matrix.command }}
+    strategy:
+      fail-fast: false
+      matrix:
+        command: ${{ fromJson(inputs.matrix_commands) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-node-
+            ${{ runner.OS }}-
+      - name: Install Packages
+        run: npm ci
+      - name: ${{ matrix.command }}
+        run: npm run ${{ matrix.command }}

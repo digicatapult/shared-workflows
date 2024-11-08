@@ -1,0 +1,200 @@
+name: Build Docker
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
+      push_dockerhub:
+        required: false
+        type: boolean
+        default: false
+      push_ghcr:
+        required: false
+        type: boolean
+        default: false
+      docker_platforms:
+        required: false
+        type: string
+        default: "linux/amd64,linux/arm64"
+      docker_file:
+        required: false
+        type: string
+        default: Dockerfile
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: false
+      DOCKERHUB_TOKEN:
+        required: false
+permissions:
+  contents: write
+  packages: write
+jobs:
+  repo_ids:
+    name: Repo IDs
+    runs-on: ubuntu-latest
+    outputs:
+      repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
+      org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get repository identifiers
+        id: repo_ids
+        run: |
+          REPO_NAME=$(echo "${{ github.event.repository.name }}" | tr '[:upper:]' '[:lower:]')
+          ORG_NAME=$(echo "${{ github.event.repository.owner.name }}" | tr '[:upper:]' '[:lower:]')
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
+          echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
+  build-docker:
+    name: 'Build docker image'
+    needs: repo_ids
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - id: get_version
+        uses: digicatapult/check-version@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-flags: '--debug'
+      - name: Generate tags
+        id: generate-tags
+        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
+        env:
+          VERSION: ${{ steps.get_version.outputs.VERSION }}
+          IS_NEW_VERSION: ${{ steps.get_version.outputs.IS_NEW_VERSION }}
+          IS_PRERELEASE: ${{ steps.get_version.outputs.IS_PRERELEASE }}
+        run: |
+          # Reset all tag variables
+          echo "GHCR_VERSION_TAG=" >> $GITHUB_OUTPUT
+          echo "DOCKERHUB_VERSION_TAG=" >> $GITHUB_OUTPUT
+          echo "GHCR_LATEST_TAG=" >> $GITHUB_OUTPUT
+          echo "DOCKERHUB_LATEST_TAG=" >> $GITHUB_OUTPUT
+
+          # Check if it is a new version
+          if [ "$IS_NEW_VERSION" == "true" ]; then
+            # Generate tags for GHCR if enabled
+            if [ "${{ inputs.push_ghcr }}" == "true" ]; then
+              echo "GHCR_VERSION_TAG=ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:$VERSION" >> $GITHUB_OUTPUT
+              if [ "$IS_PRERELEASE" == "false" ]; then
+                echo "GHCR_LATEST_TAG=ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:latest" >> $GITHUB_OUTPUT
+              fi
+            fi
+
+            # Generate tags for Dockerhub if enabled
+            if [ "${{ inputs.push_dockerhub }}" == "true" ]; then
+              echo "DOCKERHUB_VERSION_TAG=${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:$VERSION" >> $GITHUB_OUTPUT
+              if [ "$IS_PRERELEASE" == "false" ]; then
+                echo "DOCKERHUB_LATEST_TAG=${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:latest" >> $GITHUB_OUTPUT
+              fi
+            fi
+          fi
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.push_ghcr == true }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Dockerhub Registry
+        if: ${{ inputs.push_dockerhub == true }}
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Case 1: Only GHCR enabled
+      - name: Build and push image to GHCR only
+        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == false }}
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ${{ inputs.docker_file }}
+          platforms: ${{ inputs.docker_platforms }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
+            ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
+            ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
+          labels: |
+            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
+            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
+      # Case 2: Only DockerHub enabled
+      - name: Build and push image to DockerHub only
+        if: ${{ inputs.push_ghcr == false && inputs.push_dockerhub == true }}
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ${{ inputs.docker_file }}
+          platforms: ${{ inputs.docker_platforms }}
+          push: true
+          tags: |
+            ${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
+            ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
+            ${{ steps.generate-tags.outputs.DOCKERHUB_LATEST_TAG }}
+          labels: |
+            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
+            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
+      # Case 3: Both GHCR and DockerHub enabled
+      - name: Build and push image to both GHCR and DockerHub
+        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == true }}
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ${{ inputs.docker_file }}
+          platforms: ${{ inputs.docker_platforms }}
+          push: true
+          tags: |
+            ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
+            ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
+            ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
+            ${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
+            ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
+            ${{ steps.generate-tags.outputs.DOCKERHUB_LATEST_TAG }}
+          labels: |
+            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
+            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
+      # Case 4: Build only
+      - name: Build only
+        if: ${{ inputs.push_ghcr == false && inputs.push_dockerhub == false }}
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          context: .
+          file: ${{ inputs.docker_file }}
+          platforms: ${{ inputs.docker_platforms }}
+          push: false

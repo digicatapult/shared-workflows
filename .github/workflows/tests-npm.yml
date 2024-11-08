@@ -1,0 +1,69 @@
+name: NPM Tests
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
+      npm_build_command:
+        required: false
+        type: string
+        default: ''
+      pre_test_command:
+        required: false
+        type: string
+        default: ''
+      docker_compose_file:
+        required: false
+        type: string
+        default: docker-compose.yml
+      tests:
+        required: false
+        type: string
+        default: '["test:unit", "test:integration"]'
+jobs:
+  tests:
+    name: Run tests - ${{ matrix.command }}
+    strategy:
+      fail-fast: false
+      matrix:
+        command: ${{ fromJson(inputs.tests) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-node-
+            ${{ runner.OS }}-
+      - name: Install Packages
+        run: npm ci
+      - name: Build
+        run: ${{ inputs.npm_build_command }}
+        if: inputs.npm_build_command != ''
+      - name: Create environment file
+        run: touch .env
+      - name: Setup dependencies
+        run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
+      - name: Sleep
+        uses: kibertoad/wait-action@1.0.1
+        with:
+          time: '30s'
+      - name: Run pre-test command
+        run: ${{ inputs.pre_test_command }}
+        if: inputs.npm_build_command != ''
+      - name: Run tests
+        run: npm run ${{ matrix.command }}

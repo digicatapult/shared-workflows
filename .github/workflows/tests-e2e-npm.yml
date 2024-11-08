@@ -1,0 +1,73 @@
+name: NPM E2E tests
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: '{}'
+      npm_build_command:
+        required: false
+        type: string
+        default: ''
+      pre_test_command:
+        required: false
+        type: string
+        default: ''
+      docker_compose_file:
+        required: false
+        type: string
+        default: docker-compose.yml
+      test_command:
+        required: false
+        type: string
+        default: 'docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull'
+permissions:
+  contents: write
+jobs:
+  e2e-tests:
+    name: Run e2e tests
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-flags: '--debug'
+      - name: Build e2e containers
+        uses: docker/bake-action@v5
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          files: ${{ inputs.docker_compose_file }}
+      - name: Build
+        run: ${{ inputs.npm_build_command }}
+        if: inputs.npm_build_command != ''
+      - name: Run pre-test command
+        run: ${{ inputs.pre_test_command }}
+        if: inputs.npm_build_command != ''
+      - name: Run e2e tests
+        run: ${{ inputs.test_command }}
+        if: ${{ github.event.repository.name != 'veritable-ui' }}
+      - name: Run e2e tests - veritable UI
+        run: ${{ inputs.test_command }}
+        env:
+          VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
+          VERITABLE_E2E_OUT_DIR: ${{ runner.temp }}
+        if: ${{ github.event.repository.name == 'veritable-ui' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: ${{ runner.temp }}/playwright-report/
+          retention-days: 90
+      - name: Publish CTRF Test Summary Results
+        run: npx github-actions-ctrf ${{ runner.temp }}/playwright-report/ctrf-report.json
+        if: always()
