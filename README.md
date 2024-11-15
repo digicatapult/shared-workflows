@@ -192,7 +192,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 | env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                                                            | false    |
 | npm_build_command   | string | Optional command to build the application before running tests                                                            | `''`                                                                                                            | false    |
 | pre_test_command    | string | Optional command to execute before running the main test command                                                          | `''`                                                                                                            | false    |
-| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `''`                                                                                                            | false    |
+| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml`                                                                                            | false    |
 | node_version        | string | The node version to use                                                                                                   | `'22.x'`                                                                                                        | false    |
 | test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull` | false    |
 
@@ -212,7 +212,6 @@ This GitHub Actions workflow is tailored for running end-to-end tests within a D
 8. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for comprehensive reporting.
 
 This workflow is designed to accommodate different testing needs, offering flexibility with custom commands and environment-specific configurations for robust E2E testing.
-When using testcontainers, simply omit providing a docker-compose file.
 
 ### [NPM Tests](.github/workflows/npm-tests.yml)
 
@@ -225,7 +224,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
 | npm_build_command   | string | Optional command to build the application before running tests                                                        | `''`                                | false    |
 | pre_test_command    | string | Optional command to execute before the main test command                                                              | `''`                                | false    |
-| docker_compose_file | string | The Docker Compose file to use for setting up dependencies                                                            | `''`                                | false    |
+| docker_compose_file | string | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
 | npm_version         | string | The node version to use                                                                                               | `'22.x'`                            | false    |
 | tests               | string | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
 
@@ -244,4 +243,4 @@ This GitHub Actions workflow runs a series of NPM test commands, with each test 
 9. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
 10. **Run Tests**: Executes each command from the `tests` matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
 
-This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, and Docker-based dependencies, making it adaptable for various test scenarios. When using testcontainers, simply omit providing a docker-compose file.
+This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, and Docker-based dependencies, making it adaptable for various test scenarios.
