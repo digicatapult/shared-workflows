@@ -5,23 +5,27 @@ on:
       env_vars:
         required: false
         type: string
-        default: '{}'
+        default: "{}"
       npm_build_command:
         required: false
         type: string
-        default: ''
+        default: ""
       pre_test_command:
         required: false
         type: string
-        default: ''
+        default: ""
       docker_compose_file:
         required: false
         type: string
         default: docker-compose.yml
+      node_version:
+        required: false
+        type: string
+        default: 22.x
       test_command:
         required: false
         type: string
-        default: 'docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull'
+        default: "docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull"
 permissions:
   contents: write
 jobs:
@@ -37,16 +41,21 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
         with:
-          buildkitd-flags: '--debug'
+          buildkitd-flags: "--debug"
+        if: inputs.docker_compose_file != ''
       - name: Build e2e containers
         uses: docker/bake-action@v5
         with:
           builder: ${{ steps.buildx.outputs.name }}
           files: ${{ inputs.docker_compose_file }}
+        if: inputs.docker_compose_file != ''
       - name: Build
         run: ${{ inputs.npm_build_command }}
         if: inputs.npm_build_command != ''
