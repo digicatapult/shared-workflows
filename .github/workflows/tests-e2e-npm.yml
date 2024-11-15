@@ -44,7 +44,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
-        if: inputs.docker_compose_file == ''
       - name: Setup Docker Buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
