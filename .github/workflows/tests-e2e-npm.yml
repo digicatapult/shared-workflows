@@ -17,7 +17,7 @@ on:
       docker_compose_file:
         required: false
         type: string
-        default: ""
+        default: docker-compose.yml
       node_version:
         required: false
         type: string
