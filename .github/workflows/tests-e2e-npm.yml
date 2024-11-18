@@ -82,5 +82,7 @@ jobs:
           path: ${{ inputs.output_dir }}/playwright-report/
           retention-days: 90
       - name: Publish CTRF Test Summary Results
-        run: npx github-actions-ctrf ${{ inputs.output_dir }}/playwright-report/ctrf-report.json
+        run: |
+          set -e
+          npx github-actions-ctrf ${{ inputs.output_dir }}/playwright-report/ctrf-report.json
         if: always()
