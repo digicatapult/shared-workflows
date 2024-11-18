@@ -83,5 +83,5 @@ jobs:
           retention-days: 90
           if-no-files-found: error
       - name: Publish CTRF Test Summary Results
-        run: npx github-actions-ctrf ./playwright-report/ctrf-report.json || exit 1
+        run: npx github-actions-ctrf ./playwright-report/ctrf-report.json
         if: always()
