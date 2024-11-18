@@ -195,6 +195,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 | docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml`                                                                                            | false    |
 | node_version        | string | The node version to use                                                                                                   | `'22.x'`                                                                                                        | false    |
 | test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull` | false    |
+| output_dir          | string | Provides the output dir to be used in artifact upload and publishing of ctrf test summary results                         | `.`                                                                                                             | false    |
 
 #### Workflow Description
 
