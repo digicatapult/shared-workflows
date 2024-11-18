@@ -67,6 +67,7 @@ jobs:
         uses: kibertoad/wait-action@1.0.1
         with:
           time: "30s"
+        if: inputs.docker_compose_file != ''
       - name: Run pre-test command
         run: ${{ inputs.pre_test_command }}
         if: inputs.pre_test_command != ''

@@ -47,14 +47,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
-          registry-url: ${{ github.event.inputs.registry_url }}
-          scope: ${{ github.event.inputs.registry_scope }}
+          registry-url: ${{ inputs.registry_url }}
+          scope: ${{ inputs.registry_scope }}
       - name: Install Packages
         run: npm ci
       - name: Build
         run: npm run build
         if: inputs.npm_build == true
       - name: Publish to npmjs packages
-        run: npm publish --access ${{ github.event.inputs.package_access }}
+        run: npm publish --access ${{   inputs.package_access }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.REGISTRY_AUTH_TOKEN }}
