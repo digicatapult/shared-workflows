@@ -25,7 +25,7 @@ on:
       test_command:
         required: false
         type: string
-        default: "docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull"
+        default: "npm run test:e2e"
 permissions:
   contents: write
 jobs:
@@ -61,7 +61,7 @@ jobs:
         if: inputs.npm_build_command != ''
       - name: Run pre-test command
         run: ${{ inputs.pre_test_command }}
-        if: inputs.npm_build_command != ''
+        if: inputs.pre_test_command != ''
       - name: Run e2e tests
         run: ${{ inputs.test_command }}
         if: ${{ github.event.repository.name != 'veritable-ui' }}
