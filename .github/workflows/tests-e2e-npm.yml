@@ -73,7 +73,6 @@ jobs:
         run: ${{ inputs.test_command }}
         env:
           VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
-          VERITABLE_E2E_OUT_DIR: ${{ runner.temp }}
         if: ${{ github.event.repository.name == 'veritable-ui' }}
       - uses: actions/upload-artifact@v4
         if: always()
