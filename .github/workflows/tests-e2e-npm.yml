@@ -26,10 +26,6 @@ on:
         required: false
         type: string
         default: "npm run test:e2e"
-      output_dir:
-        required: false
-        type: string
-        default: "."
 permissions:
   contents: write
 jobs:
@@ -82,5 +78,5 @@ jobs:
           retention-days: 90
           if-no-files-found: error
       - name: Publish CTRF Test Summary Results
-        run: npx github-actions-ctrf ./playwright-report/ctrf-report.json
+        run: '[ -f ./playwright-report/ctrf-report.json ] && npx github-actions-ctrf ./playwright-report/ctrf-report.json || (echo "CTRF report not found! Exiting with error." && exit 1)'
         if: always()
