@@ -8,6 +8,7 @@ on:
         default: '{}'
 permissions:
   contents: write
+  pull-requests: read
 jobs:
   release:
     name: 'Release'
