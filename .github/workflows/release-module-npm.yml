@@ -5,31 +5,37 @@ on:
       env_vars:
         required: false
         type: string
-        default: '{}'
+        default: "{}"
+      node_version:
+        required: false
+        type: string
+        default: 22.x
       registry_url:
         required: false
         type: string
-        default: 'https://registry.npmjs.org'
+        default: "https://registry.npmjs.org"
       registry_scope:
         required: false
         type: string
-        default: '@digicatapult'
-      npm_build:
+        default: "@digicatapult"
+      npm_build_command:
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: ""
       package_access:
         required: false
         type: string
-        default: 'public'
+        default: "public"
     secrets:
       REGISTRY_AUTH_TOKEN:
-        required: true
+        required: false
+        description: "Auth token for registry. Required if registry_url is not https://npm.pkg.github.com"
 permissions:
   contents: write
+  packages: write
 jobs:
   publish-npm:
-    name: 'Publish package to NPMJS'
+    name: "Publish package to ${{ inputs.registry_url }}"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,15 +52,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: ${{ inputs.node_version }}
           registry-url: ${{ inputs.registry_url }}
           scope: ${{ inputs.registry_scope }}
       - name: Install Packages
         run: npm ci
       - name: Build
-        run: npm run build
-        if: inputs.npm_build == true
-      - name: Publish to npmjs packages
+        run: ${{ inputs.npm_build_command }}
+        if: inputs.npm_build_command != ''
+      - name: Publish to ${{ inputs.registry_url }}
         run: npm publish --access ${{   inputs.package_access }}
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.REGISTRY_AUTH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ inputs.registry_url == 'https://npm.pkg.github.com' && secrets.GITHUB_TOKEN || secrets.REGISTRY_AUTH_TOKEN }}
