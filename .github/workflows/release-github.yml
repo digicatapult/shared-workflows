@@ -5,13 +5,13 @@ on:
       env_vars:
         required: false
         type: string
-        default: '{}'
+        default: "{}"
 permissions:
   contents: write
   pull-requests: read
 jobs:
   release:
-    name: 'Release'
+    name: "Release"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,16 +26,16 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build release version
-        uses: 'marvinpinto/action-automatic-releases@latest'
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          repo_token: '${{ secrets.GITHUB_TOKEN }}'
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: ${{ steps.get_version.outputs.version }}
           prerelease: false
-          title: Release ${{ steps.get-version.outputs.version }}
+          title: Release ${{ steps.get_version.outputs.version }}
       - name: Build release latest
-        uses: 'marvinpinto/action-automatic-releases@latest'
+        uses: "marvinpinto/action-automatic-releases@latest"
         with:
-          repo_token: '${{ secrets.GITHUB_TOKEN }}'
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: latest
           prerelease: false
-          title: Latest Release ${{ steps.get-version.outputs.version }}
+          title: Latest Release ${{ steps.get_version.outputs.version }}

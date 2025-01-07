@@ -5,7 +5,11 @@ on:
       env_vars:
         required: false
         type: string
-        default: '{}'
+        default: "{}"
+      node_version:
+        required: false
+        type: string
+        default: 22.x
       matrix_commands:
         required: false
         type: string
@@ -28,7 +32,7 @@ jobs:
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: ${{ inputs.node_version }}
       - name: Cache Node.js modules
         uses: actions/cache@v4
         with:
