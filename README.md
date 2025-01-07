@@ -131,19 +131,19 @@ Publishes an NPM package to the specified registry, optionally building the pack
 
 #### Inputs
 
-| Input          | Type    | Description                                                                                                                               | Default                      | Required |
-| -------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
-| env_vars       | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
-| registry_url   | string  | The NPM registry URL to which the package will be published                                                                               | `https://registry.npmjs.org` | false    |
-| registry_scope | string  | The NPM registry scope to use for the package                                                                                             | `@digicatapult`              | false    |
-| npm_build      | boolean | Whether to run a build step before publishing                                                                                             | `false`                      | false    |
-| package_access | string  | The access level for the published package (`public` or `restricted`)                                                                     | `public`                     | false    |
+| Input             | Type   | Description                                                                                                                               | Default                      | Required |
+| ----------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
+| env_vars          | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
+| registry_url      | string | The NPM registry URL to which the package will be published                                                                               | `https://registry.npmjs.org` | false    |
+| registry_scope    | string | The NPM registry scope to use for the package                                                                                             | `@digicatapult`              | false    |
+| npm_build_command | string | CLI command to run as a build step. Skipped if empty string                                                                               | `''`                         | false    |
+| package_access    | string | The access level for the published package (`public` or `restricted`)                                                                     | `public`                     | false    |
 
 #### Secrets
 
-| Secret              | Description                                                              |
-| ------------------- | ------------------------------------------------------------------------ |
-| REGISTRY_AUTH_TOKEN | Authentication token required to publish the package to the NPM registry |
+| Secret              | Description                                                                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| REGISTRY_AUTH_TOKEN | Authentication token required to publish the package to the NPM registry. Only needed if `registry_url` is not `https://npm.pkg.github.com` |
 
 #### Workflow Description
 
