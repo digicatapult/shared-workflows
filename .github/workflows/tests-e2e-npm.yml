@@ -70,6 +70,14 @@ jobs:
         env:
           VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
         if: ${{ github.event.repository.name == 'veritable-ui' }}
+      - name: Run e2e tests - dtdl-visualisation-tool
+        run: ${{ inputs.test_command }}
+        env:
+          GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
+          GH_TEST_USER: ${{ secrets.GH_TEST_USER }}
+          GH_TEST_PASSWORD: ${{ secrets.GH_TEST_PASSWORD }}
+        if: ${{ github.event.repository.name == 'dtdl-visualisation-tool' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
