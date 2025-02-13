@@ -77,6 +77,7 @@ jobs:
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
           GH_TEST_USER: ${{ secrets.GH_TEST_USER }}
           GH_TEST_PASSWORD: ${{ secrets.GH_TEST_PASSWORD }}
+          GH_TEST_2FA_SECRET: ${{ secrets.GH_TEST_2FA_SECRET }}
         if: ${{ github.event.repository.name == 'dtdl-visualisation-tool' }}
       - uses: actions/upload-artifact@v4
         if: always()
