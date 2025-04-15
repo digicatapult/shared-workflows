@@ -33,8 +33,8 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: Create GitHub release latest
         uses: softprops/action-gh-release@v2
         with:
@@ -42,5 +42,4 @@ jobs:
           name: Latest Release ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
