@@ -25,6 +25,33 @@ jobs:
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate release notes from PR body
+        id: release_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+
+          echo "## Changes" >> $GITHUB_OUTPUT
+
+          PR_NUMBER=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
+          echo "Fetching body for PR #$PR_NUMBER"
+
+          BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
+
+          echo "$BODY" | awk '
+            BEGIN { section = "" }
+
+            /^## Linked tickets/         { section = "### Linked Tickets"; print "\n" section; next }
+            /^## High level description/ { section = "### High Level Description"; print "\n" section; next }
+            /^## Detailed description/   { section = "### Detailed Description"; print "\n" section; next }
+
+            /^## / { section = ""; next }
+
+            { if (section != "") print $0 }
+          ' >> $GITHUB_OUTPUT
+
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v2
         with:
@@ -33,7 +60,7 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
-          generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update latest tag
         run: |
@@ -50,4 +77,5 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
