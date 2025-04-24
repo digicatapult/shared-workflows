@@ -37,7 +37,12 @@ jobs:
           PR_NUMBER=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
           echo "Fetching body for PR #$PR_NUMBER"
 
-          BODY=$(gh pr view "$PR_NUMBER" --json body --jq '.body')
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json title,url,body --jq '{title, url, body}')
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          BODY=$(echo "$PR_JSON" | jq -r '.body')
+
+          echo "**[$PR_TITLE]($PR_URL)**" >> $GITHUB_OUTPUT
 
           echo "$BODY" | awk '
             BEGIN { section = "" }
