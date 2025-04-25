@@ -116,12 +116,13 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Workflow Description
 
-This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `marvinpinto/action-automatic-releases` to create a versioned release and update the latest release tag. The process involves:
+This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. The process involves:
 
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
-3. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the previous step.
-4. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
+3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
+4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step.
+5. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 
