@@ -25,17 +25,62 @@ jobs:
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build release version
-        uses: "marvinpinto/action-automatic-releases@latest"
+      - name: Generate release notes from PR body
+        id: release_notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+
+          echo "## Changes" >> $GITHUB_OUTPUT
+
+          PR_NUMBER=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
+          echo "Fetching body for PR #$PR_NUMBER"
+
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json title,url,body --jq '{title, url, body}')
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
+          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
+          BODY=$(echo "$PR_JSON" | jq -r '.body')
+
+          echo "**[$PR_TITLE]($PR_URL)**" >> $GITHUB_OUTPUT
+
+          echo "$BODY" | awk '
+            BEGIN { section = "" }
+
+            /^## Linked tickets/         { section = "### Linked Tickets"; print "\n" section; next }
+            /^## High level description/ { section = "### High Level Description"; print "\n" section; next }
+            /^## Detailed description/   { section = "### Detailed Description"; print "\n" section; next }
+
+            /^## / { section = ""; next }
+
+            { if (section != "") print $0 }
+          ' >> $GITHUB_OUTPUT
+
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Create GitHub release version
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: ${{ steps.get_version.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Release ${{ steps.get_version.outputs.version }}
+          draft: false
           prerelease: false
-          title: Release ${{ steps.get_version.outputs.version }}
-      - name: Build release latest
-        uses: "marvinpinto/action-automatic-releases@latest"
+          make_latest: true
+          body: ${{ steps.release_notes.outputs.body }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update latest tag
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git fetch --tags
+          git tag -f latest
+          git push origin -f latest
+      - name: Create GitHub release latest
+        uses: softprops/action-gh-release@v2
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: latest
+          tag_name: latest
+          name: Latest Release ${{ steps.get_version.outputs.version }}
+          draft: false
           prerelease: false
-          title: Latest Release ${{ steps.get_version.outputs.version }}
+          generate_release_notes: true
+          body: ${{ steps.release_notes.outputs.body }}
+          token: ${{ secrets.GITHUB_TOKEN }}
