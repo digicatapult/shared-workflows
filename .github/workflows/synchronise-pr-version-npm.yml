@@ -102,7 +102,7 @@ jobs:
         with:
           app-id: ${{ secrets.bot-id }}
           private-key: ${{ secrets.bot-key }}
-      - uses: planetscale/ghcommit-action@v0.2.14
+      - uses: planetscale/ghcommit-action@v0.2.15
         with:
           commit_message: "Updating version to ${{ steps.update.outputs.new_version }}"
           repo: ${{ github.repository }}
