@@ -73,6 +73,7 @@ jobs:
       - name: Run e2e tests - dtdl-visualisation-tool
         run: ${{ inputs.test_command }}
         env:
+          GH_APP_NAME: ${{ secrets.GH_APP_NAME }}
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
           GH_TEST_USER: ${{ secrets.GH_TEST_USER }}
