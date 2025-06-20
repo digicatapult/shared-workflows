@@ -67,8 +67,6 @@ jobs:
         if: ${{ !(github.event.repository.name == 'veritable-ui' || github.event.repository.name == 'dtdl-visualisation-tool') }}
       - name: Run e2e tests - veritable UI
         run: ${{ inputs.test_command }}
-        env:
-          VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
         if: ${{ github.event.repository.name == 'veritable-ui' }}
       - name: Run e2e tests - dtdl-visualisation-tool
         run: ${{ inputs.test_command }}
