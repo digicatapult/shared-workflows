@@ -77,6 +77,9 @@ jobs:
           GH_TEST_USER: ${{ secrets.GH_TEST_USER }}
           GH_TEST_PASSWORD: ${{ secrets.GH_TEST_PASSWORD }}
           GH_TEST_2FA_SECRET: ${{ secrets.GH_TEST_2FA_SECRET }}
+          GH_TEST_USER_2: ${{ secrets.GH_TEST_USER_2 }}
+          GH_TEST_PASSWORD_2: ${{ secrets.GH_TEST_PASSWORD_2 }}
+          GH_TEST_2FA_SECRET_2: ${{ secrets.GH_TEST_2FA_SECRET_2 }}
         if: ${{ github.event.repository.name == 'dtdl-visualisation-tool' }}
       - uses: actions/upload-artifact@v4
         if: always()
