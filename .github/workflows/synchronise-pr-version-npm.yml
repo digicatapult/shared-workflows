@@ -29,7 +29,7 @@ jobs:
       TRUNK_BRANCH: ${{ inputs.trunk-branch }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.trunk-branch }}
       - name: Retrieve PR details
@@ -48,7 +48,7 @@ jobs:
           echo "Version on `$TRUNK_BRANCH`: $TRUNK_VERSION"
           echo "trunk_version=$TRUNK_VERSION" >> $GITHUB_OUTPUT
       - name: Checkout PR
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ steps.pr-details.outputs.pr_branch }}
