@@ -24,7 +24,7 @@ jobs:
       TRUNK_BRANCH: ${{ inputs.trunk-branch }}
     steps:
       - name: Checkout ${{ inputs.trunk-branch }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.trunk-branch }}
       - name: find pull requests
