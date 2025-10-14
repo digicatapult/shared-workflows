@@ -30,7 +30,7 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
       - name: Cache Node.js modules
