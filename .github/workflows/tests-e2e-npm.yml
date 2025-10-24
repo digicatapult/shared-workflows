@@ -81,7 +81,7 @@ jobs:
           GH_TEST_PASSWORD_2: ${{ secrets.GH_TEST_PASSWORD_2 }}
           GH_TEST_2FA_SECRET_2: ${{ secrets.GH_TEST_2FA_SECRET_2 }}
         if: ${{ github.event.repository.name == 'dtdl-visualisation-tool' }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report
