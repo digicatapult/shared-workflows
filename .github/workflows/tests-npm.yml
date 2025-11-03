@@ -81,10 +81,14 @@ jobs:
         if: inputs.pre_test_command != ''
       - name: Run tests
         run: npm run ${{ matrix.command }}
+      - name: Set artifact name
+        id: artifact-name
+        run: echo "name=coverage-$(echo '${{ matrix.command }}' | tr -d '\":;<>|*?\r\n\\/' | tr ' ' '-')" >> $GITHUB_OUTPUT
+        if: inputs.coverage
       - name: Upload coverage JSON summary
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.command }}
+          name: ${{ steps.artifact-name.outputs.name }}
           path: ${{ inputs.coverage_path }}
         if: inputs.coverage
 
