@@ -111,19 +111,25 @@ jobs:
           merge-multiple: true
 
       - name: Check for coverage files
+        id: check-coverage
         run: |
-          if [ -z "$(ls -A coverage/tmp)" ]; then
+          if [ ! -d "coverage/tmp" ] || [ -z "$(ls -A coverage/tmp)" ]; then
             echo "No coverage files found" >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "has_coverage=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_coverage=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate text report
+        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
         run: npx c8 report --reporter=text >> $GITHUB_STEP_SUMMARY
 
       - name: Generate html report
+        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
         run: npx c8 report --reporter=html
 
       - name: Upload html report
+        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage
@@ -132,4 +138,5 @@ jobs:
             !coverage/tmp/**
 
       - name: Fail if under thresholds
+        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
         run: npx c8 check-coverage
