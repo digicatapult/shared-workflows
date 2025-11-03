@@ -107,7 +107,15 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: coverage/tmp
+          pattern: coverage-*
           merge-multiple: true
+
+      - name: Check for coverage files
+        run: |
+          if [ -z "$(ls -A coverage/tmp)" ]; then
+            echo "No coverage files found" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
 
       - name: Generate text report
         run: npx c8 report --reporter=text >> $GITHUB_STEP_SUMMARY
