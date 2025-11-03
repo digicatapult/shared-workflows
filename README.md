@@ -216,22 +216,24 @@ This workflow is designed to accommodate different testing needs, offering flexi
 
 ### [NPM Tests](.github/workflows/npm-tests.yml)
 
-Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup.
+Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup. Optionally collects and reports code coverage.
 
 #### Inputs
 
-| Input               | Type   | Description                                                                                                           | Default                             | Required |
-| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
-| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
-| npm_build_command   | string | Optional command to build the application before running tests                                                        | `''`                                | false    |
-| pre_test_command    | string | Optional command to execute before the main test command                                                              | `''`                                | false    |
-| docker_compose_file | string | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
-| npm_version         | string | The node version to use                                                                                               | `'22.x'`                            | false    |
-| tests               | string | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
+| Input               | Type    | Description                                                                                                           | Default                             | Required |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
+| npm_build_command   | string  | Optional command to build the application before running tests                                                        | `''`                                | false    |
+| pre_test_command    | string  | Optional command to execute before the main test command                                                              | `''`                                | false    |
+| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
+| npm_version         | string  | The node version to use                                                                                               | `'22.x'`                            | false    |
+| tests               | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
+| coverage            | boolean | Whether to collect and report code coverage                                                                           | `false`                             | false    |
+| coverage_path       | string  | Path where coverage JSON summaries are stored                                                                         | `coverage/tmp`                      | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs a series of NPM test commands, with each test command running as a separate job in parallel using a matrix strategy.
+This GitHub Actions workflow runs a series of NPM test commands, with each test command running as a separate job in parallel using a matrix strategy. When coverage is enabled, it collects coverage data from all test jobs and logs a full report.
 
 1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
 2. **Node Setup**: Installs the specified Node.js version.
@@ -243,5 +245,7 @@ This GitHub Actions workflow runs a series of NPM test commands, with each test 
 8. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
 9. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
 10. **Run Tests**: Executes each command from the `tests` matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
+11. **Upload Coverage (Optional)**: If `coverage` is enabled, uploads coverage JSON summaries from each test job.
+12. **Coverage Report (Optional)**: If `coverage` is enabled, a separate job downloads all coverage summaries, generates text and HTML reports using c8, uploads the HTML report as an artifact, and fails if coverage is below configured thresholds.
 
-This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, and Docker-based dependencies, making it adaptable for various test scenarios.
+This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, Docker-based dependencies, and optional code coverage reporting, making it adaptable for various test scenarios.

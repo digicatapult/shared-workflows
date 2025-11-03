@@ -26,6 +26,14 @@ on:
         required: false
         type: string
         default: '["test:unit", "test:integration"]'
+      coverage:
+        required: false
+        type: boolean
+        default: false
+      coverage_path:
+        required: false
+        type: string
+        default: coverage/tmp
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
@@ -73,3 +81,40 @@ jobs:
         if: inputs.pre_test_command != ''
       - name: Run tests
         run: npm run ${{ matrix.command }}
+      - name: Upload coverage JSON summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.command }}
+          path: ${{ inputs.coverage_path }}
+        if: inputs.coverage
+
+  coverage-report:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: inputs.coverage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Download all coverage summaries
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage/tmp
+          merge-multiple: true
+
+      - name: Generate text report
+        run: npx c8 report --reporter=text >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate html report
+        run: npx c8 report --reporter=html
+
+      - name: Upload html report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+
+      - name: Fail if under thresholds
+        run: npx c8 check-coverage
