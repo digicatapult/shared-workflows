@@ -83,7 +83,7 @@ jobs:
         run: npm run ${{ matrix.command }}
       - name: Set artifact name
         id: artifact-name
-        run: echo "name=coverage-$(echo '${{ matrix.command }}' | tr -d '\":;<>|*?\r\n\\/' | tr ' ' '-')" >> $GITHUB_OUTPUT
+        run: echo "name=coverage-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
         if: inputs.coverage
       - name: Upload coverage JSON summary
         uses: actions/upload-artifact@v4
