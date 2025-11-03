@@ -118,7 +118,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage
-          path: coverage
+          path: |
+            coverage/**
+            !coverage/tmp/**
 
       - name: Fail if under thresholds
         run: npx c8 check-coverage
