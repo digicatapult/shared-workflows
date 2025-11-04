@@ -47,4 +47,11 @@ jobs:
         run: npm run ${{ matrix.command }}
   scan-secrets:
     needs: static-checks
-    uses: ./.github/workflows/scan-secrets.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Secrets scanning
+        run: |
+          curl -X POST https://api.github.com/repos/digicatapult/shared-workflows/dispatches \
+            -d '{"event_type": "secrets"}' \
+            -H "Authorization: token $GITHUB_TOKEN"
