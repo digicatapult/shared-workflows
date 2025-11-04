@@ -84,3 +84,6 @@ jobs:
           generate_release_notes: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+  scan-secrets:
+    needs: release
+    uses: ./.github/workflows/scan-secrets.yml

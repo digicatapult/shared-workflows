@@ -206,3 +206,6 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: false
+  scan-secrets:
+    needs: build-docker
+    uses: ./.github/workflows/scan-secrets.yml

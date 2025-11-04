@@ -45,3 +45,6 @@ jobs:
         run: npm ci
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
+  scan-secrets:
+    needs: static-checks
+    uses: ./.github/workflows/scan-secrets.yml
