@@ -66,10 +66,10 @@ jobs:
       - name: Setup c8 config
         run: |
           if [ -n "${{ inputs.coverage_config }}" ]; then
-            echo "Using custom config: ${{ inputs.coverage_config }}"
+            echo "Copying repo config '${{ inputs.coverage_config }}' to .c8rc.workflow.json"
             cp ${{ inputs.coverage_config }} .c8rc.workflow.json
           else
-            echo "Using default workflow config"
+            echo "Using default .c8rc.workflow.json"
             cat > .c8rc.workflow.json << 'EOF'
           {
             "temp-directory": "coverage/tmp",
@@ -136,10 +136,10 @@ jobs:
       - name: Setup c8 config
         run: |
           if [ -n "${{ inputs.coverage_config }}" ]; then
-            echo "Using custom config: ${{ inputs.coverage_config }}"
+            echo "Copying repo config '${{ inputs.coverage_config }}' to .c8rc.workflow.json"
             cp ${{ inputs.coverage_config }} .c8rc.workflow.json
           else
-            echo "Using default workflow config"
+            echo "Using default .c8rc.workflow.json"
             echo '{"temp-directory":"coverage/tmp","reporter":["text","html"],"lines":50,"branches":0,"functions":0,"statements":0}' > .c8rc.workflow.json
           fi
 
