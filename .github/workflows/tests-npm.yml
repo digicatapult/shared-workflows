@@ -121,8 +121,6 @@ jobs:
             echo "Using default .c8rc.workflow.json"
             cat > .c8rc.workflow.json << 'EOF'
           {
-            "temp-directory": "coverage/tmp",
-            "reporter": ["text", "html"],
             "lines": 50,
             "branches": 0,
             "functions": 0,
@@ -160,13 +158,14 @@ jobs:
             echo "has_coverage=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Generate text report
+      - name: Generate reports
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
-        run: npx c8 --config .c8rc.workflow.json report --reporter=text >> $GITHUB_STEP_SUMMARY
-
-      - name: Generate html report
+        run: npx c8 --config .c8rc.workflow.json report --reporter=html --reporter=json-summary --reporter=json
+      - name: Pretty coverage summary
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
-        run: npx c8 --config .c8rc.workflow.json report --reporter=html
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          comment-on: commit
 
       - name: Upload html report
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
