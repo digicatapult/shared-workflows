@@ -29,11 +29,31 @@ on:
       coverage:
         required: false
         type: boolean
-        default: false
+        default: true
       coverage_path:
         required: false
         type: string
         default: coverage/tmp
+      coverage_config:
+        required: false
+        type: string
+        default: .c8rc.json
+      coverage_lines:
+        required: false
+        type: number
+        default: 50
+      coverage_branches:
+        required: false
+        type: number
+        default: 0
+      coverage_functions:
+        required: false
+        type: number
+        default: 0
+      coverage_statements:
+        required: false
+        type: number
+        default: 0
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
@@ -80,7 +100,7 @@ jobs:
         run: ${{ inputs.pre_test_command }}
         if: inputs.pre_test_command != ''
       - name: Run tests
-        run: npm run ${{ matrix.command }}
+        run: npx c8 npm run ${{ matrix.command }}
       - name: Set artifact name
         id: artifact-name
         run: echo "name=coverage-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
@@ -121,15 +141,15 @@ jobs:
           fi
 
       - name: Generate text report
-        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
+        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: npx c8 report --reporter=text >> $GITHUB_STEP_SUMMARY
 
       - name: Generate html report
-        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
+        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: npx c8 report --reporter=html
 
       - name: Upload html report
-        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
+        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage
@@ -138,5 +158,12 @@ jobs:
             !coverage/tmp/**
 
       - name: Fail if under thresholds
-        if: ${{ steps.check-coverage.outputs.has_coverage == true }}
-        run: npx c8 check-coverage
+        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
+        run: |
+          if [ -f ${{ inputs.coverage_config }} ]; then
+            echo "Using repo config"
+            npx c8 check-coverage
+          else
+            echo "Using workflow thresholds"
+            npx c8 check-coverage --lines ${{ inputs.coverage_lines }} --branches ${{ inputs.coverage_branches }} --functions ${{ inputs.coverage_functions }} --statements ${{ inputs.coverage_statements }}
+          fi
