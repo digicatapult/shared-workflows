@@ -178,8 +178,7 @@ jobs:
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: |
           if [ -d "coverage-main/tmp" ] && [ -n "$(ls -A coverage-main/tmp)" ]; then
-            npx c8 --temp-directory coverage-main/tmp --config .c8rc.workflow.json report --reporter=json-summary
-            mv coverage/coverage-summary.json coverage-main/coverage-summary.json
+            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary
           fi
 
       - name: Pretty coverage summary
