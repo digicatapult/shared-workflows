@@ -206,13 +206,3 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: false
-  scan-secrets:
-    needs: build-docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Secrets scanning
-        run: |
-          curl -X POST https://api.github.com/repos/digicatapult/shared-workflows/dispatches \
-            -d '{"event_type": "secrets"}' \
-            -H "Authorization: token $GITHUB_TOKEN"

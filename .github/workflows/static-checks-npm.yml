@@ -45,13 +45,11 @@ jobs:
         run: npm ci
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
-  scan-secrets:
-    needs: static-checks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - name: Secrets scanning
-        run: |
-          curl -X POST https://api.github.com/repos/digicatapult/shared-workflows/dispatches \
-            -d '{"event_type": "secrets"}' \
-            -H "Authorization: token $GITHUB_TOKEN"
+      - name: TruffleHog PR scan
+        uses: trufflesecurity/trufflehog@v3.90.12
+        if: ${{ always() }}
+        with:
+          base: ""
+          head: ${{ github.ref_name }}
+          extra_args: --results=verified,unknown
+        continue-on-error: true
