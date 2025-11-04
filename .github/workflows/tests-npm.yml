@@ -30,30 +30,10 @@ on:
         required: false
         type: boolean
         default: true
-      coverage_path:
-        required: false
-        type: string
-        default: coverage/tmp
       coverage_config:
         required: false
         type: string
-        default: .c8rc.json
-      coverage_lines:
-        required: false
-        type: number
-        default: 50
-      coverage_branches:
-        required: false
-        type: number
-        default: 0
-      coverage_functions:
-        required: false
-        type: number
-        default: 0
-      coverage_statements:
-        required: false
-        type: number
-        default: 0
+        default: ""
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }}
@@ -83,6 +63,36 @@ jobs:
             ${{ runner.OS }}-
       - name: Install Packages
         run: npm ci
+      - name: Setup c8 config
+        run: |
+          if [ -n "${{ inputs.coverage_config }}" ]; then
+            echo "Using custom config: ${{ inputs.coverage_config }}"
+            cp ${{ inputs.coverage_config }} .c8rc.workflow.json
+          else
+            echo "Using default workflow config"
+            cat > .c8rc.workflow.json << 'EOF'
+          {
+            "temp-directory": "coverage/tmp",
+            "exclude": [
+              "coverage/**",
+              "packages/*/test{,s}/**",
+              "**/*.d.ts",
+              "test{,s}/**",
+              "test{,-*}.js",
+              "**/*{.,-}test.js",
+              "**/__tests__/**",
+              "**/node_modules/**",
+              "**/babel.config.js",
+              "**/*.tsx"
+            ]
+          }
+          EOF
+          fi
+        if: inputs.coverage
+      - name: Get coverage temp directory
+        id: coverage-dir
+        run: echo "path=$(node -pe "require('./.c8rc.workflow.json')['temp-directory'] || 'coverage/tmp'")" >> $GITHUB_OUTPUT
+        if: inputs.coverage
       - name: Build
         run: ${{ inputs.npm_build_command }}
         if: inputs.npm_build_command != ''
@@ -100,7 +110,7 @@ jobs:
         run: ${{ inputs.pre_test_command }}
         if: inputs.pre_test_command != ''
       - name: Run tests
-        run: npx c8 npm run ${{ matrix.command }}
+        run: npx c8 --config .c8rc.workflow.json npm run ${{ matrix.command }}
       - name: Set artifact name
         id: artifact-name
         run: echo "name=coverage-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
@@ -109,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.artifact-name.outputs.name }}
-          path: ${{ inputs.coverage_path }}
+          path: ${{ steps.coverage-dir.outputs.path }}
         if: inputs.coverage
 
   coverage:
@@ -122,6 +132,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ inputs.node_version }}
+
+      - name: Setup c8 config
+        run: |
+          if [ -n "${{ inputs.coverage_config }}" ]; then
+            echo "Using custom config: ${{ inputs.coverage_config }}"
+            cp ${{ inputs.coverage_config }} .c8rc.workflow.json
+          else
+            echo "Using default workflow config"
+            echo '{"temp-directory":"coverage/tmp","reporter":["text","html"],"lines":50,"branches":0,"functions":0,"statements":0}' > .c8rc.workflow.json
+          fi
 
       - name: Download all coverage summaries
         uses: actions/download-artifact@v4
@@ -142,11 +162,11 @@ jobs:
 
       - name: Generate text report
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
-        run: npx c8 report --reporter=text >> $GITHUB_STEP_SUMMARY
+        run: npx c8 --config .c8rc.workflow.json report --reporter=text >> $GITHUB_STEP_SUMMARY
 
       - name: Generate html report
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
-        run: npx c8 report --reporter=html
+        run: npx c8 --config .c8rc.workflow.json report --reporter=html
 
       - name: Upload html report
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
@@ -159,11 +179,4 @@ jobs:
 
       - name: Fail if under thresholds
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
-        run: |
-          if [ -f ${{ inputs.coverage_config }} ]; then
-            echo "Using repo config"
-            npx c8 check-coverage
-          else
-            echo "Using workflow thresholds"
-            npx c8 check-coverage --lines ${{ inputs.coverage_lines }} --branches ${{ inputs.coverage_branches }} --functions ${{ inputs.coverage_functions }} --statements ${{ inputs.coverage_statements }}
-          fi
+        run: npx c8 --config .c8rc.workflow.json check-coverage
