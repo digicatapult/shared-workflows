@@ -187,12 +187,14 @@ jobs:
         with:
           file-coverage-mode: all
           json-summary-compare-path: coverage-main/coverage-summary.json
+          vite-config-path: ""
+          comment-on: none
 
       - name: Upload html report
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: coverage
+          name: coverage-full-html-report
           path: |
             coverage/**
             !coverage/tmp/**
