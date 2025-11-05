@@ -181,6 +181,8 @@ jobs:
             npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary
           fi
 
+      - name: Create minimal vite config to silence action warning
+        run: echo "export default {}" > vite.config.js
       - name: Pretty coverage summary
         if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         uses: davelosert/vitest-coverage-report-action@v2
