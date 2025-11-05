@@ -34,14 +34,14 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
       - name: Setup Docker Buildx
@@ -67,19 +67,21 @@ jobs:
         if: ${{ !(github.event.repository.name == 'veritable-ui' || github.event.repository.name == 'dtdl-visualisation-tool') }}
       - name: Run e2e tests - veritable UI
         run: ${{ inputs.test_command }}
-        env:
-          VERITABLE_COMPANY_PROFILE_API_KEY: ${{ secrets.COMPANIES_HOUSE_API }}
         if: ${{ github.event.repository.name == 'veritable-ui' }}
       - name: Run e2e tests - dtdl-visualisation-tool
         run: ${{ inputs.test_command }}
         env:
+          GH_APP_NAME: ${{ secrets.GH_APP_NAME }}
           GH_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
           GH_CLIENT_SECRET: ${{ secrets.GH_CLIENT_SECRET }}
           GH_TEST_USER: ${{ secrets.GH_TEST_USER }}
           GH_TEST_PASSWORD: ${{ secrets.GH_TEST_PASSWORD }}
           GH_TEST_2FA_SECRET: ${{ secrets.GH_TEST_2FA_SECRET }}
+          GH_TEST_USER_2: ${{ secrets.GH_TEST_USER_2 }}
+          GH_TEST_PASSWORD_2: ${{ secrets.GH_TEST_PASSWORD_2 }}
+          GH_TEST_2FA_SECRET_2: ${{ secrets.GH_TEST_2FA_SECRET_2 }}
         if: ${{ github.event.repository.name == 'dtdl-visualisation-tool' }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: playwright-report

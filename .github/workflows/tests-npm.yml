@@ -34,6 +34,8 @@ on:
         required: false
         type: string
         default: ""
+permissions:
+  pull-requests: write
 jobs:
   tests:
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
@@ -46,7 +48,7 @@ jobs:
           - main
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ matrix.branch }}
       - name: Set environment variables from JSON
@@ -55,7 +57,7 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
       - name: Cache Node.js modules
