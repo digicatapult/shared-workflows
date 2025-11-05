@@ -45,6 +45,11 @@ jobs:
         run: npm ci
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
+  scan-secrets:
+    name: Secrets scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
       - name: TruffleHog PR scan
         uses: trufflesecurity/trufflehog@v3.90.12
         if: ${{ always() }}
