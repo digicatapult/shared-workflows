@@ -190,10 +190,10 @@ jobs:
           file-coverage-mode: all
           json-summary-compare-path: coverage-main/coverage-summary.json
 
-      - name: Upload html report
+      - name: Upload reports for current branch
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-all-html-report
+          name: coverage-current-all
           path: |
             coverage/**
             !coverage/tmp/**

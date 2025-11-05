@@ -258,7 +258,7 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 4. **Generate Main Branch Reports**: Creates JSON summary and JSON reports for the main branch coverage in a separate directory.
 5. **Setup Vite Config**: Checks for an existing vite/vitest config file, creating a minimal one if none exists to prevent warnings from the coverage report action.
 6. **Pretty Coverage Summary**: Uses `davelosert/vitest-coverage-report-action` to generate a formatted coverage report with trend indicators comparing current branch to main.
-7. **Upload HTML Report**: Saves the comprehensive HTML coverage report as an artifact.
+7. **Upload Reports for Current Branch**: Saves current branch coverage reports as an artifact.
 8. **Fail if Under Thresholds**: Runs c8's threshold check, failing the workflow if coverage is below configured thresholds.
 
 This workflow provides a comprehensive testing and coverage solution with branch comparison, custom build commands, Docker-based dependencies, and detailed coverage reporting including trend analysis.
