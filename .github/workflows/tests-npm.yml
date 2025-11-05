@@ -93,8 +93,12 @@ jobs:
       - name: Run pre-test command
         run: ${{ inputs.pre_test_command }}
         if: inputs.pre_test_command != ''
-      - name: Run tests
+      - name: Run tests with coverage
         run: npx c8 npm run ${{ matrix.command }}
+        if: inputs.coverage
+      - name: Run tests without coverage
+        run: npm run ${{ matrix.command }}
+        if: ${{ !inputs.coverage }}
       - name: Set artifact name
         id: artifact-name
         run: echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
