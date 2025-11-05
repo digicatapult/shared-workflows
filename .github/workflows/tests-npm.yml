@@ -160,40 +160,31 @@ jobs:
           pattern: coverage-main-*
           merge-multiple: true
 
-      - name: Check for coverage files
-        id: check-coverage
-        run: |
-          if [ ! -d "coverage/tmp" ] || [ -z "$(ls -A coverage/tmp)" ]; then
-            echo "No coverage files found" >> $GITHUB_STEP_SUMMARY
-            echo "has_coverage=false" >> $GITHUB_OUTPUT
-          else
-            echo "has_coverage=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Generate reports
-        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: npx c8 --config .c8rc.workflow.json report --reporter=html --reporter=json-summary --reporter=json
 
       - name: Generate main branch reports
-        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: |
           if [ -d "coverage-main/tmp" ] && [ -n "$(ls -A coverage-main/tmp)" ]; then
-            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary
+            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary --reporter=json
           fi
 
-      - name: Create minimal vite config to silence action warning
-        run: echo "export default {}" > vite.config.js
-      - name: Pretty coverage summary
-        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
+      - name: Setup vite config if none exists
+        run: |
+          if ! compgen -G "{vite,vitest}.config.{ts,mts,cts,js,mjs,cjs}" > /dev/null; then
+            echo "No vite config found, creating minimal vite.config.js"
+            echo "export default {}" > vite.config.js
+          else
+            echo "Vite config found"
+          fi
 
+      - name: Pretty coverage summary
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           file-coverage-mode: all
           json-summary-compare-path: coverage-main/coverage-summary.json
-          vite-config-path: ""
 
       - name: Upload html report
-        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-all-html-report
@@ -202,5 +193,4 @@ jobs:
             !coverage/tmp/**
 
       - name: Fail if under thresholds
-        if: ${{ steps.check-coverage.outputs.has_coverage == 'true' }}
         run: npx c8 --config .c8rc.workflow.json check-coverage
