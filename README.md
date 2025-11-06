@@ -283,6 +283,6 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 This GitHub Actions workflow runs TruffleHog scans.
 
 1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
-2. **TruffleHog PR scan**: Execute the TruffleHog scan of the P, checking for verified and unverified secrets.
+2. **TruffleHog PR Scan**: Execute the TruffleHog scan of the P, checking for verified and unverified secrets.
 
 This workflow can be complemented with the complete list of TruffleHog arguments, found in that project's [repository](https://github.com/trufflesecurity/trufflehog/?tab=readme-ov-file#memo-usage).
