@@ -37,15 +37,41 @@ on:
 permissions:
   pull-requests: write
 jobs:
+  setup:
+    name: Setup branch matrix
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set-branches.outputs.branches }}
+      is-main: ${{ steps.check-branch.outputs.is-main }}
+    steps:
+      - name: Check if running on main
+        id: check-branch
+        run: |
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "$CURRENT_BRANCH" = "main" ]; then
+            echo "is-main=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-main=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set branch matrix
+        id: set-branches
+        run: |
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "$CURRENT_BRANCH" = "main" ]; then
+            echo 'branches=["main"]' >> $GITHUB_OUTPUT
+          else
+            echo "branches=[\"$CURRENT_BRANCH\", \"main\"]" >> $GITHUB_OUTPUT
+          fi
+
   tests:
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
+    needs: setup
     strategy:
       fail-fast: false
       matrix:
         command: ${{ fromJson(inputs.tests) }}
-        branch:
-          - ${{ github.head_ref || github.ref_name }}
-          - main
+        branch: ${{ fromJson(needs.setup.outputs.branches) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -115,7 +141,7 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: tests
+    needs: [tests, setup]
     if: inputs.coverage
     steps:
       - uses: actions/checkout@v5
@@ -165,11 +191,13 @@ jobs:
           path: coverage-main/tmp
           pattern: coverage-main-*
           merge-multiple: true
+        if: needs.setup.outputs.is-main == 'false'
 
       - name: Generate reports
         run: npx c8 --config .c8rc.workflow.json report --reporter=html --reporter=json-summary --reporter=json
 
       - name: Generate main branch reports
+        if: needs.setup.outputs.is-main == 'false'
         run: |
           if [ -d "coverage-main/tmp" ] && [ -n "$(ls -A coverage-main/tmp)" ]; then
             npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary --reporter=json
@@ -188,7 +216,7 @@ jobs:
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           file-coverage-mode: all
-          json-summary-compare-path: coverage-main/coverage-summary.json
+          json-summary-compare-path: ${{ needs.setup.outputs.is-main == 'false' && 'coverage-main/coverage-summary.json' || '' }}
 
       - name: Upload reports for current branch
         uses: actions/upload-artifact@v5
