@@ -74,7 +74,13 @@ jobs:
         id: coverage-dir
         run: |
           if [ -n "${{ inputs.coverage_config }}" ] && [ -f "${{ inputs.coverage_config }}" ]; then
-            echo "path=$(node -pe "require('${{ inputs.coverage_config }}')['temp-directory'] || 'coverage/tmp'")" >> $GITHUB_OUTPUT
+            if [[ "${{ inputs.coverage_config }}" == *.json ]]; then
+              path=$(jq -r '."temp-directory" // "coverage/tmp"' "${{ inputs.coverage_config }}")
+            else
+              CONFIG_PATH="$(realpath "${{ inputs.coverage_config }}")"
+              path=$(node -e "const c = require('$CONFIG_PATH'); const config = c.default || c; console.log(config['temp-directory'] || 'coverage/tmp')")
+            fi
+            echo "path=$path" >> $GITHUB_OUTPUT
           else
             echo "path=coverage/tmp" >> $GITHUB_OUTPUT
           fi
