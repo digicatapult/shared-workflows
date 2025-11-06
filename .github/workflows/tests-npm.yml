@@ -130,12 +130,13 @@ jobs:
           node-version: ${{ inputs.node_version }}
 
       - name: Setup c8 config
+        id: c8-config
         run: |
-          if [ -n "${{ inputs.coverage_config }}" ]; then
-            echo "Copying repo config '${{ inputs.coverage_config }}' to .c8rc.workflow.json"
-            cp ${{ inputs.coverage_config }} .c8rc.workflow.json
+          if [ -n "${{ inputs.coverage_config }}" ] && [ -f "${{ inputs.coverage_config }}" ]; then
+            echo "Using repo config '${{ inputs.coverage_config }}'"
+            echo "path=${{ inputs.coverage_config }}" >> $GITHUB_OUTPUT
           else
-            echo "Using default .c8rc.workflow.json"
+            echo "Using default workflow config"
             cat > .c8rc.workflow.json << 'EOF'
           {
             "lines": 50,
@@ -156,6 +157,7 @@ jobs:
             ]
           }
           EOF
+            echo "path=.c8rc.workflow.json" >> $GITHUB_OUTPUT
           fi
 
       - name: Download current branch coverage summaries
@@ -173,12 +175,12 @@ jobs:
           merge-multiple: true
 
       - name: Generate reports
-        run: npx c8 --config .c8rc.workflow.json report --reporter=html --reporter=json-summary --reporter=json
+        run: npx c8 --config ${{ steps.c8-config.outputs.path }} report --reporter=html --reporter=json-summary --reporter=json
 
       - name: Generate main branch reports
         run: |
           if [ -d "coverage-main/tmp" ] && [ -n "$(ls -A coverage-main/tmp)" ]; then
-            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary --reporter=json
+            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config ${{ steps.c8-config.outputs.path }} report --reporter=json-summary --reporter=json
           fi
 
       - name: Setup vite config if none exists
@@ -205,4 +207,4 @@ jobs:
             !coverage/tmp/**
 
       - name: Fail if under thresholds
-        run: npx c8 --config .c8rc.workflow.json check-coverage
+        run: npx c8 --config ${{ steps.c8-config.outputs.path }} check-coverage
