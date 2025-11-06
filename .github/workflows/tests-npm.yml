@@ -129,7 +129,13 @@ jobs:
         if: ${{ !inputs.coverage }}
       - name: Set artifact name
         id: artifact-name
-        run: echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
+        run: |
+          COMMAND_SAFE=$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')
+          if [ "${{ needs.setup.outputs.is-main }}" = "true" ]; then
+            echo "name=coverage-current-$COMMAND_SAFE" >> $GITHUB_OUTPUT
+          else
+            echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$COMMAND_SAFE" >> $GITHUB_OUTPUT
+          fi
         if: inputs.coverage
       - name: Upload coverage JSON summary
         uses: actions/upload-artifact@v5
