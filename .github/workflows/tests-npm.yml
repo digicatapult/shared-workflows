@@ -30,7 +30,7 @@ on:
         required: false
         type: boolean
         default: true
-      coverage_config:
+      coverage_config_json:
         required: false
         type: string
         default: ""
@@ -99,8 +99,8 @@ jobs:
       - name: Get coverage temp directory
         id: coverage-dir
         run: |
-          if [ -n "${{ inputs.coverage_config }}" ] && [ -f "${{ inputs.coverage_config }}" ]; then
-            echo "path=$(node -pe "require('${{ inputs.coverage_config }}')['temp-directory'] || 'coverage/tmp'")" >> $GITHUB_OUTPUT
+          if [ -n "${{ inputs.coverage_config_json }}" ] && [ -f "${{ inputs.coverage_config_json }}" ]; then
+            echo "path=$(jq -r '."temp-directory" // "coverage/tmp"' "${{ inputs.coverage_config_json }}")" >> $GITHUB_OUTPUT
           else
             echo "path=coverage/tmp" >> $GITHUB_OUTPUT
           fi
@@ -157,9 +157,9 @@ jobs:
 
       - name: Setup c8 config
         run: |
-          if [ -n "${{ inputs.coverage_config }}" ]; then
-            echo "Copying repo config '${{ inputs.coverage_config }}' to .c8rc.workflow.json"
-            cp ${{ inputs.coverage_config }} .c8rc.workflow.json
+          if [ -n "${{ inputs.coverage_config_json }}" ]; then
+            echo "Copying repo config '${{ inputs.coverage_config_json }}' to .c8rc.workflow.json"
+            cp ${{ inputs.coverage_config_json }} .c8rc.workflow.json
           else
             echo "Using default .c8rc.workflow.json"
             cat > .c8rc.workflow.json << 'EOF'
