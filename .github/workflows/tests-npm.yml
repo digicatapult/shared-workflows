@@ -106,7 +106,7 @@ jobs:
         run: echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
         if: inputs.coverage
       - name: Upload coverage JSON summary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ steps.artifact-name.outputs.name }}
           path: ${{ steps.coverage-dir.outputs.path }}
@@ -153,14 +153,14 @@ jobs:
           fi
 
       - name: Download current branch coverage summaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: coverage/tmp
           pattern: coverage-current-*
           merge-multiple: true
 
       - name: Download main branch coverage summaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: coverage-main/tmp
           pattern: coverage-main-*
@@ -191,7 +191,7 @@ jobs:
           json-summary-compare-path: coverage-main/coverage-summary.json
 
       - name: Upload reports for current branch
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-current-all
           path: |
