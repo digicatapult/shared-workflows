@@ -26,16 +26,31 @@ on:
         required: false
         type: string
         default: '["test:unit", "test:integration"]'
+      coverage:
+        required: false
+        type: boolean
+        default: true
+      coverage_config:
+        required: false
+        type: string
+        default: ""
+permissions:
+  pull-requests: write
 jobs:
   tests:
-    name: Run tests - ${{ matrix.command }}
+    name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
     strategy:
       fail-fast: false
       matrix:
         command: ${{ fromJson(inputs.tests) }}
+        branch:
+          - ${{ github.head_ref || github.ref_name }}
+          - main
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.branch }}
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
@@ -55,6 +70,15 @@ jobs:
             ${{ runner.OS }}-
       - name: Install Packages
         run: npm ci
+      - name: Get coverage temp directory
+        id: coverage-dir
+        run: |
+          if [ -n "${{ inputs.coverage_config }}" ] && [ -f "${{ inputs.coverage_config }}" ]; then
+            echo "path=$(node -pe "require('${{ inputs.coverage_config }}')['temp-directory'] || 'coverage/tmp'")" >> $GITHUB_OUTPUT
+          else
+            echo "path=coverage/tmp" >> $GITHUB_OUTPUT
+          fi
+        if: inputs.coverage
       - name: Build
         run: ${{ inputs.npm_build_command }}
         if: inputs.npm_build_command != ''
@@ -71,5 +95,108 @@ jobs:
       - name: Run pre-test command
         run: ${{ inputs.pre_test_command }}
         if: inputs.pre_test_command != ''
-      - name: Run tests
+      - name: Run tests with coverage
+        run: npx c8 npm run ${{ matrix.command }}
+        if: inputs.coverage
+      - name: Run tests without coverage
         run: npm run ${{ matrix.command }}
+        if: ${{ !inputs.coverage }}
+      - name: Set artifact name
+        id: artifact-name
+        run: echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')" >> $GITHUB_OUTPUT
+        if: inputs.coverage
+      - name: Upload coverage JSON summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: ${{ steps.coverage-dir.outputs.path }}
+        if: inputs.coverage
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: tests
+    if: inputs.coverage
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Setup c8 config
+        run: |
+          if [ -n "${{ inputs.coverage_config }}" ]; then
+            echo "Copying repo config '${{ inputs.coverage_config }}' to .c8rc.workflow.json"
+            cp ${{ inputs.coverage_config }} .c8rc.workflow.json
+          else
+            echo "Using default .c8rc.workflow.json"
+            cat > .c8rc.workflow.json << 'EOF'
+          {
+            "lines": 50,
+            "branches": 0,
+            "functions": 0,
+            "statements": 0,
+            "exclude": [
+              "coverage/**",
+              "packages/*/test{,s}/**",
+              "**/*.d.ts",
+              "test{,s}/**",
+              "test{,-*}.js",
+              "**/*{.,-}test.js",
+              "**/__tests__/**",
+              "**/node_modules/**",
+              "**/babel.config.js",
+              "**/*.tsx"
+            ]
+          }
+          EOF
+          fi
+
+      - name: Download current branch coverage summaries
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage/tmp
+          pattern: coverage-current-*
+          merge-multiple: true
+
+      - name: Download main branch coverage summaries
+        uses: actions/download-artifact@v4
+        with:
+          path: coverage-main/tmp
+          pattern: coverage-main-*
+          merge-multiple: true
+
+      - name: Generate reports
+        run: npx c8 --config .c8rc.workflow.json report --reporter=html --reporter=json-summary --reporter=json
+
+      - name: Generate main branch reports
+        run: |
+          if [ -d "coverage-main/tmp" ] && [ -n "$(ls -A coverage-main/tmp)" ]; then
+            npx c8 --temp-directory coverage-main/tmp --reports-dir coverage-main --config .c8rc.workflow.json report --reporter=json-summary --reporter=json
+          fi
+
+      - name: Setup vite config if none exists
+        run: |
+          if ! compgen -G "{vite,vitest}.config.{ts,mts,cts,js,mjs,cjs}" > /dev/null; then
+            echo "No vite config found, creating minimal vite.config.js"
+            echo "export default {}" > vite.config.js
+          else
+            echo "Vite config found"
+          fi
+
+      - name: Pretty coverage summary
+        uses: davelosert/vitest-coverage-report-action@v2
+        with:
+          file-coverage-mode: all
+          json-summary-compare-path: coverage-main/coverage-summary.json
+
+      - name: Upload reports for current branch
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-current-all
+          path: |
+            coverage/**
+            !coverage/tmp/**
+
+      - name: Fail if under thresholds
+        run: npx c8 --config .c8rc.workflow.json check-coverage

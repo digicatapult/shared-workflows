@@ -214,34 +214,51 @@ This GitHub Actions workflow is tailored for running end-to-end tests within a D
 
 This workflow is designed to accommodate different testing needs, offering flexibility with custom commands and environment-specific configurations for robust E2E testing.
 
-### [NPM Tests](.github/workflows/npm-tests.yml)
+### [NPM Tests](.github/workflows/tests-npm.yml)
 
-Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup.
+Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup. Collects and reports code coverage by default, comparing coverage between the current branch and main branch.
 
 #### Inputs
 
-| Input               | Type   | Description                                                                                                           | Default                             | Required |
-| ------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
-| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
-| npm_build_command   | string | Optional command to build the application before running tests                                                        | `''`                                | false    |
-| pre_test_command    | string | Optional command to execute before the main test command                                                              | `''`                                | false    |
-| docker_compose_file | string | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
-| npm_version         | string | The node version to use                                                                                               | `'22.x'`                            | false    |
-| tests               | string | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
+| Input               | Type    | Description                                                                                                           | Default                             | Required |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
+| npm_build_command   | string  | Optional command to build the application before running tests                                                        | `''`                                | false    |
+| pre_test_command    | string  | Optional command to execute before the main test command                                                              | `''`                                | false    |
+| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
+| node_version        | string  | The node version to use                                                                                               | `'22.x'`                            | false    |
+| tests               | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
+| coverage            | boolean | Whether to collect and report code coverage                                                                           | `true`                              | false    |
+| coverage_config     | string  | Path to a custom c8 configuration file                                                                                | `''`                                | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow runs a series of NPM test commands, with each test command running as a separate job in parallel using a matrix strategy.
+This GitHub Actions workflow runs a series of NPM test commands in a matrix strategy, testing both the current branch and main branch for coverage comparison. Each test command runs as a separate matrix job. When coverage is enabled, it collects coverage data from all test jobs and generates a comprehensive comparison report.
+
+**Tests Job:**
 
 1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
 2. **Node Setup**: Installs the specified Node.js version.
 3. **Node Modules Caching**: Caches `node_modules` based on `package-lock.json` for faster dependency installation.
 4. **Install Packages**: Installs project dependencies using `npm ci`.
-5. **Build Step (Optional)**: Executes `npm_build_command` if it is provided.
-6. **Environment File Creation**: Creates a `.env` file for environment configuration.
-7. **Setup Docker Dependencies**: Brings up services defined in the specified Docker Compose file to support test dependencies.
-8. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
-9. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
-10. **Run Tests**: Executes each command from the `tests` matrix (e.g., `test:unit`, `test:integration`) as defined in the NPM scripts.
+5. **Get Coverage Temp Directory**: Determines the coverage temporary directory from the provided config file or uses the default `coverage/tmp`.
+6. **Build Step (Optional)**: Executes `npm_build_command` if it is provided.
+7. **Environment File Creation**: Creates a `.env` file for environment configuration.
+8. **Setup Docker Dependencies**: Brings up services defined in the specified Docker Compose file to support test dependencies.
+9. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
+10. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
+11. **Run Tests**: Executes each test command using c8 for coverage collection (e.g., `npx c8 npm run test:unit`).
+12. **Upload Coverage**: If `coverage` is enabled, uploads coverage data from each test job, tagged by branch and test command.
 
-This workflow provides a flexible testing setup that allows for custom build commands, pre-test commands, and Docker-based dependencies, making it adaptable for various test scenarios.
+**Coverage Job:**
+
+1. **Setup c8 Config**: Creates or copies a c8 configuration file. Uses the provided `coverage_config` if specified, otherwise creates a default configuration.
+2. **Download Coverage Artifacts**: Downloads coverage summaries from both the current branch and main branch test jobs.
+3. **Generate Reports**: Creates HTML, JSON summary, and JSON reports for the current branch coverage.
+4. **Generate Main Branch Reports**: Creates JSON summary and JSON reports for the main branch coverage in a separate directory.
+5. **Setup Vite Config**: Checks for an existing vite/vitest config file, creating a minimal one if none exists to prevent warnings from the coverage report action.
+6. **Pretty Coverage Summary**: Uses `davelosert/vitest-coverage-report-action` to generate a formatted coverage report with trend indicators comparing current branch to main.
+7. **Upload Reports for Current Branch**: Saves current branch coverage reports as an artifact.
+8. **Fail if Under Thresholds**: Runs c8's threshold check, failing the workflow if coverage is below configured thresholds.
+
+This workflow provides a comprehensive testing and coverage solution with branch comparison, custom build commands, Docker-based dependencies, and detailed coverage reporting including trend analysis.
