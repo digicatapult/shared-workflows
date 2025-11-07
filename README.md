@@ -221,16 +221,17 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                           | Default                                     | Required |
-| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------- |
-| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                        | false    |
-| npm_build_command   | string  | Optional command to build the application before running tests                                                        | `""`                                        | false    |
-| pre_test_command    | string  | Optional command to execute before the main test command                                                              | `""`                                        | false    |
-| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                        | false    |
-| node_version        | string  | The node version to use                                                                                               | `24.x`                                      | false    |
-| tests               | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]`          | false    |
-| coverage            | boolean | Whether to collect and report code coverage                                                                           | `true`                                      | false    |
-| coverage_config     | string  | Path to a custom c8 configuration file                                                                                | `""`                                        | false    |
+| Input                | Type    | Description                                                                                                           | Default                                     | Required |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------- |
+| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                        | false    |
+| npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                                        | false    |
+| pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                                        | false    |
+| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                        | false    |
+| node_version         | string  | The node version to use                                                                                               | `24.x`                                      | false    |
+| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]`          | false    |
+| coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                                      | false    |
+| coverage_config_json | string  |  Path to a custom c8 configuration JSON file                                                                          | `""`                                        | false    |
+
 
 #### Workflow Description
 
@@ -253,7 +254,7 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 
 **Coverage Job:**
 
-1. **Setup c8 Config**: Creates or copies a c8 configuration file. Uses the provided `coverage_config` if specified, otherwise creates a default configuration.
+1. **Setup c8 Config**: Uses the provided `coverage_config_json` if specified, otherwise creates a default configuration.
 2. **Download Coverage Artifacts**: Downloads coverage summaries from both the current branch and main branch test jobs.
 3. **Generate Reports**: Creates HTML, JSON summary, and JSON reports for the current branch coverage.
 4. **Generate Main Branch Reports**: Creates JSON summary and JSON reports for the main branch coverage in a separate directory.
