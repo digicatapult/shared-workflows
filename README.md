@@ -8,14 +8,14 @@ The following workflows are included in this repository
 
 ### [Synchronise PR Version](.github/workflows/synchronise-pr-version-npm.yml)
 
-Synchronises the version in a `package.json` on a pull-request branch in relation to a trunk branch based on the presence of one of three labels: [`v:major`, `v:minor`, `v:patch`] and removes the label `v:stale` if present. If the current version is found to be incorrect this workflow will perform a commit on that branch in order to set the correct value.
+Synchronises the version in a `package.json` on a pull-request branch in relation to a trunk branch based on the presence of one of three labels: [`v:major`, `v:minor`, `v:patch`]. The workflow calculates the next version by incrementing the trunk branch version according to the label (major increments X.0.0, minor increments 0.X.0, patch increments 0.0.X). If the PR's current version doesn't match the expected version, the workflow commits the correction. The `v:stale` label is removed if present to indicate the version is now current. This workflow is typically called from repository-specific workflows when PR labels are added or changed.
 
 #### Inputs
 
-| input          | type     | description                             |
-| -------------- | -------- | --------------------------------------- |
-| `pr-number`    | `number` | The PR to run this workflow for         |
-| `trunk-branch` | `string` | The trunk branch to synchronise against |
+| input          | type     | description                             | default |
+| -------------- | -------- | --------------------------------------- | ------- |
+| `pr-number`    | `number` | The PR to run this workflow for         |         |
+| `trunk-branch` | `string` | The trunk branch to synchronise against | `main`  |
 
 This workflow also requires two secrets in order to run
 
@@ -26,13 +26,13 @@ This workflow also requires two secrets in order to run
 
 ### [Synchronise all PR versions](.github/workflows/synchronise-trunk-version-npm.yml)
 
-Synchronises the version in a `package.json` in relation to a trunk branch based on the presence of one of three labels: [`v:major`, `v:minor`, `v:patch`] and removes the label `v:stale` if present. If the current version is found to be incorrect this workflow will perform a commit on that branch in order to set the correct value. This is done for all open pull-requests.
+Synchronises the version in `package.json` for all open pull-requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`]. This workflow finds all PRs with these labels and calls the Synchronise PR Version workflow for each one. It's useful after the trunk branch version changes to ensure all open PRs have the correct calculated versions. Like the single PR workflow, it removes the `v:stale` label and commits corrections as needed.
 
 #### Inputs
 
-| input          | type     | description                             |
-| -------------- | -------- | --------------------------------------- |
-| `trunk-branch` | `string` | The trunk branch to synchronise against |
+| input          | type     | description                             | default |
+| -------------- | -------- | --------------------------------------- | ------- |
+| `trunk-branch` | `string` | The trunk branch to synchronise against | `main`  |
 
 This workflow also requires two secrets in order to run
 
@@ -49,6 +49,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 | Input            | Type    | Description                                                                                                           | Default                     | Required |
 | ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
+| build_args       | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
 | env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
 | push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
 | push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
@@ -89,7 +90,7 @@ This workflow is versatile, offering a full pipeline for Docker image creation a
 
 ### [Check Version](.github/workflows/check-version.yml)
 
-Determines the versioning information of the repository, setting output values related to version, release type, and build date.
+Determines the versioning information of the repository, setting output values related to version, release type, and build date. This workflow is typically used as a prerequisite step in other workflows that need version information for tagging, releasing, or publishing. It detects if the current commit represents a new version by comparing the `package.json` version against existing git tags, determines if the version follows pre-release naming conventions (e.g., contains alpha, beta, rc), and captures the build timestamp.
 
 #### Outputs
 
@@ -106,7 +107,7 @@ This GitHub Actions workflow verifies and checks the versioning details of the r
 
 ### [Release Github](.github/workflows/release-github.yml)
 
-Automates the release process on GitHub, creating a versioned release based on the repository’s current version.
+Automates the release process on GitHub, creating a versioned release based on the repository's current version. This workflow is typically called after merging to the main branch when a new version is detected. It creates two GitHub releases: one with the specific version tag (e.g., v1.2.3) and another that updates the `latest` tag to point to this release. Release notes are automatically generated from the most recent merged PR's body, extracting sections for linked tickets, high-level description, and detailed description.
 
 #### Inputs
 
@@ -135,6 +136,7 @@ Publishes an NPM package to the specified registry, optionally building the pack
 | Input             | Type   | Description                                                                                                                               | Default                      | Required |
 | ----------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
 | env_vars          | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
+| node_version      | string | The node version to use                                                                                                                   | `24.x`                       | false    |
 | registry_url      | string | The NPM registry URL to which the package will be published                                                                               | `https://registry.npmjs.org` | false    |
 | registry_scope    | string | The NPM registry scope to use for the package                                                                                             | `@digicatapult`              | false    |
 | npm_build_command | string | CLI command to run as a build step. Skipped if empty string                                                                               | `''`                         | false    |
@@ -154,8 +156,8 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Node Setup**: Configures the Node.js environment, including setting the registry URL and scope.
 4. **Install Packages**: Installs the package dependencies.
-5. **Build**: Builds the package if `npm_build` is set to true.
-6. **Publish to NPM**: Publishes the package to the specified registry with the given access level, using the provided `AUTH_TOKEN` for authentication.
+5. **Build**: Builds the package if `npm_build_command` is provided.
+6. **Publish to NPM**: Publishes the package to the specified registry with the given access level, using the provided authentication token.
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
 
@@ -165,11 +167,12 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Inputs
 
-| Input                    | Type   | Description                                                                                                                               | Default                 | Required |
-| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | -------- |
-| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                   | false    |
-| env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                    | false    |
-| matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `[lint,depcheck,check]` | false    |
+| Input                    | Type   | Description                                                                                                                               | Default                       | Required |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------- |
+| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                         | false    |
+| env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                          | false    |
+| node_version             | string | The node version to use                                                                                                                   | `24.x`                        | false    |
+| matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]` | false    |
 
 #### Workflow Description
 
@@ -190,27 +193,25 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 #### Inputs
 
-| Input               | Type   | Description                                                                                                               | Default                                                                                                         | Required |
-| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------- |
-| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                                                            | false    |
-| npm_build_command   | string | Optional command to build the application before running tests                                                            | `''`                                                                                                            | false    |
-| pre_test_command    | string | Optional command to execute before running the main test command                                                          | `''`                                                                                                            | false    |
-| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml`                                                                                            | false    |
-| node_version        | string | The node version to use                                                                                                   | `'22.x'`                                                                                                        | false    |
-| test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `docker compose -f docker-compose.e2e.yml up --exit-code-from e2e-tests --abort-on-container-exit --quiet-pull` | false    |
+| Input               | Type   | Description                                                                                                               | Default              | Required |
+| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
+| npm_build_command   | string | Optional command to build the application before running tests                                                            | `""`                 | false    |
+| pre_test_command    | string | Optional command to execute before running the main test command                                                          | `""`                 | false    |
+| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
+| node_version        | string | The node version to use                                                                                                   | `24.x`               | false    |
+| test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
 
 #### Workflow Description
 
-This GitHub Actions workflow is tailored for running end-to-end tests within a Dockerized environment, with customizable build and test steps. The workflow includes conditional handling for the `veritable-ui` repository, where additional environment variables are provided.
+This GitHub Actions workflow is tailored for running end-to-end tests within a Dockerized environment, with customizable build and test steps. The workflow supports conditional handling for specific repositories that require additional environment variables or secrets during test execution.
 
 1. **Set Environment Variables**: Parses and applies environment variables from a JSON string to the workflow environment.
 2. **Docker Buildx Setup**: Configures Docker Buildx for advanced Docker build support.
 3. **Build E2E Containers**: Uses Docker Bake to build containers based on the provided Docker Compose file.
 4. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
 5. **Pre-Test Command (Optional)**: Executes `pre_test_command` before running tests if specified.
-6. **Run E2E Tests**:
-   - For general repositories, runs the E2E test using `test_command`.
-   - For the `veritable-ui` repository, additional environment variables, such as `VERITABLE_COMPANY_PROFILE_API_KEY` and `VERITABLE_E2E_OUT_DIR`, are set.
+6. **Run E2E Tests**: Executes the test command with repository-specific environment variables injected as needed.
 7. **Upload Playwright Report**: Saves the Playwright report as an artifact, accessible for 90 days.
 8. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for comprehensive reporting.
 
@@ -222,16 +223,17 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                           | Default                             | Required |
-| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
-| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                | false    |
-| npm_build_command   | string  | Optional command to build the application before running tests                                                        | `''`                                | false    |
-| pre_test_command    | string  | Optional command to execute before the main test command                                                              | `''`                                | false    |
-| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                | false    |
-| node_version        | string  | The node version to use                                                                                               | `'22.x'`                            | false    |
-| tests               | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit", "test:integration"]` | false    |
-| coverage            | boolean | Whether to collect and report code coverage                                                                           | `true`                              | false    |
-| coverage_config     | string  | Path to a custom c8 configuration file                                                                                | `''`                                | false    |
+| Input                | Type    | Description                                                                                                           | Default                                     | Required |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------- |
+| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                        | false    |
+| npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                                        | false    |
+| pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                                        | false    |
+| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                        | false    |
+| node_version         | string  | The node version to use                                                                                               | `24.x`                                      | false    |
+| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]`          | false    |
+| coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                                      | false    |
+| coverage_config_json | string  |  Path to a custom c8 configuration JSON file                                                                          | `""`                                        | false    |
+
 
 #### Workflow Description
 
@@ -254,7 +256,7 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 
 **Coverage Job:**
 
-1. **Setup c8 Config**: Creates or copies a c8 configuration file. Uses the provided `coverage_config` if specified, otherwise creates a default configuration.
+1. **Setup c8 Config**: Uses the provided `coverage_config_json` if specified, otherwise creates a default configuration.
 2. **Download Coverage Artifacts**: Downloads coverage summaries from both the current branch and main branch test jobs.
 3. **Generate Reports**: Creates HTML, JSON summary, and JSON reports for the current branch coverage.
 4. **Generate Main Branch Reports**: Creates JSON summary and JSON reports for the main branch coverage in a separate directory.
