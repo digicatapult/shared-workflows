@@ -19,7 +19,7 @@ on:
         type: string
         default: '["lint", "depcheck", "check"]'
       trufflehog_extra_args:
-        required: true
+        required: false
         type: string
         default: "--results=verified,unknown"
 jobs:
@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: TruffleHog PR scan
-        uses: trufflesecurity/trufflehog@v3.90.12
+        uses: trufflesecurity/trufflehog@v3
         with:
           base: ""
           head: ${{ github.ref_name }}
