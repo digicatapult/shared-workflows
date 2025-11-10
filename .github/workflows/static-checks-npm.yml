@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: '["lint", "depcheck", "check"]'
+      trufflehog_extra_args:
+        required: true
+        type: string
+        default: "--results=verified,unknown"
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
@@ -50,14 +54,14 @@ jobs:
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
   scan-secrets:
+    if: ${{ inputs.enable_trufflehog_action == true }}
     name: Secrets scanning
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: TruffleHog PR scan
         uses: trufflesecurity/trufflehog@v3.90.12
-        if: ${{ inputs.enable_trufflehog_action == true }}
         with:
           base: ""
           head: ${{ github.ref_name }}
-          extra_args: --results=verified,unknown
+          extra_args: ${{ inputs.trufflehog_extra_args }}

@@ -167,12 +167,13 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Inputs
 
-| Input                    | Type   | Description                                                                                                                               | Default                       | Required |
-| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------- |
-| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                         | false    |
-| env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                          | false    |
-| node_version             | string | The node version to use                                                                                                                   | `24.x`                        | false    |
-| matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]` | false    |
+| Input                    | Type   | Description                                                                                                                               | Default                        | Required |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------- |
+| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                          | false    |
+| env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                           | false    |
+| node_version             | string | The node version to use                                                                                                                   | `24.x`                         | false    |
+| matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
+| trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
 
@@ -276,7 +277,7 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 | Input                    | Type   | Description                                                                   | Default                        | Required |
 | ------------------------ | ------ | ----------------------------------------------------------------------------- | ------------------------------ | -------- |
 | base                     | string | An optional branch to base the scan on                                        | `""`                           | false    |
-| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets | false                          | false    |
+| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets | false                          | true     |
 | env_vars                 | string | Extra variables to be passed to the environment                               | `{}`                           | false    |
 | extra_args               | string | Extra arguments to be passed to the TruffleHog CLI                            | `"--results=verified,unknown"` | true     |
 
