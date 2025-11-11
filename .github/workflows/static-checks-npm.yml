@@ -95,8 +95,6 @@ jobs:
         echo "Parsing JSON environment variables..."
         echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
     - name: Semgrep CE scan
-      with:
-        extra_args: ${{ inputs.semgrep_extra_args }}
       run: |
         semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
     - name: Upload Semgrep's SARIF results
