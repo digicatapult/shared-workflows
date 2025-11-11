@@ -2,6 +2,10 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
+      enable_trufflehog_action:
+        required: false
+        type: boolean
+        default: false
       env_vars:
         required: false
         type: string
@@ -14,6 +18,10 @@ on:
         required: false
         type: string
         default: '["lint", "depcheck", "check"]'
+      trufflehog_extra_args:
+        required: false
+        type: string
+        default: "--results=verified,unknown"
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
@@ -45,3 +53,15 @@ jobs:
         run: npm ci
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
+  scan-secrets:
+    if: ${{ inputs.enable_trufflehog_action == true }}
+    name: Secrets scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: TruffleHog PR scan
+        uses: trufflesecurity/trufflehog@v3
+        with:
+          base: ""
+          head: ${{ github.ref_name }}
+          extra_args: ${{ inputs.trufflehog_extra_args }}

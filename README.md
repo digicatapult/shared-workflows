@@ -167,11 +167,13 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Inputs
 
-| Input           | Type   | Description                                                                                                                               | Default                       | Required |
-| --------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | -------- |
-| env_vars        | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                          | false    |
-| node_version    | string | The node version to use                                                                                                                   | `24.x`                        | false    |
-| matrix_commands | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]` | false    |
+| Input                    | Type   | Description                                                                                                                               | Default                        | Required |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------- |
+| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                          | false    |
+| env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                           | false    |
+| node_version             | string | The node version to use                                                                                                                   | `24.x`                         | false    |
+| matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
+| trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
 
@@ -182,6 +184,7 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 3. **Node Modules Caching**: Caches `node_modules` based on the `package-lock.json` hash to speed up dependency installation.
 4. **Install Packages**: Installs the necessary dependencies.
 5. **Run Static Checks**: Executes each specified command in the matrix (`lint`, `depcheck`, `check` or others as configured) as defined in the NPM scripts.
+6. **Secrets Scanning**: Run TruffleHog against the calling branch for both verified and unverified secrets.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
 
@@ -264,3 +267,25 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 8. **Fail if Under Thresholds**: Runs c8's threshold check, failing the workflow if coverage is below configured thresholds.
 
 This workflow provides a comprehensive testing and coverage solution with branch comparison, custom build commands, Docker-based dependencies, and detailed coverage reporting including trend analysis.
+
+### [Scan Secrets](.github/workflows/scan-secrets.yml)
+
+Runs scanners to detect the exposure of secrets, with the option to add in extra arguments to exclude directories, fail on detection, or output the results in JSON format.
+
+#### Inputs
+
+| Input                    | Type   | Description                                                                   | Default                        | Required |
+| ------------------------ | ------ | ----------------------------------------------------------------------------- | ------------------------------ | -------- |
+| base                     | string | An optional branch to base the scan on                                        | `""`                           | false    |
+| enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets | false                          | true     |
+| env_vars                 | string | Extra variables to be passed to the environment                               | `{}`                           | false    |
+| extra_args               | string | Extra arguments to be passed to the TruffleHog CLI                            | `"--results=verified,unknown"` | true     |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs TruffleHog scans.
+
+1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
+2. **TruffleHog PR Scan**: Execute the TruffleHog scan of the P, checking for verified and unverified secrets.
+
+This workflow can be complemented with the complete list of TruffleHog arguments, found in that project's [repository](https://github.com/trufflesecurity/trufflehog/?tab=readme-ov-file#memo-usage).
