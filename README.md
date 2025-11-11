@@ -302,7 +302,7 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 
 | Input                 | Type   | Description                                                                                     | Default                    | Required |
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------- | -------------------------- | -------- |
-| enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues | false                      | false    |
+| enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues | true                       | false    |
 | env_vars              | string | Extra variables to be passed to the environment                                                 | `{}`                       | false    |
 | extra_args            | string | Extra arguments to be passed to the Semgrep CE CLI                                              | `'--config="p/default"'`   | false    |
 | sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                             | `/tmp/results_sarif.sarif` | false    |
