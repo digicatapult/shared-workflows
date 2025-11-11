@@ -1,0 +1,60 @@
+name: Perform vulnerability scans
+on:
+  workflow_call:
+    inputs:
+      enable_semgrep_action:
+        required: false
+        type: boolean
+        default: true
+        description: An option to enable the Semgrep scan action.
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+        description: Extra variables to be passed to the environment.
+      extra_args:
+        required: false
+        type: string
+        default: '--config="p/default"'
+        description: Extra arguments to be passed to Semgrep.
+      sarif_path:
+        required: false
+        type: string
+        default: "/tmp/results_sarif.sarif"
+        description: A file path for the scan results in SARIF format.
+jobs:
+  semgrep:
+    if: ${{ inputs.enable_semgrep_action == true }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - uses: Homebrew/actions/setup-homebrew@main
+    - name: Install scanners
+      run: |
+        brew install semgrep
+    - name: Set environment variables from JSON
+      env:
+        ENV_VARS_JSON: "${{ inputs.env_vars }}"
+      run: |
+        echo "Parsing JSON environment variables..."
+        echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+    - name: Semgrep CE scan
+      with:
+        extra_args: ${{ inputs.extra_args }}
+      run: |
+        semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}
+    - name: Upload Semgrep CE's SARIF results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && github.ref == 'refs/heads/main'
+      with:
+        sarif_file: ${{ inputs.sarif_path }}
+        category: semgrep
+    - name: Upload Semgrep CE results as artifact (PR fallback)
+      uses: actions/upload-artifact@v4
+      if: always() && github.event_name == 'pull_request'
+      with:
+        name: semgrep-ce-sarif-results
+        path: ${{ inputs.sarif_path }}
+        retention-days: 30

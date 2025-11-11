@@ -2,6 +2,10 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
+      enable_semgrep_action:
+        required: false
+        type: boolean
+        default: false
       enable_trufflehog_action:
         required: false
         type: boolean
@@ -18,6 +22,14 @@ on:
         required: false
         type: string
         default: '["lint", "depcheck", "check"]'
+      semgrep_extra_args:
+        required: false
+        type: string
+        default: '--config="p/default"'
+      semgrep_sarif_path:
+        required: false
+        type: string
+        default: "/tmp/results_sarif.sarif"
       trufflehog_extra_args:
         required: false
         type: string
@@ -65,3 +77,38 @@ jobs:
           base: ""
           head: ${{ github.ref_name }}
           extra_args: ${{ inputs.trufflehog_extra_args }}
+  scan-vulns:
+    if: ${{ inputs.enable_semgrep_action == true }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 0
+    - uses: Homebrew/actions/setup-homebrew@main
+    - name: Install scanners
+      run: |
+        brew install semgrep
+    - name: Set environment variables from JSON
+      env:
+        ENV_VARS_JSON: "${{ inputs.env_vars }}"
+      run: |
+        echo "Parsing JSON environment variables..."
+        echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+    - name: Semgrep CE scan
+      with:
+        extra_args: ${{ inputs.semgrep_extra_args }}
+      run: |
+        semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
+    - name: Upload Semgrep's SARIF results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always() && github.ref == 'refs/heads/main'
+      with:
+        sarif_file: ${{ inputs.semgrep_sarif_path }}
+        category: semgrep
+    - name: Upload Semgrep CE results as artifact (PR fallback)
+      uses: actions/upload-artifact@v4
+      if: always() && github.event_name == 'pull_request'
+      with:
+        name: semgrep-ce-sarif-results
+        path: ${{ inputs.semgrep_sarif_path }}
+        retention-days: 30
