@@ -17,6 +17,11 @@ on:
         type: string
         default: "semgrep.sarif"
         description: A file path for the scan results in SARIF format.
+      upload_type:
+        required: false
+        type: string
+        default: "sarif"
+        description: The upload format for the SARIF results - "sarif" uploads the SARIF report directly via CodeQL, "artefact" uploads the report as a PR artefact, and "none" skips the upload step altogether.
 permissions:
   security-events: write
 jobs:
@@ -35,9 +40,16 @@ jobs:
       - name: Semgrep CE scan
         run: |
           semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}
-      - name: Upload Semgrep CE's SARIF results
+      - name: Upload Semgrep CE's SARIF results directly to GHAS
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        if: always() && (inputs.upload_type == 'sarif')
         with:
           sarif_file: ${{ inputs.sarif_path }}
           category: semgrep
+      - name: Upload Semgrep CE's SARIF results as an artifact
+        uses: actions/upload-artifact@v4
+        if: always() && (inputs.upload_type == 'artefact')
+        with:
+          name: semgrep
+          path: ${{ inputs.sarif_path }}
+          retention-days: 30
