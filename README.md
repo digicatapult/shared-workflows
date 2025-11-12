@@ -303,7 +303,6 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 | Input                 | Type   | Description                                                                                     | Default                    | Required |
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------- | -------------------------- | -------- |
 | enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues | true                       | false    |
-| env_vars              | string | Extra variables to be passed to the environment                                                 | `{}`                       | false    |
 | extra_args            | string | Extra arguments to be passed to the Semgrep CE CLI                                              | `'--config="p/default"'`   | false    |
 | sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                             | `/tmp/results_sarif.sarif` | false    |
 
@@ -311,9 +310,7 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 
 This GitHub Actions workflow runs Semgrep CE vulnerability scans.
 
-1. **Install Scanners**: Install scanner packages using Homebrew.
-2. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
-3. **Semgrep CE Scan**: Execute the Semgrep CE CLI scan.
-4. **Upload Semgrep CE's SARIF Results**: Upload the results to GitHub.
+1. **Semgrep CE Scan**: Execute the Semgrep CE CLI scan.
+2. **Upload Semgrep CE's SARIF Results**: Upload the results to GitHub.
 
 This workflow can be complemented with rulesets from the Semgrep [registry](https://semgrep.dev/r) of first- and third-party rules.
