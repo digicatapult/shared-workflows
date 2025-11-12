@@ -17,8 +17,6 @@ on:
         type: string
         default: "semgrep.sarif"
         description: A file path for the scan results in SARIF format.
-  # schedule:
-  #   - cron: '0 21 * * *' # Sets Semgrep to scan every day at 21:00 UTC
 permissions:
   security-events: write
 jobs:
