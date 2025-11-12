@@ -175,7 +175,7 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 | node_version             | string | The node version to use                                                                                                                   | `24.x`                         | false    |
 | matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
 | semgrep_extra_args       | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`       | false    |
-| semgrep_sarif_path       | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `/tmp/results_sarif.sarif`     | false    |
+| semgrep_sarif_path       | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                | false    |
 | trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
@@ -304,7 +304,7 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------- | -------------------------- | -------- |
 | enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues | true                       | false    |
 | extra_args            | string | Extra arguments to be passed to the Semgrep CE CLI                                              | `'--config="p/default"'`   | false    |
-| sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                             | `/tmp/results_sarif.sarif` | false    |
+| sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                             | `semgrep.sarif`            | false    |
 
 #### Workflow Description
 

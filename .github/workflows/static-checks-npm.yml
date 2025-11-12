@@ -34,8 +34,6 @@ on:
         required: false
         type: string
         default: "--results=verified,unknown"
-permissions:
-  security-events: write
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
@@ -84,19 +82,21 @@ jobs:
       (inputs.enable_semgrep_action == true) &&
       (github.actor != 'dependabot[bot]')
     name: Vulnerability scanning
+    permissions:
+      security-events: write
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep:1.142.1-nonroot
     steps:
-    - uses: actions/checkout@v5
-      with:
-        fetch-depth: 0
-    - name: Semgrep CE scan
-      run: |
-        semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
-    - name: Upload Semgrep's SARIF results
-      uses: github/codeql-action/upload-sarif@v3
-      if: always()
-      with:
-        sarif_file: ${{ inputs.semgrep_sarif_path }}
-        category: semgrep
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Semgrep CE scan
+        run: |
+          semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
+      - name: Upload Semgrep's SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: ${{ inputs.semgrep_sarif_path }}
+          category: semgrep

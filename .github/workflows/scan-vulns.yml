@@ -27,7 +27,7 @@ jobs:
     name: Semgrep CE
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep
+      image: semgrep/semgrep:1.142.1-nonroot
     steps:
       - uses: actions/checkout@v5
         with:
