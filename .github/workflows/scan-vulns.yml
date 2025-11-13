@@ -1,0 +1,58 @@
+name: Perform vulnerability scans
+on:
+  workflow_call:
+    inputs:
+      enable_semgrep_action:
+        required: false
+        type: boolean
+        default: true
+        description: An option to enable the Semgrep scan action.
+      extra_args:
+        required: false
+        type: string
+        default: '--config="p/default"'
+        description: Extra arguments to be passed to Semgrep.
+      sarif_path:
+        required: false
+        type: string
+        default: "semgrep.sarif"
+        description: A file path for the scan results in SARIF format.
+      upload_type:
+        required: false
+        type: string
+        default: "sarif"
+        description: The upload format for the SARIF results - "sarif" uploads the SARIF report directly via CodeQL, "artefact" uploads the report as a PR artefact, and "none" skips the upload step altogether.
+permissions:
+  security-events: write
+jobs:
+  semgrep:
+    if: |
+      (inputs.enable_semgrep_action == true) &&
+      (github.actor != 'dependabot[bot]')
+    name: Semgrep CE
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install Semgrep
+        run: pip install semgrep
+      - name: Semgrep CE scan
+        run: |
+          semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}
+      - name: Upload Semgrep CE's SARIF results directly to GHAS
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (inputs.upload_type == 'sarif')
+        with:
+          sarif_file: ${{ inputs.sarif_path }}
+          category: semgrep
+      - name: Upload Semgrep CE's SARIF results as an artifact
+        uses: actions/upload-artifact@v4
+        if: always() && (inputs.upload_type == 'artefact')
+        with:
+          name: semgrep
+          path: ${{ inputs.sarif_path }}
+          retention-days: 30

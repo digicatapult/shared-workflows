@@ -2,6 +2,10 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
+      enable_semgrep_action:
+        required: false
+        type: boolean
+        default: true
       enable_trufflehog_action:
         required: false
         type: boolean
@@ -18,6 +22,18 @@ on:
         required: false
         type: string
         default: '["lint", "depcheck", "check"]'
+      semgrep_extra_args:
+        required: false
+        type: string
+        default: '--config="p/default"'
+      semgrep_sarif_path:
+        required: false
+        type: string
+        default: "semgrep.sarif"
+      semgrep_upload_type:
+        required: false
+        type: string
+        default: "sarif"
       trufflehog_extra_args:
         required: false
         type: string
@@ -65,3 +81,36 @@ jobs:
           base: ""
           head: ${{ github.ref_name }}
           extra_args: ${{ inputs.trufflehog_extra_args }}
+  scan-vulns:
+    if: |
+      (inputs.enable_semgrep_action == true) &&
+      (github.actor != 'dependabot[bot]')
+    name: Vulnerability scanning
+    permissions:
+      security-events: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install Semgrep
+        run: pip install semgrep
+      - name: Semgrep CE scan
+        run: |
+          semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
+      - name: Upload Semgrep CE's SARIF results directly to GHAS
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (inputs.semgrep_upload_type == 'sarif')
+        with:
+          sarif_file: ${{ inputs.semgrep_sarif_path }}
+          category: semgrep
+      - name: Upload Semgrep CE's SARIF results as an artifact
+        uses: actions/upload-artifact@v4
+        if: always() && (inputs.semgrep_upload_type == 'artefact')
+        with:
+          name: semgrep
+          path: ${{ inputs.semgrep_sarif_path }}
+          retention-days: 30

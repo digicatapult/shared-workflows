@@ -169,10 +169,14 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 | Input                    | Type   | Description                                                                                                                               | Default                        | Required |
 | ------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | -------- |
+| enable_semgrep_action    | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | true                           | false    |
 | enable_trufflehog_action | bool   | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | false                          | false    |
 | env_vars                 | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                           | false    |
 | node_version             | string | The node version to use                                                                                                                   | `24.x`                         | false    |
 | matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
+| semgrep_extra_args       | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`       | false    |
+| semgrep_sarif_path       | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                | false    |
+| semgrep_upload_type      | string | Upload format for Semgrep results; "sarif" uses the CodeQL SARIF upload action, "artefact" uses vanilla artefact upload, and "none" skips | `sarif`                        | false    |
 | trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
@@ -185,6 +189,7 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 4. **Install Packages**: Installs the necessary dependencies.
 5. **Run Static Checks**: Executes each specified command in the matrix (`lint`, `depcheck`, `check` or others as configured) as defined in the NPM scripts.
 6. **Secrets Scanning**: Run TruffleHog against the calling branch for both verified and unverified secrets.
+7. **Vulnerability Scanning**: Run Semgrep CE to identify security vulnerabilities and upload the results in SARIF format to GitHub.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
 
@@ -286,6 +291,28 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 This GitHub Actions workflow runs TruffleHog scans.
 
 1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
-2. **TruffleHog PR Scan**: Execute the TruffleHog scan of the P, checking for verified and unverified secrets.
+2. **TruffleHog PR Scan**: Execute the TruffleHog scan of the PR, checking for verified and unverified secrets.
 
 This workflow can be complemented with the complete list of TruffleHog arguments, found in that project's [repository](https://github.com/trufflesecurity/trufflehog/?tab=readme-ov-file#memo-usage).
+
+### [Scan Vulnerabilities](.github/workflows/scan-vulns.yml)
+
+Runs scanners to detect bugs, security vulnerabilities, and compliance issues, with the option to add in extra arguments, e.g. additional Semgrep rulesets.
+
+#### Inputs
+
+| Input                 | Type   | Description                                                                                                                               | Default                  | Required |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------| -------- |
+| enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | true                     | false    |
+| extra_args            | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'` | false    |
+| sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`          | false    |
+| upload_type           | string | Upload format for Semgrep results; "sarif" uses the CodeQL SARIF upload action, "artefact" uses vanilla artefact upload, and "none" skips | `sarif`                  | false    |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs Semgrep CE vulnerability scans.
+
+1. **Semgrep CE Scan**: Execute the Semgrep CE CLI scan.
+2. **Upload Semgrep CE's SARIF Results**: Upload the results to GitHub either as a SARIF report directly to the GitHub Advanced Security panel or as an artefact.
+
+This workflow can be complemented with rulesets from the Semgrep [registry](https://semgrep.dev/r) of first- and third-party rules.
