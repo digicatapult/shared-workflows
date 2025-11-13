@@ -90,7 +90,7 @@ jobs:
       security-events: write
     runs-on: ubuntu-latest
     container:
-      image: semgrep/semgrep:1.142.1-nonroot
+      image: semgrep/semgrep:1.142.1
     steps:
       - uses: actions/checkout@v5
         with:
