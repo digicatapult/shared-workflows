@@ -31,12 +31,15 @@ jobs:
       (github.actor != 'dependabot[bot]')
     name: Semgrep CE
     runs-on: ubuntu-latest
-    container:
-      image: semgrep/semgrep:1.142.1
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+      - name: Install Semgrep
+        run: pip install semgrep
       - name: Semgrep CE scan
         run: |
           semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}
