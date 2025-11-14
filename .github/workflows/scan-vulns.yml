@@ -44,7 +44,7 @@ jobs:
         run: |
           semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}
       - name: Upload Semgrep CE's SARIF results directly to GHAS
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always() && (inputs.upload_type == 'sarif')
         with:
           sarif_file: ${{ inputs.sarif_path }}
