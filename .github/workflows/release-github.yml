@@ -58,6 +58,7 @@ jobs:
 
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Create GitHub release version
+        id: create_github_release_version
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.get_version.outputs.version }}

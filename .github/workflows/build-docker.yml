@@ -206,3 +206,43 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: false
+      # Generate and upload SBOMs
+      - name: Generate SBOMs with Docker Scout (Docker Hub)
+        if: ${{ inputs.push_dockerhub == true }}
+        uses: docker/scout-action@v1
+        with:
+          command: sbom
+          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image: ${{ needs.repo_ids.outputs.repo_name }}
+          organization: ${{ needs.repo_ids.outputs.org_name }}
+          exit-code: false
+          output: ${{ github.event.repository.name }}.cdx.json
+          format: cyclonedx
+      - name: Generate SBOMs with Docker Scout (GHCR only)
+        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == false }}
+        uses: docker/scout-action@v1
+        with:
+          command: sbom
+          registry-user: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image: ${{ needs.repo_ids.outputs.repo_name }}
+          organization: ${{ needs.repo_ids.outputs.org_name }}
+          exit-code: false
+          output: ${{ github.event.repository.name }}.cdx.json
+          format: cyclonedx
+      - name: Upload SBOM files as PR artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          path: |
+            ${{ github.event.repository.name }}.cdx.json
+      - name: Upload SBOM files as release assets
+        if: ${{ steps.create_github_release_version == success }}
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.get_version.outputs.VERSION }}
+          files: |
+            ${{ github.event.repository.name }}.cdx.json
