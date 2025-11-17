@@ -238,7 +238,6 @@ jobs:
           path: |
             ${{ github.event.repository.name }}.cdx.json
       - name: Upload SBOM files as release assets
-        if: ${{ steps.create_github_release_version.conclusion == success }}
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
