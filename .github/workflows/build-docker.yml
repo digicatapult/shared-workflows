@@ -237,27 +237,32 @@ jobs:
           output: ${{ github.event.repository.name }}.cdx.json
           format: cyclonedx
           sarif-file: scout.sarif
-      - name: Upload SBOM files as PR artefacts
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          path: |
-            ${{ github.event.repository.name }}.cdx.json
       - name: Upload Scout's SARIF results directly to GHAS
         uses: github/codeql-action/upload-sarif@v4
-        if: inputs.sarif_upload_type == 'codeql'
+        if: |
+          inputs.sarif_upload_type == 'codeql' &&
+          (inputs.push_dockerhub == true || inputs.push_ghcr == true)
         with:
           category: scout
           sarif_file: scout.sarif
       - name: Upload Scout's SARIF results as artifacts
         uses: actions/upload-artifact@v5
-        if: inputs.sarif_upload_type == 'artefact'
+        if: inputs.sarif_upload_type == 'artefact' &&
+          (inputs.push_dockerhub == true || inputs.push_ghcr == true)
         with:
           name: scout
           path: scout.sarif
           retention-days: 30
+      - name: Upload SBOM files as PR artefacts
+        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          path: |
+            ${{ github.event.repository.name }}.cdx.json
       - name: Upload SBOM files as release assets
         uses: actions/upload-release-asset@v1
+        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
