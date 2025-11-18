@@ -231,7 +231,7 @@ jobs:
           command: cves,sbom
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image: ${{ needs.repo_ids.outputs.repo_name }}
+          image: ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
           organization: ${{ needs.repo_ids.outputs.org_name }}
           exit-code: false
           output: ${{ github.event.repository.name }}.cdx.json
