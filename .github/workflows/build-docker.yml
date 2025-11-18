@@ -250,7 +250,7 @@ jobs:
         if: inputs.sarif_upload_type == 'artefact' &&
           (inputs.push_dockerhub == true || inputs.push_ghcr == true)
         with:
-          name: scout
+          name: scout.sarif
           path: scout.sarif
           retention-days: 30
       - name: Upload SBOM files as PR artefacts
@@ -258,8 +258,8 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           overwrite: true
-          path: |
-            ${{ github.event.repository.name }}.cdx.json
+          name: ${{ github.event.repository.name }}.cdx.json
+          path: ${{ github.event.repository.name }}.cdx.json
       - name: Upload SBOM files as release assets
         uses: softprops/action-gh-release@v2
         if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
