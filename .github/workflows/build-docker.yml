@@ -255,13 +255,13 @@ jobs:
           retention-days: 30
       - name: Upload SBOM files as PR artefacts
         if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           overwrite: true
           path: |
             ${{ github.event.repository.name }}.cdx.json
       - name: Upload SBOM files as release assets
-        uses: actions/upload-release-asset@v1
+        uses: softprops/action-gh-release@v2
         if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
