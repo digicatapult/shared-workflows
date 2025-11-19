@@ -134,6 +134,7 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: true
+          sbom: true
           tags: |
             ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
             ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
@@ -157,6 +158,7 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: true
+          sbom: true
           tags: |
             ${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
             ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
@@ -180,6 +182,7 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: true
+          sbom: true
           tags: |
             ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
             ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
