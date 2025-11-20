@@ -76,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: TruffleHog PR scan
-        uses: trufflesecurity/trufflehog@v3.91.0
+        uses: trufflesecurity/trufflehog@v3.91.1
         with:
           base: ""
           head: ${{ github.ref_name }}
