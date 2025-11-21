@@ -47,14 +47,15 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Inputs
 
-| Input            | Type    | Description                                                                                                           | Default                     | Required |
-| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
-| build_args       | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
-| env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
-| push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
-| push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
-| docker_platforms | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
-| docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
+| Input             | Type    | Description                                                                                                           | Default                     | Required |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
+| build_args        | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
+| env_vars          | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
+| push_dockerhub    | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
+| push_ghcr         | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
+| docker_platforms  | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
+| docker_file       | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
+| sarif_upload_type | string  | Destination for Docker Scout's SARIF report; "codeql" uploads to GHAS, "artefact" uploads as a PR artefact            | `codeql`                    | false    |
 
 #### Secrets
 
@@ -74,6 +75,9 @@ This GitHub Actions workflow is designed to build a Docker container, optionally
    - **QEMU Setup**: Enables emulation for multi-platform builds.
    - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
 5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
+6. **Generate SBOMs with Docker Scout**: If set to push to a registry, then Scout is used to generate an SBOM and a SARIF report from the image.
+7. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
+8. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
 
 #### Conditional Push Cases
 
