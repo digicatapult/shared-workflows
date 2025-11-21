@@ -245,7 +245,7 @@ jobs:
         with:
           category: scout
           sarif_file: scout.sarif
-      - name: Upload Scout's SARIF results as artifacts
+      - name: Upload Scout's SARIF results as artefacts
         uses: actions/upload-artifact@v5
         if: inputs.sarif_upload_type == 'artefact' &&
           (inputs.push_dockerhub == true || inputs.push_ghcr == true)
@@ -254,7 +254,8 @@ jobs:
           path: scout.sarif
           retention-days: 30
       - name: Upload SBOM files as PR artefacts
-        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
+        if: inputs.sarif_upload_type == 'artefact' &&
+          (inputs.push_dockerhub == true || inputs.push_ghcr == true)
         uses: actions/upload-artifact@v5
         with:
           overwrite: true
