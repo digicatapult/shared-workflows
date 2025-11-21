@@ -61,8 +61,6 @@ jobs:
     name: "Build docker image"
     needs: repo_ids
     runs-on: ubuntu-latest
-    permissions:
-      security-events: write
     steps:
       - uses: actions/checkout@v5
       - name: Set environment variables from JSON
