@@ -38,6 +38,7 @@ on:
 permissions:
   contents: write
   packages: write
+  security-events: write
 jobs:
   repo_ids:
     name: Repo IDs
