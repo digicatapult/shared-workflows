@@ -245,6 +245,8 @@ jobs:
         with:
           category: scout
           sarif_file: scout.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Scout's SARIF results as artefacts
         uses: actions/upload-artifact@v5
         if: inputs.sarif_upload_type == 'artefact' &&
