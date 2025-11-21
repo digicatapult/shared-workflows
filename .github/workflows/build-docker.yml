@@ -218,7 +218,7 @@ jobs:
           command: cves,sbom
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-          image: ${{ needs.repo_ids.outputs.repo_name }}
+          image: registry://${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
           organization: ${{ needs.repo_ids.outputs.org_name }}
           exit-code: false
           output: ${{ github.event.repository.name }}.cdx.json
