@@ -180,7 +180,6 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 | matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
 | semgrep_extra_args       | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`       | false    |
 | semgrep_sarif_path       | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                | false    |
-| semgrep_upload_type      | string | Upload format for Semgrep results; "sarif" uses the CodeQL SARIF upload action, "artefact" uses vanilla artefact upload, and "none" skips | `sarif`                        | false    |
 | trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
