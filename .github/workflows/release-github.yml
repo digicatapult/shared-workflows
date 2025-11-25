@@ -67,6 +67,8 @@ jobs:
           make_latest: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            **/*.cdx.json
       - name: Update latest tag
         run: |
           git config user.name github-actions
