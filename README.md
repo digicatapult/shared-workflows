@@ -55,7 +55,6 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | push_ghcr         | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
 | docker_platforms  | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
 | docker_file       | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
-| sarif_upload_type | string  | Destination for Docker Scout's SARIF report; "codeql" uploads to GHAS, "artefact" uploads as a PR artefact            | `codeql`                    | false    |
 
 #### Secrets
 
@@ -76,8 +75,8 @@ This GitHub Actions workflow is designed to build a Docker container, optionally
    - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
 5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
 6. **Generate SBOMs with Docker Scout**: If set to push to a registry, then Scout is used to generate an SBOM and a SARIF report from the image.
-7. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
-8. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
+7. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
+8. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
 
 #### Conditional Push Cases
 
@@ -180,6 +179,7 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 | matrix_commands          | string | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint","depcheck","check"]`  | false    |
 | semgrep_extra_args       | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`       | false    |
 | semgrep_sarif_path       | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                | false    |
+| semgrep_upload_type      | string | Upload format for Semgrep results; "sarif" uses the CodeQL SARIF upload action, "artefact" uses vanilla artefact upload, and "none" skips | `sarif`                        | false    |
 | trufflehog_extra_args    | string | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"` | true     |
 
 #### Workflow Description
