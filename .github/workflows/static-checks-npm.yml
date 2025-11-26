@@ -47,7 +47,7 @@ jobs:
         command: ${{ fromJson(inputs.matrix_commands) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
@@ -74,7 +74,7 @@ jobs:
     name: Secrets scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: TruffleHog PR scan
         uses: trufflesecurity/trufflehog@v3.91.1
         with:
@@ -90,7 +90,7 @@ jobs:
       security-events: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v6

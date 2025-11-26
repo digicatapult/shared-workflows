@@ -34,7 +34,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
