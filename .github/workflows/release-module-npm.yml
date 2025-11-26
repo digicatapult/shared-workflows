@@ -33,6 +33,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 jobs:
   publish-npm:
     name: "Publish package to ${{ inputs.registry_url }}"
