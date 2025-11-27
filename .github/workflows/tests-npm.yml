@@ -43,6 +43,7 @@ jobs:
     outputs:
       branches: ${{ steps.set-branches.outputs.branches }}
       is-main: ${{ steps.check-branch.outputs.is-main }}
+      artifact-prefix: ${{ steps.set-prefix.outputs.prefix }}
     steps:
       - name: Check if running on main
         id: check-branch
@@ -63,6 +64,10 @@ jobs:
           else
             echo "branches=[\"$CURRENT_BRANCH\", \"main\"]" >> $GITHUB_OUTPUT
           fi
+
+      - name: Generate artifact prefix
+        id: set-prefix
+        run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
@@ -123,9 +128,9 @@ jobs:
         run: |
           COMMAND_SAFE=$(echo "${{ matrix.command }}" | sed 's/[:\";<>|*?\/\\ \r\n]/-/g')
           if [ "${{ needs.setup.outputs.is-main }}" = "true" ]; then
-            echo "name=coverage-current-$COMMAND_SAFE" >> $GITHUB_OUTPUT
+            echo "name=${{ needs.setup.outputs.artifact-prefix }}-coverage-current-$COMMAND_SAFE" >> $GITHUB_OUTPUT
           else
-            echo "name=coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$COMMAND_SAFE" >> $GITHUB_OUTPUT
+            echo "name=${{ needs.setup.outputs.artifact-prefix }}-coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-$COMMAND_SAFE" >> $GITHUB_OUTPUT
           fi
         if: inputs.coverage
       - name: Upload coverage JSON summary
@@ -182,14 +187,14 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           path: ${{ env.COVERAGE_CURRENT_DIR }}/tmp
-          pattern: coverage-current-*
+          pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-current-*
           merge-multiple: true
 
       - name: Download main branch coverage summaries
         uses: actions/download-artifact@v6
         with:
           path: ${{ env.COVERAGE_MAIN_DIR }}/tmp
-          pattern: coverage-main-*
+          pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-main-*
           merge-multiple: true
         if: needs.setup.outputs.is-main == 'false'
 
@@ -217,7 +222,7 @@ jobs:
       - name: Upload reports for current branch
         uses: actions/upload-artifact@v5
         with:
-          name: coverage-current-all
+          name: ${{ needs.setup.outputs.artifact-prefix }}-coverage-current-all
           path: |
             ${{ env.COVERAGE_CURRENT_DIR }}/**
             !${{ env.COVERAGE_CURRENT_DIR }}/tmp/**
