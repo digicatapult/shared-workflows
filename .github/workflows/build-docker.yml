@@ -32,8 +32,10 @@ on:
       DOCKERHUB_TOKEN:
         required: false
 permissions:
+  actions: read
   contents: write
   packages: write
+  security-events: write
 jobs:
   repo_ids:
     name: Repo IDs
@@ -209,3 +211,46 @@ jobs:
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
           push: false
+      # Generate and upload SBOMs
+      - name: Generate SBOMs with Docker Scout (Docker Hub)
+        if: ${{ inputs.push_dockerhub == true }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves,sbom
+          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
+          image: registry://${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
+          organization: ${{ needs.repo_ids.outputs.org_name }}
+          exit-code: false
+          output: ${{ github.event.repository.name }}.cdx.json
+          format: cyclonedx
+          sarif-file: scout.sarif
+      - name: Generate SBOMs with Docker Scout (GHCR only)
+        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == false }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves,sbom
+          registry-user: ${{ github.repository_owner }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          image: ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
+          organization: ${{ needs.repo_ids.outputs.org_name }}
+          exit-code: false
+          output: ${{ github.event.repository.name }}.cdx.json
+          format: cyclonedx
+          sarif-file: scout.sarif
+      - name: Upload SBOM artefacts
+        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
+        uses: actions/upload-artifact@v5
+        with:
+          overwrite: true
+          name: ${{ github.event.repository.name }}.cdx.json
+          path: ${{ github.event.repository.name }}.cdx.json
+          retention-days: 7
+      - name: Upload Scout's SARIF results directly to GHAS
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
+        with:
+          category: scout
+          sarif_file: scout.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

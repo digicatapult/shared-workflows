@@ -57,6 +57,10 @@ jobs:
           ' >> $GITHUB_OUTPUT
 
           echo "EOF" >> $GITHUB_OUTPUT
+      - name: Download SBOM artefacts
+        uses: actions/download-artifact@v6
+        with:
+          name: ${{ github.event.repository.name }}.cdx.json
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v2
         with:
@@ -67,6 +71,8 @@ jobs:
           make_latest: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            **/*.cdx.json
       - name: Update latest tag
         run: |
           git config user.name github-actions

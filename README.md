@@ -74,6 +74,9 @@ This GitHub Actions workflow is designed to build a Docker container, optionally
    - **QEMU Setup**: Enables emulation for multi-platform builds.
    - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
 5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
+6. **Generate SBOMs with Docker Scout**: If set to push to a registry, then Scout is used to generate an SBOM and a SARIF report from the image.
+7. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
+8. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
 
 #### Conditional Push Cases
 
