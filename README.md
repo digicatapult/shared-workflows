@@ -114,9 +114,10 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Inputs
 
-| Input    | Type   | Description                                                                                                                               | Default |
-| -------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| env_vars | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    |
+| Input    | Type    | Description                                                                                                                               | Default |
+| -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| env_vars | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    |
+| get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | true    |
 
 #### Workflow Description
 
