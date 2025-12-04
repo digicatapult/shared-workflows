@@ -43,7 +43,7 @@ on:
     outputs:
       sbom_file:
         description: "The name of the generated SBOM file"
-        value: ${{ jobs.generate-sbom.outputs. sbom_file }}
+        value: ${{ jobs.generate-sbom.outputs.sbom_file }}
 permissions:
   contents: read
 jobs:
@@ -82,12 +82,12 @@ jobs:
           if [ -n "${{ inputs.sbom_output_file }}" ]; then
             echo "filename=${{ inputs.sbom_output_file }}" >> $GITHUB_OUTPUT
           else
-            echo "filename=${{ github.event.repository.name }}. cdx.${{ inputs.sbom_format }}" >> $GITHUB_OUTPUT
+            echo "filename=${{ github.event.repository.name }}.cdx.${{ inputs.sbom_format }}" >> $GITHUB_OUTPUT
           fi
       - name: Generate SBOM with CycloneDX NPM
         if: inputs.sbom_tool == '@cyclonedx/cyclonedx-npm'
         run: |
-          ARGS="--output-file ${{ steps.set-filename. outputs.filename }}"
+          ARGS="--output-file ${{ steps.set-filename.outputs.filename }}"
           if [ "${{ inputs.sbom_format }}" = "xml" ]; then
             ARGS="$ARGS --output-format XML"
           fi
@@ -96,7 +96,7 @@ jobs:
           fi
           npx @cyclonedx/cyclonedx-npm $ARGS
       - name: Generate SBOM with cdxgen
-        if: inputs. sbom_tool == '@cyclonedx/cdxgen'
+        if: inputs.sbom_tool == '@cyclonedx/cdxgen'
         run: |
           ARGS="-o ${{ steps.set-filename.outputs.filename }}"
           if [ "${{ inputs.sbom_format }}" = "xml" ]; then
