@@ -114,10 +114,13 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Inputs
 
-| Input    | Type    | Description                                                                                                                               | Default |
-| -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| env_vars | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    |
-| get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | true    |
+| Input                 | Type    | Description                                                                                                                               | Default                                        |
+| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| dtrack_project_name   | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}`          |
+| enable_dtrack_project | boolean | An option to disable the use of Dependency Track                                                                                          | `true`                                         |
+| env_vars              | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                           |
+| get_sbom              | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | `true`                                         |
+| sbom_filename         | string  | A path and filename to locate SBOM artefacts                                                                                              | `${{ github.event.repository.name }}.cdx.json` |
 
 #### Workflow Description
 
@@ -128,6 +131,7 @@ This GitHub Actions workflow creates a new release on GitHub. It uses the `digic
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
 4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step.
 5. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
+6. **Upload to Dependency Track**: Creates a project entry in Dependency Track (if needed) and uploads the SBOM with versioned and `latest` tags.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 

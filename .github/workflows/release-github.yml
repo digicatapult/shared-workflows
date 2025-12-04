@@ -2,6 +2,14 @@ name: Release Github
 on:
   workflow_call:
     inputs:
+      dtrack_project_name:
+        required: false
+        type: string
+        default: ${{ github.event.repository.name }}
+      enable_dtrack_project:
+        required: false
+        type: boolean
+        default: false
       env_vars:
         required: false
         type: string
@@ -10,6 +18,10 @@ on:
         required: false
         type: boolean
         default: true
+      sbom_filename:
+        required: false
+        type: string
+        default: ${{ github.event.repository.name }}.cdx.json
 permissions:
   contents: write
   pull-requests: read
@@ -65,7 +77,7 @@ jobs:
         uses: actions/download-artifact@v6
         if: inputs.get_sbom
         with:
-          name: ${{ github.event.repository.name }}.cdx.json
+          name: ${{ inputs.sbom_filename }}
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v2
         with:
@@ -95,3 +107,16 @@ jobs:
           generate_release_notes: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: DependencyTrack/gh-upload-sbom@v3
+        if: |
+          success() &&
+          inputs.get_sbom &&
+          inputs.enable_dtrack_project
+        with:
+          serverHostname: ${{ secrets.DTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DTRACK_APIKEY }}
+          projectName: ${{ inputs.dtrack_project_name }}
+          projectVersion: ${{ steps.get_version.outputs.version }}
+          projectTags: "${{ steps.get_version.outputs.version }},latest"
+          bomFilename: ${{ inputs.sbom_filename }}
+          autoCreate: true
