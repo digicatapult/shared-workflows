@@ -1,0 +1,115 @@
+name: NPM Generate SBOM
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+      node_version:
+        required: false
+        type: string
+        default: 24.x
+      sbom_tool:
+        required: false
+        type: string
+        default: "@cyclonedx/cyclonedx-npm"
+        description: "SBOM generation tool to use.  Options: @cyclonedx/cyclonedx-npm, @cyclonedx/cdxgen"
+      sbom_format:
+        required: false
+        type: string
+        default: "json"
+        description: "SBOM output format. Options: json, xml"
+      sbom_output_file:
+        required: false
+        type: string
+        default: ""
+        description: "Custom output filename.  Defaults to {repo-name}.cdx. {format}"
+      npm_build_command:
+        required: false
+        type: string
+        default: ""
+        description: "Optional build command to run before generating SBOM (e.g., for compiling dependencies)"
+      additional_args:
+        required: false
+        type: string
+        default: ""
+        description: "Additional arguments to pass to the SBOM generation tool"
+      upload_artifact:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to upload the SBOM as a workflow artifact"
+    outputs:
+      sbom_file:
+        description: "The name of the generated SBOM file"
+        value: ${{ jobs.generate-sbom.outputs.sbom_file }}
+permissions:
+  contents: read
+jobs:
+  generate-sbom:
+    name: "Generate SBOM"
+    runs-on: ubuntu-latest
+    outputs:
+      sbom_file: ${{ steps.set-filename.outputs.filename }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-node-
+            ${{ runner.OS }}-
+      - name: Install Packages
+        run: npm ci
+      - name: Build
+        run: ${{ inputs.npm_build_command }}
+        if: inputs.npm_build_command != ''
+      - name: Set output filename
+        id: set-filename
+        run: |
+          if [ -n "${{ inputs.sbom_output_file }}" ]; then
+            echo "filename=${{ inputs.sbom_output_file }}" >> $GITHUB_OUTPUT
+          else
+            echo "filename=${{ github.event.repository.name }}.cdx.${{ inputs.sbom_format }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate SBOM with CycloneDX NPM
+        if: inputs.sbom_tool == '@cyclonedx/cyclonedx-npm'
+        run: |
+          ARGS="--output-file ${{ steps.set-filename.outputs.filename }}"
+          if [ "${{ inputs.sbom_format }}" = "xml" ]; then
+            ARGS="$ARGS --output-format XML"
+          fi
+          if [ -n "${{ inputs.additional_args }}" ]; then
+            ARGS="$ARGS ${{ inputs.additional_args }}"
+          fi
+          npx @cyclonedx/cyclonedx-npm $ARGS
+      - name: Generate SBOM with cdxgen
+        if: inputs.sbom_tool == '@cyclonedx/cdxgen'
+        run: |
+          ARGS="-o ${{ steps.set-filename.outputs.filename }}"
+          if [ "${{ inputs.sbom_format }}" = "xml" ]; then
+            ARGS="$ARGS --format xml"
+          fi
+          if [ -n "${{ inputs.additional_args }}" ]; then
+            ARGS="$ARGS ${{ inputs.additional_args }}"
+          fi
+          npx @cyclonedx/cdxgen $ARGS
+      - name: Upload SBOM artifact
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.set-filename.outputs.filename }}
+          path: ${{ steps.set-filename.outputs.filename }}
+          retention-days: 90

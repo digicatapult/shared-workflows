@@ -165,6 +165,40 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
 
+### [NPM Generate SBOM](.github/workflows/generate-sbom-npm.yml)
+
+Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX tools. This workflow supports multiple generation tools, output formats, and optional build steps.
+
+#### Inputs
+
+| Input             | Type    | Description                                                                                                                               | Default                      | Required |
+| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
+| env_vars          | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
+| node_version      | string  | The node version to use                                                                                                                   | `24.x`                       | false    |
+| sbom_tool         | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`   | false    |
+| sbom_format       | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                       | false    |
+| sbom_output_file  | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                         | false    |
+| npm_build_command | string  | Optional build command to run before generating SBOM                                                                                      | `""`                         | false    |
+| additional_args   | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                         | false    |
+| upload_artifact   | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                       | false    |
+
+#### Outputs
+
+| Output    | Description                         |
+| --------- | ----------------------------------- |
+| sbom_file | The name of the generated SBOM file |
+
+#### Workflow Description
+
+This GitHub Actions workflow generates an SBOM for an NPM project. It allows flexibility in choosing the generation tool and format.
+
+1. **Set Environment Variables**: Parses and sets environment variables from a JSON string.
+2. **Node Setup**: Configures the Node.js environment.
+3. **Install Packages**: Installs project dependencies.
+4. **Build (Optional)**: Runs a build command if specified, useful for projects that need compilation before SBOM generation.
+5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
+6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
+
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml)
 
 Performs configurable static analysis checks on an NPM project, such as linting, dependency checking, XSS scanning, and additional checks, based on the specified commands.
