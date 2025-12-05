@@ -2,6 +2,18 @@ name: NPM Generate SBOM
 on:
   workflow_call:
     inputs:
+      dtrack_project_name:
+        required: false
+        type: string
+        default: ${{ github.event.repository.name }}
+      enable_check_version:
+        required: false
+        type: boolean
+        default: false
+      enable_dtrack_project:
+        required: false
+        type: boolean
+        default: false
       env_vars:
         required: false
         type: string
@@ -60,6 +72,11 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - id: get-version
+        if: inputs.enable_check_version
+        uses: digicatapult/check-version@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
@@ -113,3 +130,16 @@ jobs:
           name: ${{ steps.set-filename.outputs.filename }}
           path: ${{ steps.set-filename.outputs.filename }}
           retention-days: 90
+      - uses: DependencyTrack/gh-upload-sbom@v3
+        if: |
+          success() &&
+          inputs.enable_check_version &&
+          inputs.enable_dtrack_project
+        with:
+          serverHostname: ${{ secrets.DTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DTRACK_APIKEY }}
+          projectName: ${{ inputs.dtrack_project_name }}
+          projectVersion: ${{ steps.get-version.outputs.version }}
+          projectTags: ${{ steps.get-version.outputs.version }}
+          bomFilename: ${{ steps.set-filename.outputs.filename }}
+          autoCreate: true
