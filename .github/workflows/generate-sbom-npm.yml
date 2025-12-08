@@ -56,6 +56,11 @@ on:
       sbom_file:
         description: "The name of the generated SBOM file"
         value: ${{ jobs.generate-sbom.outputs.sbom_file }}
+    secrets:
+      DTRACK_APIKEY:
+        required: false
+      DTRACK_HOSTNAME:
+        required: false
 permissions:
   contents: read
 jobs:
