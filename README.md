@@ -74,9 +74,8 @@ This GitHub Actions workflow is designed to build a Docker container, optionally
    - **QEMU Setup**: Enables emulation for multi-platform builds.
    - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
 5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
-6. **Generate SBOMs with Docker Scout**: If set to push to a registry, then Scout is used to generate an SBOM and a SARIF report from the image.
-7. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
-8. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
+6. **Generate CVEs with Docker Scout**: Scout is used to generate a SARIF report from any CVEs found for the image.
+7. **Upload Scout's SARIF results**: Any SARIF findings are pushed to GitHub's Advanced Security API.
 
 #### Conditional Push Cases
 
@@ -126,7 +125,7 @@ This GitHub Actions workflow creates a new release on GitHub. It uses the `digic
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
-4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step.
+4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and SBOMs if available.
 5. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
