@@ -173,8 +173,8 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 | Input                 | Type    | Description                                                                                                                               | Default                               | Required |
 | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
 | dtrack_project_name   | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
-| enable_check_version  | boolean | An option to disable the use of the digicatapult/check-version action                                                                     | `false`                               | false    |
-| enable_dtrack_project | boolean | An option to disable the use of Dependency Track                                                                                          | `false`                               | false    |
+| enable_check_version  | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
+| enable_dtrack_project | boolean | An option to enable the use of Dependency Track                                                                                           | `false`                               | false    |
 | env_vars              | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
 | node_version          | string  | The node version to use                                                                                                                   | `24.x`                                | false    |
 | sbom_tool             | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`            | false    |
@@ -184,6 +184,11 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 | additional_args       | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                                  | false    |
 | upload_artifact       | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
 
+#### Secrets
+| Secret            | Description                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DTRACK_APIKEY`   | The Dependency Track API key; requires both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions                                          |
+| `DTRACK_HOSTNAME` | The hostname of the Dependency Track server; the HTTP schema is set separately with the inputs `protocol` (default: `https`) and `port` (`443`) |
 
 #### Outputs
 
