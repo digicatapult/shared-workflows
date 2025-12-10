@@ -9,7 +9,7 @@ on:
       get_sbom:
         required: false
         type: boolean
-        default: true
+        default: false
 permissions:
   contents: write
   pull-requests: read

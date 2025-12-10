@@ -74,9 +74,8 @@ This GitHub Actions workflow is designed to build a Docker container, optionally
    - **QEMU Setup**: Enables emulation for multi-platform builds.
    - **Buildx Setup**: Sets up Docker Buildx for advanced build features.
 5. **Tag Generation**: Based on version data and push preferences, generates tags for GHCR and DockerHub, including `:latest` tags for stable releases.
-6. **Generate SBOMs with Docker Scout**: If set to push to a registry, then Scout is used to generate an SBOM and a SARIF report from the image.
-7. **Upload SBOM**: An SBOM is included with the PR as an artefact and also uploaded as a release asset based on the versioned tag used for the image.
-8. **Upload Scout's SARIF results**: Depending on the destination selected, the SARIF results are pushed as an artefact or via CodeQL to GHAS.
+6. **Generate CVEs with Docker Scout**: Scout is used to generate a SARIF report from any CVEs found for the image.
+7. **Upload Scout's SARIF results**: Any SARIF findings are pushed to GitHub's Advanced Security API.
 
 #### Conditional Push Cases
 
@@ -117,7 +116,7 @@ Automates the release process on GitHub, creating a versioned release based on t
 | Input    | Type    | Description                                                                                                                               | Default |
 | -------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | env_vars | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    |
-| get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | true    |
+| get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | `true`  |
 
 #### Workflow Description
 
@@ -126,7 +125,7 @@ This GitHub Actions workflow creates a new release on GitHub. It uses the `digic
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
-4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step.
+4. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and SBOMs if available.
 5. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
@@ -171,16 +170,25 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 
 #### Inputs
 
-| Input             | Type    | Description                                                                                                                               | Default                      | Required |
-| ----------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
-| env_vars          | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
-| node_version      | string  | The node version to use                                                                                                                   | `24.x`                       | false    |
-| sbom_tool         | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`   | false    |
-| sbom_format       | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                       | false    |
-| sbom_output_file  | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                         | false    |
-| npm_build_command | string  | Optional build command to run before generating SBOM                                                                                      | `""`                         | false    |
-| additional_args   | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                         | false    |
-| upload_artifact   | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                       | false    |
+| Input                 | Type    | Description                                                                                                                               | Default                               | Required |
+| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| dtrack_project_name   | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
+| enable_check_version  | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
+| enable_dtrack_project | boolean | An option to enable the use of Dependency Track                                                                                           | `false`                               | false    |
+| env_vars              | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
+| node_version          | string  | The node version to use                                                                                                                   | `24.x`                                | false    |
+| sbom_tool             | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`            | false    |
+| sbom_format           | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                                | false    |
+| sbom_output_file      | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                                  | false    |
+| npm_build_command     | string  | Optional build command to run before generating SBOM                                                                                      | `""`                                  | false    |
+| additional_args       | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                                  | false    |
+| upload_artifact       | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
+
+#### Secrets
+| Secret            | Description                                                                                                                                     |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DTRACK_APIKEY`   | The Dependency Track API key; requires both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions                                          |
+| `DTRACK_HOSTNAME` | The hostname of the Dependency Track server; the HTTP schema is set separately with the inputs `protocol` (default: `https`) and `port` (`443`) |
 
 #### Outputs
 
@@ -198,6 +206,7 @@ This GitHub Actions workflow generates an SBOM for an NPM project. It allows fle
 4. **Build (Optional)**: Runs a build command if specified, useful for projects that need compilation before SBOM generation.
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
+7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
 
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml)
 
