@@ -134,7 +134,7 @@ jobs:
           fi
         if: inputs.coverage
       - name: Upload coverage JSON summary
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.artifact-name.outputs.name }}
           path: coverage/tmp
@@ -184,14 +184,14 @@ jobs:
           fi
 
       - name: Download current branch coverage summaries
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: ${{ env.COVERAGE_CURRENT_DIR }}/tmp
           pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-current-*
           merge-multiple: true
 
       - name: Download main branch coverage summaries
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           path: ${{ env.COVERAGE_MAIN_DIR }}/tmp
           pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-main-*
@@ -220,7 +220,7 @@ jobs:
           file-coverage-mode: all
           json-summary-compare-path: ${{ needs.setup.outputs.is-main == 'false' && format('{0}/coverage-summary.json', env.COVERAGE_MAIN_DIR) || '' }}
       - name: Upload reports for current branch
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ needs.setup.outputs.artifact-prefix }}-coverage-current-all
           path: |
