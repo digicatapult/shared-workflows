@@ -131,7 +131,7 @@ jobs:
           npx @cyclonedx/cdxgen $ARGS
       - name: Upload SBOM artifact
         if: inputs.upload_artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.set-filename.outputs.filename }}
           path: ${{ steps.set-filename.outputs.filename }}
