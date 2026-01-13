@@ -59,11 +59,14 @@ jobs:
         id: set-branches
         run: |
           CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
-          if [ "$CURRENT_BRANCH" = "main" ]; then
-            echo 'branches=["main"]' >> $GITHUB_OUTPUT
+
+          if [ "${{ inputs.coverage }}" = "false" ] || [ "$CURRENT_BRANCH" = "main" ]; then
+            BRANCHES="[\"$CURRENT_BRANCH\"]"
           else
-            echo "branches=[\"$CURRENT_BRANCH\", \"main\"]" >> $GITHUB_OUTPUT
+            BRANCHES="[\"$CURRENT_BRANCH\", \"main\"]"
           fi
+
+          echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
 
       - name: Generate artifact prefix
         id: set-prefix
