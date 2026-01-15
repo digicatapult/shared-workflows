@@ -15,7 +15,6 @@ on:
       bot-key:
         required: true
 permissions:
-  contents: write
   pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.pr-number }}
