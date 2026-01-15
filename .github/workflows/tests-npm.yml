@@ -34,8 +34,6 @@ on:
         required: false
         type: string
         default: ""
-permissions:
-  pull-requests: write
 jobs:
   setup:
     name: Setup branch matrix
