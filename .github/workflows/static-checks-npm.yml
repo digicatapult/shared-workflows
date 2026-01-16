@@ -2,6 +2,11 @@ name: NPM Static checks
 on:
   workflow_call:
     inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
       enable_semgrep_action:
         required: false
         type: boolean
@@ -47,6 +52,10 @@ jobs:
         command: ${{ fromJson(inputs.matrix_commands) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
       - name: Set environment variables from JSON
         env:
@@ -74,6 +83,10 @@ jobs:
     name: Secrets scanning
     runs-on: ubuntu-latest
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
       - name: TruffleHog PR scan
         uses: trufflesecurity/trufflehog@v3.92.4
@@ -90,6 +103,10 @@ jobs:
       security-events: write
     runs-on: ubuntu-latest
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0

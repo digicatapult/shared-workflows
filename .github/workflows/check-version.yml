@@ -1,6 +1,12 @@
 name: Check version
 on:
   workflow_call:
+    inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
 permissions:
   contents: write
 jobs:
@@ -13,6 +19,10 @@ jobs:
       build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
       is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE }}
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
       - name: Check version
         id: get_version

@@ -2,6 +2,11 @@ name: NPM Tests
 on:
   workflow_call:
     inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
       env_vars:
         required: false
         type: string
@@ -45,6 +50,10 @@ jobs:
       is-main: ${{ steps.check-branch.outputs.is-main }}
       artifact-prefix: ${{ steps.set-prefix.outputs.prefix }}
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - name: Check if running on main
         id: check-branch
         run: |
@@ -82,6 +91,10 @@ jobs:
         branch: ${{ fromJson(needs.setup.outputs.branches) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
         with:
           ref: ${{ matrix.branch }}
@@ -152,6 +165,10 @@ jobs:
       COVERAGE_CURRENT_DIR: coverage
       COVERAGE_MAIN_DIR: coverage-main
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:

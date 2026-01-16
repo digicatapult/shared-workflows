@@ -2,6 +2,11 @@ name: Synchronise PR Version
 on:
   workflow_call:
     inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
       pr-number:
         required: true
         type: number
@@ -28,6 +33,10 @@ jobs:
       PR_NUMBER: ${{ inputs.pr-number }}
       TRUNK_BRANCH: ${{ inputs.trunk-branch }}
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - name: Checkout
         uses: actions/checkout@v6
         with:

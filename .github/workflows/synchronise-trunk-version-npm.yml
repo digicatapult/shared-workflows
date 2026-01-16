@@ -2,6 +2,11 @@ name: Synchronise all PR versions
 on:
   workflow_call:
     inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
       trunk-branch:
         required: true
         type: string
@@ -23,6 +28,10 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       TRUNK_BRANCH: ${{ inputs.trunk-branch }}
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - name: Checkout ${{ inputs.trunk-branch }}
         uses: actions/checkout@v6
         with:

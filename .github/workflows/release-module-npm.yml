@@ -2,6 +2,11 @@ name: NPM Release Module
 on:
   workflow_call:
     inputs:
+      enable_permissions_monitor:
+        required: false
+        type: boolean
+        default: false
+        description: An option to enable minimal permissions checks
       env_vars:
         required: false
         type: string
@@ -39,6 +44,10 @@ jobs:
     name: "Publish package to ${{ inputs.registry_url }}"
     runs-on: ubuntu-latest
     steps:
+      - uses: GitHubSecurityLab/actions-permissions/monitor@v1
+        if: ${{ inputs.enable_permissions_monitor }}
+        with:
+          config: '{ "create_artifact": false, "enabled": true, "debug": false }'
       - uses: actions/checkout@v6
       - name: Set environment variables from JSON
         env:
