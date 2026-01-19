@@ -59,7 +59,7 @@ This workflow also requires two secrets in order to run:
 | `bot-key` | Private Key for the `Github App`                              |
 
 
-### [Build Docker](.github/workflows/build-docker.yml)
+### [Build Docker](.github/workflows/build-docker.yml) ([examples](examples/build-docker.md))
 
 Builds a Docker container and optionally pushes it to GitHub Container Registry (GHCR), DockerHub, or both. The workflow is configurable to support multi-platform builds and various tagging options.
 
@@ -166,7 +166,7 @@ This GitHub Actions workflow creates a new release on GitHub. It uses the `digic
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 
 
-### [Release Module NPM](.github/workflows/release-module-npm.yml)
+### [Release Module NPM](.github/workflows/release-module-npm.yml) ([examples](examples/release-module.md))
 
 Publishes an NPM package to the specified registry, optionally building the package before publishing. This workflow supports configurable registry details, package access settings, and the option to build the package.
 
