@@ -19,9 +19,10 @@ Synchronises the version in a `package.json` on a pull-request branch in relatio
 
 #### Permissions
 
-| Access          | Value   | Jobs used             | Level    | Reason                                                                           |
-| --------------- | ------- | --------------------- | -------- | -------------------------------------------------------------------------------- |
-| `pull-requests` | `write` | `synchronise-version` | Workflow | Required by `planetscale@ghcommit-action` to POST commits against a pull request |
+| Access          | Value   | Jobs used             | Level    | Reason                                                                            |
+| --------------- | ------- | --------------------- | -------- | --------------------------------------------------------------------------------- |
+| `contents`      | `write` | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` |
+| `pull-requests` | `write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                     |
 
 #### Secrets
 
@@ -47,7 +48,8 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 | Access          | Value   | Jobs used                   | Level    | Reason                                                                                     |
 | --------------- | ------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `pull-requests` | `write` | `synchronise-pull-requests` | Workflow | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
+| `contents`      | `write` | `synchronise-pull-requests` | Workflow | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
+| `pull-requests` | `write` | `synchronise-pull-requests` | Workflow | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
 
 #### Secrets
 

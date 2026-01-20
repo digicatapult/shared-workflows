@@ -2,13 +2,11 @@
 
 ## Using [synchronise-trunk-version-npm.yml](../.github/workflows/synchronise-trunk-version-npm.yml) in callers
 
-<!-- Verify that contents: write is needed -->
-
 Several permissions are assumed by this workflow:
 - contents: write
 - pull-requests: write
 
-The permission `pull-requests:write` is required by the third-party action `planetscale/ghcommit-action` from the upstream workflow `synchronise-pr-version-npm.yml` in this repository.
+Both permissions are required by the upstream [synchronise-pr-version-npm.yml](../.github/workflows/synchronise-pr-version-npm.yml) workflow.
 
 > [!TIP]
 > Permission blocks in the caller workflow can be omitted and made implicit, to reduce maintenance when making changes to the callee. They can also be explicit, to minimise warnings from CodeQL scans and to enforce compliance. Any divergence in the permissions invoked can result in a workflow breaking, specifically where the caller assumes permissions that the callee isn't expecting. It's a trade-off between DRY principles, convenience, and compliance.
