@@ -78,7 +78,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Permissions
 
-> IMPORTANT
+> !IMPORTANT
 > Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
@@ -160,7 +160,7 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Permissions
 
-> IMPORTANT
+> !IMPORTANT
 > Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
@@ -296,7 +296,7 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Permissions
 
-> IMPORTANT
+> !IMPORTANT
 > Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
@@ -376,7 +376,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Permissions
 
-> IMPORTANT
+> !IMPORTANT
 > Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                 | Jobs used  | Level | Reason                                                                      | Conditions        |
