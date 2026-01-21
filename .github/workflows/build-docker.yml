@@ -31,14 +31,15 @@ on:
         required: false
       DOCKERHUB_TOKEN:
         required: false
-permissions:
-  actions: read
-  contents: write
-  packages: write
-  security-events: write
+# permissions:
+#   actions: read
+#   contents: write
+#   packages: write
+#   security-events: write
 jobs:
   repo_ids:
     name: Repo IDs
+    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
@@ -57,6 +58,10 @@ jobs:
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
   build-docker:
     name: "Build docker image"
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
     needs: repo_ids
     runs-on: ubuntu-latest
     steps:

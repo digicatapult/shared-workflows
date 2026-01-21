@@ -11,11 +11,9 @@ on:
         required: true
       bot-key:
         required: true
-permissions:
-  contents: write
-  pull-requests: write
 jobs:
   find-pull-requests:
+    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}
@@ -34,6 +32,9 @@ jobs:
           echo "pr_list=$PR_LIST" >> $GITHUB_OUTPUT
   synchronise-pull-requests:
     needs: find-pull-requests
+    permissions:
+      contents: write
+      pull-requests: write
     if: ${{ join(fromJSON(needs.find-pull-requests.outputs.pr_list), '') != '' }}
     strategy:
       matrix:

@@ -26,8 +26,9 @@ on:
         required: false
         type: string
         default: "npm run test:e2e"
-permissions:
-  contents: write
+# permissions:
+#   contents: write
+permissions: {}
 jobs:
   e2e-tests:
     name: Run e2e tests

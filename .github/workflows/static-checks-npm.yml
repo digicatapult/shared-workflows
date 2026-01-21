@@ -41,6 +41,7 @@ on:
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
+    permissions: {}
     strategy:
       fail-fast: false
       matrix:
@@ -72,6 +73,7 @@ jobs:
   scan-secrets:
     if: ${{ inputs.enable_trufflehog_action == true }}
     name: Secrets scanning
+    permissions: {}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

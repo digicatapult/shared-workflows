@@ -34,11 +34,12 @@ on:
         required: false
         type: string
         default: ""
-permissions:
-  pull-requests: write
+# permissions:
+#   pull-requests: write
 jobs:
   setup:
     name: Setup branch matrix
+    permissions: {}
     runs-on: ubuntu-latest
     outputs:
       branches: ${{ steps.set-branches.outputs.branches }}
@@ -75,6 +76,7 @@ jobs:
   tests:
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
     needs: setup
+    permissions: {}
     strategy:
       fail-fast: false
       matrix:
@@ -147,6 +149,8 @@ jobs:
     name: Coverage
     runs-on: ubuntu-latest
     needs: [tests, setup]
+    permissions:
+      pull-requests: write
     if: inputs.coverage
     env:
       COVERAGE_CURRENT_DIR: coverage
