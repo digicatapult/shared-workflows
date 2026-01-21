@@ -28,14 +28,8 @@ jobs:
       security-events: write
 ```
 
-> CAUTION
-> If these permissions were changed to `{}`, then the workflow would fail because of the requirements of the nested jobs.
-
 
 ### Implicit permissions
-
-> Tip
-> Implicit permissions in the caller will tend to cause CodeQL warnings to fire, assuming that GitHub Code Scanning is enabled.
 
 ```yaml
 jobs:
