@@ -6,24 +6,12 @@ Several permissions are included in this workflow:
 - `pull-requests: read`
 - `contents: write`
 
-They're invoked at the workflow level for the `release` job.
-
-> [!TIP]
-> Permission blocks in the caller workflow can be omitted and made implicit, to reduce maintenance when making changes to the callee. They can also be explicit, to minimise warnings from CodeQL scans and to enforce compliance. Any divergence in the permissions invoked can result in a workflow breaking, specifically where the caller assumes permissions that the callee isn't expecting. It's a trade-off between DRY principles, convenience, and compliance.
+They're invoked at the workflow level for the `release` job. Writing contents ensures that the workflow can create new assets for the release. Reading the PR is required by `inputs.get_sbom`, in that the endpoint to GET artifacts from the pull requests means that the SBOM can be retrieved and then uploaded as a release asset.
 
 
-### Implicit permissions with defaults
+### Explicit permissions with defaults
 
 A minimal workflow will create a release on GitHub with tags for the given version and separately for `latest`.
-
-```yaml
-jobs:
-  release-github:
-    uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
-```
-
-
-### Explicit permissions
 
 ```yaml
 jobs:
@@ -35,16 +23,27 @@ jobs:
 ```
 
 
-### Minimal with dependencies
-
-In practice, this kind of job should be dependent on a build step succeededing, e.g. [build-docker.yml](../.github/workflows/build-docker.yml) via `needs: [build-docker]`, to help avoid broken releases.
-
+### Implicit permissions
 
 ```yaml
 jobs:
   release-github:
-    needs: [build-docker]
     uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
+```
+
+
+### Minimal with dependencies
+
+This kind of job in `release.yml` should be dependent on a build step succeededing, e.g. [build-docker.yml](../.github/workflows/build-docker.yml) via `needs: [build-docker]`, to help avoid broken releases.
+
+```yaml
+jobs:
+  release-github:
+    uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
+    needs: [build-docker]
+    permissions:
+      pull-requests: read
+      contents: write
 ```
 
 
@@ -57,6 +56,9 @@ jobs:
   release-github:
     uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
     needs: [build-docker]
+    permissions:
+      pull-requests: read
+      contents: write
     with:
       get_sboms: true
 ```

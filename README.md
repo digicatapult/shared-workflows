@@ -19,10 +19,10 @@ Synchronises the version in a `package.json` on a pull-request branch in relatio
 
 #### Permissions
 
-| Access          | Value   | Jobs used             | Level    | Reason                                                                            |
-| --------------- | ------- | --------------------- | -------- | --------------------------------------------------------------------------------- |
-| `contents`      | `write` | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` |
-| `pull-requests` | `write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                     |
+| Access                 | Jobs used             | Level    | Reason                                                                            |
+| ---------------------- | --------------------- | -------- | --------------------------------------------------------------------------------- |
+| `contents: write`      | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` |
+| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                     |
 
 #### Secrets
 
@@ -46,10 +46,10 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 #### Permissions
 
-| Access          | Value   | Jobs used                   | Level    | Reason                                                                                     |
-| --------------- | ------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------ |
-| `contents`      | `write` | `synchronise-pull-requests` | Workflow | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
-| `pull-requests` | `write` | `synchronise-pull-requests` | Workflow | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
+| Access                 | Jobs used                   | Level    | Reason                                                                                     |
+| ---------------------- | --------------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| `contents: write`      | `synchronise-pull-requests` | Workflow | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
+| `pull-requests: write` | `synchronise-pull-requests` | Workflow | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
 
 #### Secrets
 
@@ -78,11 +78,15 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Permissions
 
-| Access            | Value   | Jobs used      | Level    | Reason                                                                   | Conditions                                 |
-| ------------------| ------- | ---------------| -------- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| `contents`        | `write` | `build-docker` | Workflow | To GET contents to include along with the upload to a container registry | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `packages`        | `write` | `build-docker` | Workflow | To POST built packages to one or more container registries               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `security-events` | `write` | `build-docker` | Workflow | To POST new code scanning alerts based on the SARIF report               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+> IMPORTANT
+> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+
+| Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
+| ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
+| `{}` (none)              | `repo_ids`     | Job   | To implement minimal permissions                                         | N/A                                        |
+| `contents: read`         | `build-docker` | Job   | To GET contents to include along with the upload to a container registry | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `packages: write`        | `build-docker` | Job   | To POST built packages to one or more container registries               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `security-events: write` | `build-docker` | Job   | To POST new code scanning alerts based on the SARIF report               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 
 #### Secrets
 
@@ -132,6 +136,12 @@ Determines the versioning information of the repository, setting output values r
 | build_date     | string  | The date when the build was initiated              |
 | is_prerelease  | boolean | Indicates if the version is a pre-release          |
 
+#### Permissions
+
+| Access      | Jobs used       | Level    | Reason                           |
+| ----------- | --------------- | -------- | -------------------------------- |
+| `{}` (none) | `check-version` | Workflow | To implement minimal permissions |
+
 #### Workflow Description
 
 This GitHub Actions workflow verifies and checks the versioning details of the repository. It uses the `digicatapult/check-version` action to assess the version information, outputting details such as whether it’s a new version, the version string, if it's a pre-release, and the build date. These outputs can be used by subsequent jobs to conditionally perform tasks based on the versioning state.
@@ -150,10 +160,13 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Permissions
 
-| Access          | Value   | Jobs used | Level    | Reason                                                                                        | Conditions        |
-| ----------------| ------- | ----------| -------- | --------------------------------------------------------------------------------------------- | ----------------- |
-| `pull-requests` | `read`  | `release` | Workflow | To GET an SBOM artifact from a PR, and then include it subsequently as a GitHub release asset | `inputs.get_sbom` |
-| `contents`      | `write` | `release` | Workflow | To POST release contents for both the versioned and `latest` tags                             | N/A               |
+> IMPORTANT
+> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+
+| Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
+| --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | ----------------- |
+| `contents: write`     | `release` | Workflow | To POST release contents for both the versioned and `latest` tags                             | N/A               |
+| `pull-requests: read` | `release` | Workflow | To GET an SBOM artifact from a PR, and then include it subsequently as a GitHub release asset | `inputs.get_sbom` |
 
 #### Workflow Description
 
@@ -185,11 +198,11 @@ Publishes an NPM package to the specified registry, optionally building the pack
 
 #### Permissions
 
-| Access            | Value   | Jobs used     | Level    | Reason                                                                                                       |
-| ----------------- | ------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `contents`        | `write` | `publish-npm` | Workflow | To both GET and POST repository contents, as the READMEs are included in the package's documentation         |
-| `packages`        | `write` | `publish-npm` | Workflow | To POST a package to a GitHub Packages registry using `npm publish`                                          |
-| `id-token`        | `write` | `publish-npm` | Workflow | To request an OCID token and POST to confirm details about the provenance of a package in the NPMJS registry |
+| Access            | Jobs used     | Level    | Reason                                                                                                       |
+| ----------------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `contents: write` | `publish-npm` | Workflow | To both GET and POST repository contents, as the READMEs are included in the package's documentation         |
+| `id-token: write` | `publish-npm` | Workflow | To request an OCID token and POST to confirm details about the provenance of a package in the NPMJS registry |
+| `packages: write` | `publish-npm` | Workflow | To POST a package to a GitHub Packages registry using `npm publish`                                          |
 
 #### Secrets
 
@@ -230,6 +243,12 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 | npm_build_command     | string  | Optional build command to run before generating SBOM                                                                                      | `""`                                  | false    |
 | additional_args       | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                                  | false    |
 | upload_artifact       | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
+
+#### Permissions
+
+| Access      | Jobs used       | Level    | Reason                           |
+| ----------- | --------------- | -------- | -------------------------------- |
+| `{}` (none) | `generate-sbom` | Workflow | To implement minimal permissions |
 
 #### Secrets
 
@@ -277,9 +296,14 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Permissions
 
-| Access            | Value   | Jobs required | Level | Reason                                                     | Conditions                          |
-| ----------------- | ------- | ------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
-| `security-events` | `write` | `scan-vulns`  | Job   | To POST new code scanning alerts based on the SARIF report | `inputs.semgrep_upload_type: sarif` |
+> IMPORTANT
+> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+
+| Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
+| ------------------------ | --------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
+| `{}` (none)              | `scan-secrets`  | Job   | To implement minimal permissions                           | N/A                                 |
+| `{}` (none)              | `static-checks` | Job   | To implement minimal permissions                           | N/A                                 |
+| `security-events: write` | `scan-vulns`    | Job   | To POST new code scanning alerts based on the SARIF report | `inputs.semgrep_upload_type: sarif` |
 
 #### Workflow Description
 
@@ -310,6 +334,12 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 | docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
 | node_version        | string | The node version to use                                                                                                   | `24.x`               | false    |
 | test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
+
+#### Permissions
+
+| Access      | Jobs used   | Level    | Reason                           |
+| ----------- | ----------- | -------- | -------------------------------- |
+| `{}` (none) | `e2e-tests` | Workflow | To implement minimal permissions |
 
 #### Workflow Description
 
@@ -343,6 +373,17 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]`          | false    |
 | coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                                      | false    |
 | coverage_config_json | string  |  Path to a custom c8 configuration JSON file                                                                          | `""`                                        | false    |
+
+#### Permissions
+
+> IMPORTANT
+> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+
+| Access                 | Jobs used  | Level | Reason                                                                      | Conditions        |
+| ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ----------------- |
+| `{}` (none)            | `setup`    | Job   | To implement minimal permissions                                            | N/A               |
+| `{}` (none)            | `tests`    | Job   | To implement minimal permissions                                            | N/A               |
+| `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage` |
 
 #### Workflow Description
 
@@ -390,6 +431,12 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 | env_vars                 | string | Extra variables to be passed to the environment                               | `{}`                           | false    |
 | extra_args               | string | Extra arguments to be passed to the TruffleHog CLI                            | `"--results=verified,unknown"` | true     |
 
+#### Permissions
+
+| Access      | Jobs used    | Level    | Reason                           |
+| ----------- | ------------ | -------- | -------------------------------- |
+| `{}` (none) | `trufflehog` | Workflow | To implement minimal permissions |
+
 #### Workflow Description
 
 This GitHub Actions workflow runs TruffleHog scans.
@@ -407,7 +454,7 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 #### Inputs
 
 | Input                 | Type   | Description                                                                                                                               | Default                  | Required |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------| -------- |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------- |
 | enable_semgrep_action | bool   | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | true                     | false    |
 | extra_args            | string | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'` | false    |
 | sarif_path            | string | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`          | false    |
@@ -415,9 +462,9 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 
 #### Permissions
 
-| Access            | Value   | Jobs used | Level    | Reason                                                     |
-| ----------------- | ------- | ----------| -------- | ---------------------------------------------------------- |
-| `security-events` | `write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report |
+| Access                   | Jobs used | Level    | Reason                                                     |
+| ------------------------ | --------- | -------- | ---------------------------------------------------------- |
+| `security-events: write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report |
 
 #### Workflow Description
 

@@ -6,7 +6,7 @@
 > No extra job/workflow permissions are required by any of the options.
 
 
-### Implicit permissions with defaults
+### Explicit permissions with defaults
 
 This call invokes the TruffleHog action, scanning for exposed secrets. TruffleHog merely scans the working branch by default. Its results are printed, rather than uploaded.
 
@@ -14,14 +14,14 @@ This call invokes the TruffleHog action, scanning for exposed secrets. TruffleHo
 jobs:
   scan-secrets:
     uses: digicatapult/shared-workflows/.github/workflows/scan-secrets.yml@main
+    permissions: {}
 ```
 
 
-### Explicit permissions
+### Implicit permissions
 
 ```yaml
 jobs:
   scan-secrets:
     uses: digicatapult/shared-workflows/.github/workflows/scan-secrets.yml@main
-    permissions: {}
 ```

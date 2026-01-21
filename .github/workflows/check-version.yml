@@ -1,8 +1,7 @@
 name: Check version
 on:
   workflow_call:
-permissions:
-  contents: write
+permissions: {}
 jobs:
   check-version:
     name: 'Check version'

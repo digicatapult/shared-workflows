@@ -2,56 +2,58 @@
 
 ## Using [build-docker.yml](../.github/workflows/build-docker.yml) in callers
 
-<!--
-Permissions should be at job level, as repo-ids doesn't use any.
-contents: write needs to be verified; contents: read might be more accurate.
--->
-
-Several permissions are included in this workflow:
-- `contents: write`
+Several permissions are needed for the `build-docker` job:
+- `contents: read`
 - `packages: write`
 - `security-events: write`
 
-They're invoked at the workflow level for the `build-docker` job, but the `repo-ids` job doesn't require them.
+They should be invoked at the job level. Reading READMEs and LICENSE information and writing packages are both essential to the steps invoking `docker/build-push-action`. If `build-docker` is invoked without the option to push either to Docker Hub or GHCR, if merely testing the image, then in practice these levels of access aren't applied.
 
-> [!TIP]
-> Permission blocks in the caller workflow can be omitted and made implicit, to reduce maintenance when making changes to the callee. They can also be explicit, to minimise warnings from CodeQL scans and to enforce compliance. Any divergence in the permissions invoked can result in a workflow breaking, specifically where the caller assumes permissions that the callee isn't expecting. It's a trade-off between DRY principles, convenience, and compliance.
+To upload details about any potential security vulnerabilities (CVEs) via GitHub's Code Scanning APIs, the ability to write security events is needed. These alerts are visible within the GitHub repository's Security panel. If GitHub Code Scanning is disabled at the time the workflow is executed, then the step will fail.
 
-
-### Implicit permissions with defaults
-
-A minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully.
-
-```yaml
-jobs:
-  build-docker:
-    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
-```
+By contrast, the `repo-ids` job doesn't require any additional levels of access and should take minimal permissions: `permissions: {}`.
 
 
-### Explicit permissions
+### Explicit permissions with defaults
+
+A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully. Callers will need to list the permissions for all nested jobs, even if there is only one specific job using them and all others are set to minimal access (`permissions: {}`).
 
 ```yaml
 jobs:
   build-docker:
     uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
     permissions:
-      contents: write
+      contents: read
       packages: write
       security-events: write
+```
+
+> CAUTION
+> If these permissions were changed to `{}`, then the workflow would fail because of the requirements of the nested jobs.
+
+
+### Implicit permissions
+
+> Tip
+> Implicit permissions in the caller will tend to cause CodeQL warnings to fire, assuming that GitHub Code Scanning is enabled.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
 ```
 
 
 ### Minimal with a registry push
 
-To push to either Docker Hub or the GHCR, one of the two corresponding inputs must be set. Both secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, are required.
+To push to either Docker Hub or the GHCR, one of the two corresponding inputs must be set. Both secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, are required. This use case would suit a `release.yml` workflow, to push a successful build artifact (an image) to a registry.
 
 ```yaml
 jobs:
   build-docker:
     uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
     permissions:
-      contents: write
+      contents: read
       packages: write
       security-events: write
     with:

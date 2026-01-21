@@ -40,6 +40,7 @@ on:
         default: "--results=verified,unknown"
 jobs:
   static-checks:
+    permissions: {}
     name: Static Analysis Checks - ${{ matrix.command }}
     strategy:
       fail-fast: false
@@ -70,6 +71,7 @@ jobs:
       - name: ${{ matrix.command }}
         run: npm run ${{ matrix.command }}
   scan-secrets:
+    permissions: {}
     if: ${{ inputs.enable_trufflehog_action == true }}
     name: Secrets scanning
     runs-on: ubuntu-latest
@@ -82,12 +84,12 @@ jobs:
           head: ${{ github.ref_name }}
           extra_args: ${{ inputs.trufflehog_extra_args }}
   scan-vulns:
+    permissions:
+      security-events: write
     if: |
       (inputs.enable_semgrep_action == true) &&
       (github.actor != 'dependabot[bot]')
     name: Vulnerability scanning
-    permissions:
-      security-events: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6

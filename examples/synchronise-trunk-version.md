@@ -2,17 +2,14 @@
 
 ## Using [synchronise-trunk-version-npm.yml](../.github/workflows/synchronise-trunk-version-npm.yml) in callers
 
-Several permissions are assumed by this workflow:
+Several permissions are assumed by the job `synchronise-pull-requests`:
 - contents: write
 - pull-requests: write
 
 Both permissions are required by the upstream [synchronise-pr-version-npm.yml](../.github/workflows/synchronise-pr-version-npm.yml) workflow.
 
-> [!TIP]
-> Permission blocks in the caller workflow can be omitted and made implicit, to reduce maintenance when making changes to the callee. They can also be explicit, to minimise warnings from CodeQL scans and to enforce compliance. Any divergence in the permissions invoked can result in a workflow breaking, specifically where the caller assumes permissions that the callee isn't expecting. It's a trade-off between DRY principles, convenience, and compliance.
 
-
-### Implicit permissions with defaults
+### Explicit permissions with defaults
 
 This caller synchronises the versions of all open PRs. It requires the secrets `BOT_ID` and `BOT_KEY` as variables at the repository or organisation level.
 
@@ -20,13 +17,16 @@ This caller synchronises the versions of all open PRs. It requires the secrets `
 jobs:
   synchronise-trunk-version-npm:
     uses: digicatapult/shared-workflows/.github/workflows/synchronise-trunk-version-npm.yml@main
+    permissions:
+      contents: write
+      pull-requests: write
     secrets:
       bot-id: ${{ secrets.BOT_ID }}
       bot-key: ${{ secrets.BOT_KEY }}
 ```
 
 
-### Explicit permissions
+### Implicit permissions
 
 ```yaml
 jobs:
@@ -35,7 +35,4 @@ jobs:
     secrets:
       bot-id: ${{ secrets.BOT_ID }}
       bot-key: ${{ secrets.BOT_KEY }}
-    permissions:
-      contents: write
-      pull-requests: write
 ```
