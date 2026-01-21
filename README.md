@@ -48,6 +48,7 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 | Access                 | Jobs used                   | Level | Reason                                                                                     |
 | ---------------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------ |
+| `{}` (none)            | `find-pull-requests`        | Job   | To implement minimal permissions                                                           |
 | `contents: write`      | `synchronise-pull-requests` | Job   | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
 | `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
 
