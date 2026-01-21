@@ -2,9 +2,8 @@
 
 ## Using [tests-e2e-npm.yml](../.github/workflows/tests-e2e-npm.yml) in callers
 
-<!-- Verify that contents: write is needed -->
-
-The permission `contents: write` is assumed for the `e2e-tests` job.
+> [!TIP]
+> No extra job/workflow permissions are required by any of the options.
 
 
 ### Explicit permissions with defaults
