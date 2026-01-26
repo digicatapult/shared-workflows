@@ -61,8 +61,7 @@ on:
         required: false
       DTRACK_HOSTNAME:
         required: false
-permissions:
-  contents: read
+permissions: {}
 jobs:
   generate-sbom:
     name: "Generate SBOM"

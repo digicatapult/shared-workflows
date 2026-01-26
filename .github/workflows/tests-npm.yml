@@ -34,10 +34,9 @@ on:
         required: false
         type: string
         default: ""
-permissions:
-  pull-requests: write
 jobs:
   setup:
+    permissions: {}
     name: Setup branch matrix
     runs-on: ubuntu-latest
     outputs:
@@ -73,6 +72,7 @@ jobs:
         run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
+    permissions: {}
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
     needs: setup
     strategy:
@@ -144,6 +144,8 @@ jobs:
         if: inputs.coverage
 
   coverage:
+    permissions:
+      pull-requests: write
     name: Coverage
     runs-on: ubuntu-latest
     needs: [tests, setup]
