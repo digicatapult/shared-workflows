@@ -89,6 +89,7 @@ jobs:
     permissions:
       security-events: write
       contents: read
+      actions: read
     if: |
       (inputs.enable_semgrep_action == true) &&
       (github.actor != 'dependabot[bot]')
