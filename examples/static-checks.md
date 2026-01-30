@@ -35,6 +35,7 @@ jobs:
   static-checks-npm:
     uses: digicatapult/shared-workflows/.github/workflows/static-checks-npm.yml@main
     permissions:
+      security-events: write
       contents: read
       actions: read
     with:
@@ -49,6 +50,10 @@ If `inputs.enable_semgrep_action` is changed to `false`, then Semgrep isn't exec
 jobs:
   static-checks-npm:
     uses: digicatapult/shared-workflows/.github/workflows/static-checks-npm.yml@main
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
     with:
       enable_semgrep_action: false
 ```
