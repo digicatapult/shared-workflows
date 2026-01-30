@@ -13,7 +13,8 @@ on:
         required: true
 jobs:
   find-pull-requests:
-    permissions: {}
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}

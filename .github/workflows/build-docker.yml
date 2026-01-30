@@ -33,7 +33,8 @@ on:
         required: false
 jobs:
   repo_ids:
-    permissions: {}
+    permissions:
+      contents: read
     name: Repo IDs
     runs-on: ubuntu-latest
     outputs:

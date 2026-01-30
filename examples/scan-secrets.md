@@ -3,8 +3,7 @@
 ## Using [scan-secrets.yml](../.github/workflows/scan-secrets.yml) in callers
 
 > [!TIP]
-> No extra job/workflow permissions are required by any of the options.
-
+> For public repos, no extra job/workflow permissions are required by any of the options.
 
 ### Explicit permissions with defaults
 
@@ -14,9 +13,9 @@ This call invokes the TruffleHog action, scanning for exposed secrets. TruffleHo
 jobs:
   scan-secrets:
     uses: digicatapult/shared-workflows/.github/workflows/scan-secrets.yml@main
-    permissions: {}
+    permissions:
+      contents: read
 ```
-
 
 ### Implicit permissions
 

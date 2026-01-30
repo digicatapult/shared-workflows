@@ -3,8 +3,7 @@
 ## Using [check-version.yml](../.github/workflows/check-version.yml) in callers
 
 > [!TIP]
-> No extra job/workflow permissions are required by any of the options.
-
+> For public repos, no extra job/workflow permissions are required by any of the options.
 
 ### Explicit permissions with defaults
 
@@ -14,9 +13,9 @@ A minimal workflow will check the versions for the working branch in `package*.j
 jobs:
   check-version:
     uses: digicatapult/shared-workflows/.github/workflows/check-version.yml@main
-    permissions: {}
+    permissions:
+      contents: read
 ```
-
 
 ### Implicit permissions
 
