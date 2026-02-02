@@ -221,6 +221,7 @@ jobs:
           file: ${{ inputs.docker_file }}
           platforms: ${{ inputs.docker_platforms }}
           build-args: ${{ inputs.build_args }}
+          no-cache: true
           push: false
       # Generate and upload CVEs
       - name: Generate CVEs with Docker Scout (Docker Hub)
