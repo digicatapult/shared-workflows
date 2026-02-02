@@ -2,9 +2,6 @@
 
 ## Using [tests-e2e-npm.yml](../.github/workflows/tests-e2e-npm.yml) in callers
 
-> [!TIP]
-> For public repos, no extra job/workflow permissions are required by any of the options.
-
 ### Explicit permissions with defaults
 
 This caller invokes the default end-to-end test scripts, as defined in the `package.json` file for the NPM project.
