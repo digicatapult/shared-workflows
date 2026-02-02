@@ -295,8 +295,10 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 | Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
 | ------------------------ | --------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
-| `{}` (none)              | `scan-secrets`  | Job   | To implement minimal permissions                           | N/A                                 |
-| `{}` (none)              | `static-checks` | Job   | To implement minimal permissions                           | N/A                                 |
+| `contents: read`         | `scan-secrets`  | Job   | To GET repository contents and history for secret scanning | N/A                                 |
+| `contents: read`         | `static-checks` | Job   | To GET repository contents for static analysis             | N/A                                 |
+| `contents: read`         | `scan-vulns`    | Job   | To GET repository contents for vulnerability scanning      | N/A                                 |
+| `actions: read`          | `scan-vulns`    | Job   | To GET actions metadata for the scan                       | N/A                                 |
 | `security-events: write` | `scan-vulns`    | Job   | To POST new code scanning alerts based on the SARIF report | `inputs.semgrep_upload_type: sarif` |
 
 #### Workflow Description
@@ -375,6 +377,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ----------------- |
 | `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A               |
 | `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A               |
+| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A               |
 | `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage` |
 
 #### Workflow Description

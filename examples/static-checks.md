@@ -2,7 +2,7 @@
 
 ## Using [static-checks-npm.yml](../.github/workflows/static-checks-npm.yml) in callers
 
-The permission `security-events: write` is used in this workflow and it's required at the job level for `scan-vulns`. Neither `static-checks` nor `scan-secrets` require any permissions.
+`static-checks` and `scan-secrets` require `contents: read` permissions, and `scan-vulns` requires `security-events: write`, `contents: read`, and `actions: read`.
 
 ### Explicit permissions with defaults
 

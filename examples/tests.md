@@ -4,6 +4,8 @@
 
 The permission `pull-requests: write` is assumed at the workflow level the `coverage` job, specifically by the step using `davelosert/vitest-coverage-report-action`. No permissions are required for the `setup` and `tests` jobs.
 
+Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`). `contents: read` is required by the `setup` and `tests` jobs.
+
 ### Explicit permissions with defaults
 
 This caller workflow invokes the default test scripts, as defined in the `package.json` file for the NPM project.
