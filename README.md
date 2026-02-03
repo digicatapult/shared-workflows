@@ -70,6 +70,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
 | build_args       | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
 | env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
+| pull_dhi         | boolean | Whether to login to Docker Hardened Images registry before building                                                   | `false`                     | false    |
 | push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
 | push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
 | docker_platforms | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
