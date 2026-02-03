@@ -33,7 +33,6 @@ This workflow also requires two secrets in order to run:
 | `bot-id`  | Id of the `Github App` to use when committing version updates |
 | `bot-key` | Private Key for the `Github App`                              |
 
-
 ### [Synchronise all PR versions](.github/workflows/synchronise-trunk-version-npm.yml) ([examples](examples/synchronise-trunk-version.md))
 
 Synchronises the version in `package.json` for all open pull-requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`]. This workflow finds all PRs with these labels and calls the Synchronise PR Version workflow for each one. It's useful after the trunk branch version changes to ensure all open PRs have the correct calculated versions. Like the single PR workflow, it removes the `v:stale` label and commits corrections as needed.
@@ -48,7 +47,8 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 | Access                 | Jobs used                   | Level | Reason                                                                                     |
 | ---------------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------ |
-| `{}` (none)            | `find-pull-requests`        | Job   | To implement minimal permissions                                                           |
+| `contents: read`       | `find-pull-requests`        | Job   | To GET repository contents                                                                 |
+| `pull-requests: read`  | `find-pull-requests`        | Job   | To GET open pull requests                                                                  |
 | `contents: write`      | `synchronise-pull-requests` | Job   | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
 | `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
 
@@ -60,7 +60,6 @@ This workflow also requires two secrets in order to run:
 | --------- | ------------------------------------------------------------- |
 | `bot-id`  | Id of the `Github App` to use when committing version updates |
 | `bot-key` | Private Key for the `Github App`                              |
-
 
 ### [Build Docker](.github/workflows/build-docker.yml) ([examples](examples/build-docker.md))
 
@@ -81,7 +80,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 #### Permissions
 
 > [!IMPORTANT]
-> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
 | ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
@@ -124,7 +123,6 @@ For all images, the workflow adds OCI-compliant metadata labels to enrich the im
 
 This workflow is versatile, offering a full pipeline for Docker image creation and optional registry publishing, adapting to a range of requirements from simple builds to multi-platform, multi-registry deployments.
 
-
 ### [Check Version](.github/workflows/check-version.yml) ([examples](examples/check-version.md))
 
 Determines the versioning information of the repository, setting output values related to version, release type, and build date. This workflow is typically used as a prerequisite step in other workflows that need version information for tagging, releasing, or publishing. It detects if the current commit represents a new version by comparing the `package.json` version against existing git tags, determines if the version follows pre-release naming conventions (e.g., contains alpha, beta, rc), and captures the build timestamp.
@@ -140,14 +138,13 @@ Determines the versioning information of the repository, setting output values r
 
 #### Permissions
 
-| Access      | Jobs used       | Level    | Reason                           |
-| ----------- | --------------- | -------- | -------------------------------- |
-| `{}` (none) | `check-version` | Workflow | To implement minimal permissions |
+| Access           | Jobs used       | Level    | Reason                                               |
+| ---------------- | --------------- | -------- | ---------------------------------------------------- |
+| `contents: read` | `check-version` | Workflow | To GET repository contents and version from git tags |
 
 #### Workflow Description
 
 This GitHub Actions workflow verifies and checks the versioning details of the repository. It uses the `digicatapult/check-version` action to assess the version information, outputting details such as whether it’s a new version, the version string, if it's a pre-release, and the build date. These outputs can be used by subsequent jobs to conditionally perform tasks based on the versioning state.
-
 
 ### [Release Github](.github/workflows/release-github.yml) ([examples](examples/release-github.md))
 
@@ -163,7 +160,7 @@ Automates the release process on GitHub, creating a versioned release based on t
 #### Permissions
 
 > [!IMPORTANT]
-> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
 | --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | ----------------- |
@@ -181,7 +178,6 @@ This GitHub Actions workflow creates a new release on GitHub. It uses the `digic
 5. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
-
 
 ### [Release Module NPM](.github/workflows/release-module-npm.yml) ([examples](examples/release-module.md))
 
@@ -224,7 +220,6 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 6. **Publish to NPM**: Publishes the package to the specified registry with the given access level, using the provided authentication token.
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
-
 
 ### [NPM Generate SBOM](.github/workflows/generate-sbom-npm.yml) ([examples](examples/generate-sbom.md))
 
@@ -277,7 +272,6 @@ This GitHub Actions workflow generates an SBOM for an NPM project. It allows fle
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
 7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
 
-
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml) ([examples](examples/static-checks.md))
 
 Performs configurable static analysis checks on an NPM project, such as linting, dependency checking, XSS scanning, and additional checks, based on the specified commands.
@@ -299,12 +293,14 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 #### Permissions
 
 > [!IMPORTANT]
-> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
 | ------------------------ | --------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
-| `{}` (none)              | `scan-secrets`  | Job   | To implement minimal permissions                           | N/A                                 |
-| `{}` (none)              | `static-checks` | Job   | To implement minimal permissions                           | N/A                                 |
+| `contents: read`         | `scan-secrets`  | Job   | To GET repository contents and history for secret scanning | N/A                                 |
+| `contents: read`         | `static-checks` | Job   | To GET repository contents for static analysis             | N/A                                 |
+| `contents: read`         | `scan-vulns`    | Job   | To GET repository contents for vulnerability scanning      | N/A                                 |
+| `actions: read`          | `scan-vulns`    | Job   | To GET actions metadata for the scan                       | N/A                                 |
 | `security-events: write` | `scan-vulns`    | Job   | To POST new code scanning alerts based on the SARIF report | `inputs.semgrep_upload_type: sarif` |
 
 #### Workflow Description
@@ -321,8 +317,7 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
 
-
-### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml)  ([examples](examples/tests-e2e.md))
+### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml) ([examples](examples/tests-e2e.md))
 
 Executes end-to-end (E2E) tests for an NPM project using Docker Compose, supporting optional build commands and project-specific configurations.
 
@@ -358,33 +353,33 @@ This GitHub Actions workflow is tailored for running end-to-end tests within a D
 
 This workflow is designed to accommodate different testing needs, offering flexibility with custom commands and environment-specific configurations for robust E2E testing.
 
-
-### [NPM Tests](.github/workflows/tests-npm.yml)  ([examples](examples/tests.md))
+### [NPM Tests](.github/workflows/tests-npm.yml) ([examples](examples/tests.md))
 
 Runs specified NPM tests (e.g., unit and integration tests) with optional build and pre-test commands, as well as Docker-based dependency setup. Collects and reports code coverage by default, comparing coverage between the current branch and main branch.
 
 #### Inputs
 
-| Input                | Type    | Description                                                                                                           | Default                                     | Required |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- | -------- |
-| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                                        | false    |
-| npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                                        | false    |
-| pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                                        | false    |
-| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`                        | false    |
-| node_version         | string  | The node version to use                                                                                               | `24.x`                                      | false    |
-| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]`          | false    |
-| coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                                      | false    |
-| coverage_config_json | string  |  Path to a custom c8 configuration JSON file                                                                          | `""`                                        | false    |
+| Input                | Type    | Description                                                                                                           | Default                            | Required |
+| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                               | false    |
+| npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                               | false    |
+| pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                               | false    |
+| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`               | false    |
+| node_version         | string  | The node version to use                                                                                               | `24.x`                             | false    |
+| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]` | false    |
+| coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                             | false    |
+| coverage_config_json | string  | Path to a custom c8 configuration JSON file                                                                           | `""`                               | false    |
 
 #### Permissions
 
 > [!IMPORTANT]
-> Nested jobs that may or may not run still require that the __caller__ workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
+> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                 | Jobs used  | Level | Reason                                                                      | Conditions        |
 | ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ----------------- |
-| `{}` (none)            | `setup`    | Job   | To implement minimal permissions                                            | N/A               |
-| `{}` (none)            | `tests`    | Job   | To implement minimal permissions                                            | N/A               |
+| `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A               |
+| `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A               |
+| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A               |
 | `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage` |
 
 #### Workflow Description
@@ -419,7 +414,6 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 
 This workflow provides a comprehensive testing and coverage solution with branch comparison, custom build commands, Docker-based dependencies, and detailed coverage reporting including trend analysis.
 
-
 ### [Scan Secrets](.github/workflows/scan-secrets.yml) ([examples](examples/scan-secrets.md))
 
 Runs scanners to detect the exposure of secrets, with the option to add in extra arguments to exclude directories, fail on detection, or output the results in JSON format.
@@ -435,9 +429,9 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 
 #### Permissions
 
-| Access      | Jobs used    | Level    | Reason                           |
-| ----------- | ------------ | -------- | -------------------------------- |
-| `{}` (none) | `trufflehog` | Workflow | To implement minimal permissions |
+| Access           | Jobs used    | Level    | Reason                                                     |
+| ---------------- | ------------ | -------- | ---------------------------------------------------------- |
+| `contents: read` | `trufflehog` | Workflow | To GET repository contents and history for secret scanning |
 
 #### Workflow Description
 
@@ -447,7 +441,6 @@ This GitHub Actions workflow runs TruffleHog scans.
 2. **TruffleHog PR Scan**: Execute the TruffleHog scan of the PR, checking for verified and unverified secrets.
 
 This workflow can be complemented with the complete list of TruffleHog arguments, found in that project's [repository](https://github.com/trufflesecurity/trufflehog/?tab=readme-ov-file#memo-usage).
-
 
 ### [Scan Vulnerabilities](.github/workflows/scan-vulns.yml) ([examples](examples/scan-vulns.md))
 
@@ -467,6 +460,8 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 | Access                   | Jobs used | Level    | Reason                                                     |
 | ------------------------ | --------- | -------- | ---------------------------------------------------------- |
 | `security-events: write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report |
+| `contents: read`         | `semgrep` | Workflow | To GET repository contents for vulnerability scanning      |
+| `actions: read`          | `semgrep` | Workflow | To GET actions metadata for the scan                       |
 
 #### Workflow Description
 

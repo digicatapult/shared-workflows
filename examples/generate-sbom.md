@@ -2,10 +2,6 @@
 
 ## Using [generate-sbom-npm.yml](../.github/workflows/generate-sbom-npm.yml) in callers
 
-> [!TIP]
-> No extra job/workflow permissions are required by any of the options.
-
-
 ### Explicit permissions with defaults
 
 A minimal workflow will create the SBOM against the working branch and upload it as an artifact, potentially for use by other jobs. This won't upload it to a Dependency Track host, however. It can be useful to check for issues with dependencies or the formatting of SBOMs, as the CycloneDX-NPM tool is quite strict.
@@ -14,9 +10,9 @@ A minimal workflow will create the SBOM against the working branch and upload it
 jobs:
   generate-sbom-npm:
     uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
-    permissions: {}
+    permissions:
+      contents: read
 ```
-
 
 ### Implicit permissions
 
@@ -26,7 +22,6 @@ jobs:
     uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
 ```
 
-
 ### Error handling
 
 In practice, the CycloneDX tooling will fail on a range of errors, including excessive dependencies. To minimise the time spent debugging this, it's advisable to ignore the errors instead.
@@ -35,11 +30,11 @@ In practice, the CycloneDX tooling will fail on a range of errors, including exc
 jobs:
   generate-sbom-npm:
     uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
-    permissions: {}
+    permissions:
+      contents: read
     with:
       additional_args: "--ignore-npm-errors"
 ```
-
 
 ### Minimal using Dependency Track
 
@@ -49,7 +44,8 @@ To invoke the use of Dependency Track as a destination for the SBOMs, it's neces
 jobs:
   generate-sbom-npm:
     uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
-    permissions: {}
+    permissions:
+      contents: read
     with:
       additional_args: "--ignore-npm-errors"
       enable_check_version: true

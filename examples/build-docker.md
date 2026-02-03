@@ -3,6 +3,7 @@
 ## Using [build-docker.yml](../.github/workflows/build-docker.yml) in callers
 
 Several permissions are needed for the `build-docker` job:
+
 - `contents: read`
 - `packages: write`
 - `security-events: write`
@@ -11,12 +12,9 @@ They should be invoked at the job level. Reading READMEs and LICENSE information
 
 To upload details about any potential security vulnerabilities (CVEs) via GitHub's Code Scanning APIs, the ability to write security events is needed. These alerts are visible within the GitHub repository's Security panel. If GitHub Code Scanning is disabled at the time the workflow is executed, then the step will fail.
 
-By contrast, the `repo-ids` job doesn't require any additional levels of access and should take minimal permissions: `permissions: {}`.
-
-
 ### Explicit permissions with defaults
 
-A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully. Callers will need to list the permissions for all nested jobs, even if there is only one specific job using them and all others are set to minimal access (`permissions: {}`).
+A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully. Callers will need to list the permissions for all nested jobs, even if there is only one specific job using them and all others are set to minimal access (`permissions: { contents: read }`).
 
 ```yaml
 jobs:
@@ -28,7 +26,6 @@ jobs:
       security-events: write
 ```
 
-
 ### Implicit permissions
 
 ```yaml
@@ -36,7 +33,6 @@ jobs:
   build-docker:
     uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
 ```
-
 
 ### Minimal with a registry push
 

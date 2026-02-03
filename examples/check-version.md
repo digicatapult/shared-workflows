@@ -2,10 +2,6 @@
 
 ## Using [check-version.yml](../.github/workflows/check-version.yml) in callers
 
-> [!TIP]
-> No extra job/workflow permissions are required by any of the options.
-
-
 ### Explicit permissions with defaults
 
 A minimal workflow will check the versions for the working branch in `package*.json`, as the default option is to assume NPM as the package manager. Cargo and Poetry are also supported.
@@ -14,9 +10,9 @@ A minimal workflow will check the versions for the working branch in `package*.j
 jobs:
   check-version:
     uses: digicatapult/shared-workflows/.github/workflows/check-version.yml@main
-    permissions: {}
+    permissions:
+      contents: read
 ```
-
 
 ### Implicit permissions
 
