@@ -15,6 +15,7 @@ jobs:
   find-pull-requests:
     permissions:
       contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}
