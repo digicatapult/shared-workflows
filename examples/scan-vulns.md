@@ -2,8 +2,7 @@
 
 ## Using [scan-vulns.yml](../.github/workflows/scan-vulns.yml) in callers
 
-Only the `security-events: write` permission is used and it's invoked at the workflow level for the `semgrep` job.
-
+`security-events: write`, `contents: read`, and `actions: read` permissions are used. They are invoked at the workflow level for the `semgrep` job.
 
 ### Explicit permissions with defaults
 
@@ -15,8 +14,9 @@ jobs:
     uses: digicatapult/shared-workflows/.github/workflows/scan-vulns.yml@main
     permissions:
       security-events: write
+      contents: read
+      actions: read
 ```
-
 
 ### Implicit permissions
 

@@ -47,7 +47,8 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 | Access                 | Jobs used                   | Level | Reason                                                                                     |
 | ---------------------- | --------------------------- | ----- | ------------------------------------------------------------------------------------------ |
-| `contents: read`       | `find-pull-requests`        | Job   | To GET repository contents and list open pull requests                                     |
+| `contents: read`       | `find-pull-requests`        | Job   | To GET repository contents                                                                 |
+| `pull-requests: read`  | `find-pull-requests`        | Job   | To GET open pull requests                                                                  |
 | `contents: write`      | `synchronise-pull-requests` | Job   | To invoke `synchronise-pr-version-npm.yml` and POST commits against all open pull requests |
 | `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs     |
 
@@ -459,6 +460,8 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 | Access                   | Jobs used | Level    | Reason                                                     |
 | ------------------------ | --------- | -------- | ---------------------------------------------------------- |
 | `security-events: write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report |
+| `contents: read`         | `semgrep` | Workflow | To GET repository contents for vulnerability scanning      |
+| `actions: read`          | `semgrep` | Workflow | To GET actions metadata for the scan                       |
 
 #### Workflow Description
 
