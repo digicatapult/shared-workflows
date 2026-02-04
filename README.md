@@ -364,6 +364,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                               | false    |
 | npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                               | false    |
 | pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                               | false    |
+| pull_ghcr            | boolean | Whether to login to GitHub Container Registry before docker compose                                                   | `false`                            | false    |
 | docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`               | false    |
 | node_version         | string  | The node version to use                                                                                               | `24.x`                             | false    |
 | tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]` | false    |
@@ -375,12 +376,13 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 > [!IMPORTANT]
 > Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
-| Access                 | Jobs used  | Level | Reason                                                                      | Conditions        |
-| ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ----------------- |
-| `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A               |
-| `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A               |
-| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A               |
-| `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage` |
+| Access                 | Jobs used  | Level | Reason                                                                      | Conditions         |
+| ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ------------------ |
+| `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A                |
+| `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A                |
+| `packages: read`       | `tests`    | Job   | To GET packages from GitHub Container Registry when pulling images          | `inputs.pull_ghcr` |
+| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A                |
+| `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage`  |
 
 #### Workflow Description
 

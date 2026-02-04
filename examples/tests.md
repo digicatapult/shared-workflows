@@ -2,9 +2,7 @@
 
 ## Using [tests-npm.yml](../.github/workflows/tests-npm.yml) in callers
 
-The permission `pull-requests: write` is assumed at the workflow level the `coverage` job, specifically by the step using `davelosert/vitest-coverage-report-action`. No permissions are required for the `setup` and `tests` jobs.
-
-Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`). `contents: read` is required by the `setup` and `tests` jobs.
+`contents: read` is required by the `setup` job. `contents: read` and `packages: read` are required by the `tests` job. Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`).
 
 ### Explicit permissions with defaults
 
@@ -17,6 +15,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
+      packages: read
 ```
 
 ### Implicit permissions
