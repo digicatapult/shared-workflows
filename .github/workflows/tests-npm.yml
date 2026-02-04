@@ -120,7 +120,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup dependencies
         run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
