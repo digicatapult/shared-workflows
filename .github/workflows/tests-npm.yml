@@ -79,6 +79,7 @@ jobs:
   tests:
     permissions:
       contents: read
+      packages: read
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
     needs: setup
     strategy:
