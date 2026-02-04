@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: docker-compose.yml
+      pull_ghcr:
+        required: false
+        type: boolean
+        default: false
       node_version:
         required: false
         type: string
@@ -111,6 +115,13 @@ jobs:
         if: inputs.npm_build_command != ''
       - name: Create environment file
         run: touch .env
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.pull_ghcr == true }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup dependencies
         run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
         if: inputs.docker_compose_file != ''
