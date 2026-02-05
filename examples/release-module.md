@@ -3,12 +3,12 @@
 ## Using [release-module.yml](../.github/workflows/release-module.yml) in callers
 
 Several permissions are included in this workflow:
+
 - `contents: write`
 - `id-token: write`
 - `packages: write`
 
 They're invoked at the workflow level for the `publish-npm` job.
-
 
 ### Explicit permissions with defaults
 
@@ -23,16 +23,6 @@ jobs:
       id-token: write
       packages: write
 ```
-
-
-### Implicit permissions
-
-```yaml
-jobs:
-  release-module:
-    uses: digicatapult/shared-workflows/.github/workflows/release-module.yml@main
-```
-
 
 ### Minimal using third-party registries
 

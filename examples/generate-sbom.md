@@ -14,14 +14,6 @@ jobs:
       contents: read
 ```
 
-### Implicit permissions
-
-```yaml
-jobs:
-  generate-sbom-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
-```
-
 ### Error handling
 
 In practice, the CycloneDX tooling will fail on a range of errors, including excessive dependencies. To minimise the time spent debugging this, it's advisable to ignore the errors instead.

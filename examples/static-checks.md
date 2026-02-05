@@ -18,14 +18,6 @@ jobs:
       actions: read
 ```
 
-### Implicit permissions with defaults
-
-```yaml
-jobs:
-  static-checks-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/static-checks-npm.yml@main
-```
-
 ### Minimal with PR artefacts
 
 If `inputs.semgrep_upload_type` is left empty (`""`) or set to `artefact`, then the step requiring `security-events: write` is skipped. It's only needed to upload directly to GitHub via the `github/codeql-action/upload-sarif` action.

@@ -3,11 +3,11 @@
 ## Using [release-github.yml](../.github/workflows/release-github.yml) in callers
 
 Several permissions are included in this workflow:
+
 - `pull-requests: read`
 - `contents: write`
 
 They're invoked at the workflow level for the `release` job. Writing contents ensures that the workflow can create new assets for the release. Reading the PR is required by `inputs.get_sbom`, in that the endpoint to GET artifacts from the pull requests means that the SBOM can be retrieved and then uploaded as a release asset.
-
 
 ### Explicit permissions with defaults
 
@@ -22,16 +22,6 @@ jobs:
       contents: write
 ```
 
-
-### Implicit permissions
-
-```yaml
-jobs:
-  release-github:
-    uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
-```
-
-
 ### Minimal with dependencies
 
 This kind of job in `release.yml` should be dependent on a build step succeededing, e.g. [build-docker.yml](../.github/workflows/build-docker.yml) via `needs: [build-docker]`, to help avoid broken releases.
@@ -45,7 +35,6 @@ jobs:
       pull-requests: read
       contents: write
 ```
-
 
 ### Minimal with attestable SBOM assets
 

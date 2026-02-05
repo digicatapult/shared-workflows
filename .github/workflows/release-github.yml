@@ -10,9 +10,6 @@ on:
         required: false
         type: boolean
         default: false
-permissions:
-  contents: write
-  pull-requests: read
 jobs:
   release:
     name: "Release"

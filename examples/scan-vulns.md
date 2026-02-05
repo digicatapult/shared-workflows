@@ -17,11 +17,3 @@ jobs:
       contents: read
       actions: read
 ```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  scan-vulns:
-    uses: digicatapult/shared-workflows/.github/workflows/scan-vulns.yml@main
-```

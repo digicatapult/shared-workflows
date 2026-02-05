@@ -26,14 +26,6 @@ jobs:
       security-events: write
 ```
 
-### Implicit permissions
-
-```yaml
-jobs:
-  build-docker:
-    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
-```
-
 ### Minimal with a registry push
 
 To push to either Docker Hub or the GHCR, one of the two corresponding inputs must be set. Both secrets, `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`, are required. This use case would suit a `release.yml` workflow, to push a successful build artifact (an image) to a registry.

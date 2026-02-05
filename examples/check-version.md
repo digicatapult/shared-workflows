@@ -13,11 +13,3 @@ jobs:
     permissions:
       contents: read
 ```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  check-version:
-    uses: digicatapult/shared-workflows/.github/workflows/check-version.yml@main
-```

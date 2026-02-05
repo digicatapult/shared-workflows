@@ -14,14 +14,6 @@ jobs:
       contents: read
 ```
 
-### Implicit permissions
-
-```yaml
-jobs:
-  tests-e2e-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/tests-e2e-npm.yml@main
-```
-
 ### Minimal with secret inheritance
 
 If the end-to-end tests need to handle tokens or credentials from an earlier workflow, then they can inherit them with the following example:

@@ -30,10 +30,6 @@ on:
       REGISTRY_AUTH_TOKEN:
         required: false
         description: "Auth token for registry. Required if registry_url is not https://npm.pkg.github.com"
-permissions:
-  contents: write
-  packages: write
-  id-token: write
 jobs:
   publish-npm:
     name: "Publish package to ${{ inputs.registry_url }}"

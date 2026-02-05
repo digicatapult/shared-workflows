@@ -13,11 +13,3 @@ jobs:
     permissions:
       contents: read
 ```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  scan-secrets:
-    uses: digicatapult/shared-workflows/.github/workflows/scan-secrets.yml@main
-```

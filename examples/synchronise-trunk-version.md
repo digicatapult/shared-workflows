@@ -29,14 +29,3 @@ jobs:
       bot-id: ${{ secrets.BOT_ID }}
       bot-key: ${{ secrets.BOT_KEY }}
 ```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  synchronise-trunk-version-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/synchronise-trunk-version-npm.yml@main
-    secrets:
-      bot-id: ${{ secrets.BOT_ID }}
-      bot-key: ${{ secrets.BOT_KEY }}
-```
