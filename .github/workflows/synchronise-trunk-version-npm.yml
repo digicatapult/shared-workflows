@@ -13,9 +13,6 @@ on:
         required: true
 jobs:
   find-pull-requests:
-    permissions:
-      contents: read
-      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}
@@ -33,9 +30,6 @@ jobs:
           PR_LIST=$(gh pr list --base $TRUNK_BRANCH --search "label:v:major,v:minor,v:patch" --json number --jq "map(.number)")
           echo "pr_list=$PR_LIST" >> $GITHUB_OUTPUT
   synchronise-pull-requests:
-    permissions:
-      contents: write
-      pull-requests: write
     needs: find-pull-requests
     if: ${{ join(fromJSON(needs.find-pull-requests.outputs.pr_list), '') != '' }}
     strategy:

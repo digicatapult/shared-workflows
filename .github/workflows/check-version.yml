@@ -1,11 +1,9 @@
 name: Check version
 on:
   workflow_call:
-permissions:
-  contents: read
 jobs:
   check-version:
-    name: 'Check version'
+    name: "Check version"
     runs-on: ubuntu-latest
     outputs:
       is_new_version: ${{ steps.get_version.outputs.IS_NEW_VERSION }}

@@ -37,8 +37,6 @@ on:
         required: false
 jobs:
   repo_ids:
-    permissions:
-      contents: read
     name: Repo IDs
     runs-on: ubuntu-latest
     outputs:
@@ -57,10 +55,6 @@ jobs:
           echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
   build-docker:
-    permissions:
-      contents: read
-      packages: write
-      security-events: write
     name: "Build docker image"
     needs: repo_ids
     runs-on: ubuntu-latest
