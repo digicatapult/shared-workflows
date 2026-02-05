@@ -9,7 +9,7 @@ Several permissions are assumed by this workflow:
 
 The permission `contents: write` is required by the third-party action `planetscale/ghcommit-action` as part of the `synchronise-version` job, and `pull-requests: write` is then needed to finish processing any labels against the PR. They're both assumed at the workflow level.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 This caller synchronises `package.json` if a given label is applied to the pull request. It requires the secrets `BOT_ID` and `BOT_KEY` as variables at the repository or organisation level.
 

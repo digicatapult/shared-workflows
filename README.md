@@ -323,20 +323,22 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 #### Inputs
 
-| Input               | Type   | Description                                                                                                               | Default              | Required |
-| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
-| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
-| npm_build_command   | string | Optional command to build the application before running tests                                                            | `""`                 | false    |
-| pre_test_command    | string | Optional command to execute before running the main test command                                                          | `""`                 | false    |
-| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
-| node_version        | string | The node version to use                                                                                                   | `24.x`               | false    |
-| test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
+| Input               | Type    | Description                                                                                                               | Default              | Required |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
+| npm_build_command   | string  | Optional command to build the application before running tests                                                            | `""`                 | false    |
+| pre_test_command    | string  | Optional command to execute before running the main test command                                                          | `""`                 | false    |
+| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                       | `false`              | false    |
+| docker_compose_file | string  | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
+| node_version        | string  | The node version to use                                                                                                   | `24.x`               | false    |
+| test_command        | string  | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
 
 #### Permissions
 
-| Access      | Jobs used   | Level    | Reason                           |
-| ----------- | ----------- | -------- | -------------------------------- |
-| `{}` (none) | `e2e-tests` | Workflow | To implement minimal permissions |
+| Access           | Jobs used   | Level | Reason                                                             |
+| ---------------- | ----------- | ----- | ------------------------------------------------------------------ | ------------------ |
+| `contents: read` | `e2e-tests` | Job   | To GET repository contents and determine branch information        | N/A                |
+| `packages: read` | `e2e-tests` | Job   | To GET packages from GitHub Container Registry when pulling images | `inputs.pull_ghcr` |
 
 #### Workflow Description
 

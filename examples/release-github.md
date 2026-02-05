@@ -9,7 +9,7 @@ Several permissions are included in this workflow:
 
 They're invoked at the workflow level for the `release` job. Writing contents ensures that the workflow can create new assets for the release. Reading the PR is required by `inputs.get_sbom`, in that the endpoint to GET artifacts from the pull requests means that the SBOM can be retrieved and then uploaded as a release asset.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 A minimal workflow will create a release on GitHub with tags for the given version and separately for `latest`.
 

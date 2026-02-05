@@ -10,7 +10,7 @@ Several permissions are included in this workflow:
 
 They're invoked at the workflow level for the `publish-npm` job.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 A minimal workflow will publish an NPM package to a package registry.
 

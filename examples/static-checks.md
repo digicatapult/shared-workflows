@@ -4,7 +4,7 @@
 
 `static-checks` and `scan-secrets` require `contents: read` permissions, and `scan-vulns` requires `security-events: write`, `contents: read`, and `actions: read`.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 As part of this workflow, Semgrep creates a SARIF report that captures any vulnerabilities found. If the repository doesn't have GitHub Code Scanning enabled beforehand, then the required endpoints to POST the report to can't be reached and the workflow itself will likely fail at that point.
 

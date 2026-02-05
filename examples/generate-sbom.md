@@ -2,7 +2,7 @@
 
 ## Using [generate-sbom-npm.yml](../.github/workflows/generate-sbom-npm.yml) in callers
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 A minimal workflow will create the SBOM against the working branch and upload it as an artifact, potentially for use by other jobs. This won't upload it to a Dependency Track host, however. It can be useful to check for issues with dependencies or the formatting of SBOMs, as the CycloneDX-NPM tool is quite strict.
 

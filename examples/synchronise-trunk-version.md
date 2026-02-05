@@ -14,7 +14,7 @@ The following permissions are assumed by the job `synchronise-pull-requests`:
 
 Both permissions are required by the upstream [synchronise-pr-version-npm.yml](../.github/workflows/synchronise-pr-version-npm.yml) workflow.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 This caller synchronises the versions of all open PRs. It requires the secrets `BOT_ID` and `BOT_KEY` as variables at the repository or organisation level.
 

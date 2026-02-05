@@ -12,7 +12,7 @@ They should be invoked at the job level. Reading READMEs and LICENSE information
 
 To upload details about any potential security vulnerabilities (CVEs) via GitHub's Code Scanning APIs, the ability to write security events is needed. These alerts are visible within the GitHub repository's Security panel. If GitHub Code Scanning is disabled at the time the workflow is executed, then the step will fail.
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully. Callers will need to list the permissions for all nested jobs, even if there is only one specific job using them and all others are set to minimal access (`permissions: { contents: read }`).
 
