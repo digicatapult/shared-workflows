@@ -84,7 +84,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 | Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
 | ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| `{}` (none)              | `repo_ids`     | Job   | To implement minimal permissions                                         | N/A                                        |
+| `contents: read`         | `repo_ids`     | Job   | To GET repository contents                                               | N/A                                        |
 | `contents: read`         | `build-docker` | Job   | To GET contents to include along with the upload to a container registry | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `packages: write`        | `build-docker` | Job   | To POST built packages to one or more container registries               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `security-events: write` | `build-docker` | Job   | To POST new code scanning alerts based on the SARIF report               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
@@ -240,9 +240,9 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 
 #### Permissions
 
-| Access      | Jobs used       | Level    | Reason                           |
-| ----------- | --------------- | -------- | -------------------------------- |
-| `{}` (none) | `generate-sbom` | Workflow | To implement minimal permissions |
+| Access           | Jobs used       | Level    | Reason                     |
+| ---------------- | --------------- | -------- | -------------------------- |
+| `contents: read` | `generate-sbom` | Workflow | To GET repository contents |
 
 #### Secrets
 
