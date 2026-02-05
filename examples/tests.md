@@ -2,7 +2,7 @@
 
 ## Using [tests-npm.yml](../.github/workflows/tests-npm.yml) in callers
 
-`contents: read` is required by the `setup` job. `contents: read` and `packages: read` are required by the `tests` job. Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`).
+`contents: read` is required by the `setup` job. `contents: read` is required by the `tests` job, and `packages: read` is required by the `tests` job when `inputs.pull_ghcr` is true. Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`).
 
 ### Explicit permissions
 
@@ -15,5 +15,4 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-      packages: read
 ```

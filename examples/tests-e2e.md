@@ -12,7 +12,6 @@ jobs:
     uses: digicatapult/shared-workflows/.github/workflows/tests-e2e-npm.yml@main
     permissions:
       contents: read
-      packages: read
 ```
 
 ### Minimal with secret inheritance
@@ -25,6 +24,5 @@ jobs:
     uses: digicatapult/shared-workflows/.github/workflows/tests-e2e-npm.yml@main
     permissions:
       contents: read
-      packages: read
     secrets: inherit
 ```

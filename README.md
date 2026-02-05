@@ -4,6 +4,9 @@ Shared github workflows created by the `digicatapult` organisation.
 
 ## Workflows
 
+> [!IMPORTANT]
+> Shared workflow calls from private repositories require read permissions (e.g., `contents: read`, `actions: read`, `pull-requests: read`). Public repositories do not require these permissions.
+
 The following workflows are included in this repository:
 
 ### [Synchronise PR Version](.github/workflows/synchronise-pr-version-npm.yml) ([examples](examples/synchronise-pr-version.md))
@@ -78,9 +81,6 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
 
 #### Permissions
-
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
 | ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
@@ -158,9 +158,6 @@ Automates the release process on GitHub, creating a versioned release based on t
 | get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | `true`  |
 
 #### Permissions
-
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
 | --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | ----------------- |
@@ -292,9 +289,6 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Permissions
 
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
-
 | Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
 | ------------------------ | --------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
 | `contents: read`         | `scan-secrets`  | Job   | To GET repository contents and history for secret scanning | N/A                                 |
@@ -335,7 +329,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 #### Permissions
 
-| Access           | Jobs used   | Level | Reason                                                             |
+| Access           | Jobs used   | Level | Reason                                                             | Conditions         |
 | ---------------- | ----------- | ----- | ------------------------------------------------------------------ | ------------------ |
 | `contents: read` | `e2e-tests` | Job   | To GET repository contents and determine branch information        | N/A                |
 | `packages: read` | `e2e-tests` | Job   | To GET packages from GitHub Container Registry when pulling images | `inputs.pull_ghcr` |
@@ -374,9 +368,6 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | coverage_config_json | string  | Path to a custom c8 configuration JSON file                                                                           | `""`                               | false    |
 
 #### Permissions
-
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                 | Jobs used  | Level | Reason                                                                      | Conditions         |
 | ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ------------------ |

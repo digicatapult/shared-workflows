@@ -14,7 +14,7 @@ To upload details about any potential security vulnerabilities (CVEs) via GitHub
 
 ### Explicit permissions
 
-A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully. Callers will need to list the permissions for all nested jobs, even if there is only one specific job using them and all others are set to minimal access (`permissions: { contents: read }`).
+A very minimal workflow will build an image without pushing it to a container registry. This is useful for testing that the image builds successfully.
 
 ```yaml
 jobs:
