@@ -2,7 +2,7 @@
 
 ## Using [tests-e2e-npm.yml](../.github/workflows/tests-e2e-npm.yml) in callers
 
-### Explicit permissions with defaults
+### Explicit permissions
 
 This caller invokes the default end-to-end test scripts, as defined in the `package.json` file for the NPM project.
 
@@ -12,14 +12,6 @@ jobs:
     uses: digicatapult/shared-workflows/.github/workflows/tests-e2e-npm.yml@main
     permissions:
       contents: read
-```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  tests-e2e-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/tests-e2e-npm.yml@main
 ```
 
 ### Minimal with secret inheritance

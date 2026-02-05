@@ -4,6 +4,9 @@ Shared github workflows created by the `digicatapult` organisation.
 
 ## Workflows
 
+> [!IMPORTANT]
+> Shared workflow calls from private repositories require read permissions (e.g., `contents: read`, `actions: read`, `pull-requests: read`). Public repositories do not require these permissions.
+
 The following workflows are included in this repository:
 
 ### [Synchronise PR Version](.github/workflows/synchronise-pr-version-npm.yml) ([examples](examples/synchronise-pr-version.md))
@@ -79,12 +82,9 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Permissions
 
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
-
 | Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
 | ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| `{}` (none)              | `repo_ids`     | Job   | To implement minimal permissions                                         | N/A                                        |
+| `contents: read`         | `repo_ids`     | Job   | To GET repository contents                                               | N/A                                        |
 | `contents: read`         | `build-docker` | Job   | To GET contents to include along with the upload to a container registry | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `packages: write`        | `build-docker` | Job   | To POST built packages to one or more container registries               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `security-events: write` | `build-docker` | Job   | To POST new code scanning alerts based on the SARIF report               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
@@ -158,9 +158,6 @@ Automates the release process on GitHub, creating a versioned release based on t
 | get_sbom | boolean | An option to disable the retrieval of SBOM artefacts, e.g. if none are expected from other workflows                                      | `true`  |
 
 #### Permissions
-
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
 
 | Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
 | --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | ----------------- |
@@ -243,9 +240,9 @@ Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX
 
 #### Permissions
 
-| Access      | Jobs used       | Level    | Reason                           |
-| ----------- | --------------- | -------- | -------------------------------- |
-| `{}` (none) | `generate-sbom` | Workflow | To implement minimal permissions |
+| Access           | Jobs used       | Level    | Reason                     |
+| ---------------- | --------------- | -------- | -------------------------- |
+| `contents: read` | `generate-sbom` | Workflow | To GET repository contents |
 
 #### Secrets
 
@@ -292,9 +289,6 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Permissions
 
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
-
 | Access                   | Jobs used       | Level | Reason                                                     | Conditions                          |
 | ------------------------ | --------------- | ----- | ---------------------------------------------------------- | ----------------------------------- |
 | `contents: read`         | `scan-secrets`  | Job   | To GET repository contents and history for secret scanning | N/A                                 |
@@ -323,20 +317,22 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 #### Inputs
 
-| Input               | Type   | Description                                                                                                               | Default              | Required |
-| ------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
-| env_vars            | string | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
-| npm_build_command   | string | Optional command to build the application before running tests                                                            | `""`                 | false    |
-| pre_test_command    | string | Optional command to execute before running the main test command                                                          | `""`                 | false    |
-| docker_compose_file | string | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
-| node_version        | string | The node version to use                                                                                                   | `24.x`               | false    |
-| test_command        | string | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
+| Input               | Type    | Description                                                                                                               | Default              | Required |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
+| npm_build_command   | string  | Optional command to build the application before running tests                                                            | `""`                 | false    |
+| pre_test_command    | string  | Optional command to execute before running the main test command                                                          | `""`                 | false    |
+| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                       | `false`              | false    |
+| docker_compose_file | string  | The Docker Compose file used for building the testing environment                                                         | `docker-compose.yml` | false    |
+| node_version        | string  | The node version to use                                                                                                   | `24.x`               | false    |
+| test_command        | string  | Command used to run E2E tests, which can be customized as needed                                                          | `"npm run test:e2e"` | false    |
 
 #### Permissions
 
-| Access      | Jobs used   | Level    | Reason                           |
-| ----------- | ----------- | -------- | -------------------------------- |
-| `{}` (none) | `e2e-tests` | Workflow | To implement minimal permissions |
+| Access           | Jobs used   | Level | Reason                                                             | Conditions         |
+| ---------------- | ----------- | ----- | ------------------------------------------------------------------ | ------------------ |
+| `contents: read` | `e2e-tests` | Job   | To GET repository contents and determine branch information        | N/A                |
+| `packages: read` | `e2e-tests` | Job   | To GET packages from GitHub Container Registry when pulling images | `inputs.pull_ghcr` |
 
 #### Workflow Description
 
@@ -364,6 +360,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                               | false    |
 | npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                               | false    |
 | pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                               | false    |
+| pull_ghcr            | boolean | Whether to login to GitHub Container Registry before docker compose                                                   | `false`                            | false    |
 | docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`               | false    |
 | node_version         | string  | The node version to use                                                                                               | `24.x`                             | false    |
 | tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]` | false    |
@@ -372,15 +369,13 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Permissions
 
-> [!IMPORTANT]
-> Nested jobs that may or may not run still require that the **caller** workflow set all of the permissions referenced in the callee. Conditions don't affect whether the permissions block should be included, but rather when and where access is gained.
-
-| Access                 | Jobs used  | Level | Reason                                                                      | Conditions        |
-| ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ----------------- |
-| `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A               |
-| `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A               |
-| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A               |
-| `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage` |
+| Access                 | Jobs used  | Level | Reason                                                                      | Conditions         |
+| ---------------------- | ---------- | ----- | --------------------------------------------------------------------------- | ------------------ |
+| `contents: read`       | `setup`    | Job   | To GET repository contents and determine branch information                 | N/A                |
+| `contents: read`       | `tests`    | Job   | To GET repository contents and checkout different branches for testing      | N/A                |
+| `packages: read`       | `tests`    | Job   | To GET packages from GitHub Container Registry when pulling images          | `inputs.pull_ghcr` |
+| `contents: read`       | `coverage` | Job   | To GET repository coverage config                                           | N/A                |
+| `pull-requests: write` | `coverage` | Job   | To always POST coverage reports as comments for public/private repositories | `inputs.coverage`  |
 
 #### Workflow Description
 

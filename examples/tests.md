@@ -2,11 +2,9 @@
 
 ## Using [tests-npm.yml](../.github/workflows/tests-npm.yml) in callers
 
-The permission `pull-requests: write` is assumed at the workflow level the `coverage` job, specifically by the step using `davelosert/vitest-coverage-report-action`. No permissions are required for the `setup` and `tests` jobs.
+`contents: read` is required by the `setup` job. `contents: read` is required by the `tests` job, and `packages: read` is required by the `tests` job when `inputs.pull_ghcr` is true. Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`).
 
-Permissions `pull-requests: write` and `contents: read` are required by the `coverage` job (specifically by the step using `davelosert/vitest-coverage-report-action`). `contents: read` is required by the `setup` and `tests` jobs.
-
-### Explicit permissions with defaults
+### Explicit permissions
 
 This caller workflow invokes the default test scripts, as defined in the `package.json` file for the NPM project.
 
@@ -17,12 +15,4 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-```
-
-### Implicit permissions
-
-```yaml
-jobs:
-  tests-e2e-npm:
-    uses: digicatapult/shared-workflows/.github/workflows/tests-npm.yml@main
 ```
