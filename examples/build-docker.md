@@ -10,7 +10,7 @@ Several permissions are needed for the `build-docker` job:
 
 They should be invoked at the job level. Reading READMEs and LICENSE information and writing packages are both essential to the steps invoking `docker/build-push-action`. If `build-docker` is invoked without the option to push either to Docker Hub or GHCR, if merely testing the image, then in practice these levels of access aren't applied.
 
-To upload details about any potential security vulnerabilities (CVEs) via GitHub's Code Scanning APIs, the ability to write security events is needed. These alerts are visible within the GitHub repository's Security panel. If GitHub Code Scanning is disabled at the time the workflow is executed, then the step will fail.
+To upload details about any potential security vulnerabilities (CVEs) via GitHub's Code Scanning APIs, the ability to write security events is needed. These alerts are visible within the GitHub repository's Security panel. If GitHub Code Scanning is disabled at the time the workflow is executed, then the step will fail. These steps only run on public repositories.
 
 ### Explicit permissions
 
