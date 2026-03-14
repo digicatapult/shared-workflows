@@ -95,7 +95,7 @@ jobs:
           fi
       - name: Generate a token
         id: generate-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.bot-id }}
           private-key: ${{ secrets.bot-key }}
