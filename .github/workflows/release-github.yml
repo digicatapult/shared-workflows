@@ -59,7 +59,7 @@ jobs:
 
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Download SBOM artefacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         if: inputs.get_sbom
         with:
           name: ${{ github.event.repository.name }}.cdx.json
