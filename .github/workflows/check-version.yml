@@ -5,15 +5,32 @@ jobs:
   check-version:
     name: "Check version"
     runs-on: ubuntu-latest
+    env:
+      IS_LOCKFILE_MAINTENANCE: >-
+        ${{
+          contains((github.event.pull_request && github.event.pull_request.title) || '', 'Lock file maintenance') ||
+          contains(github.head_ref || github.ref_name || '', 'lock-file-maintenance') ||
+          contains(github.head_ref || github.ref_name || '', 'lockfile-maintenance')
+        }}
     outputs:
-      is_new_version: ${{ steps.get_version.outputs.IS_NEW_VERSION }}
-      version: ${{ steps.get_version.outputs.VERSION }}
-      build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
-      is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE }}
+      is_new_version: ${{ steps.get_version.outputs.IS_NEW_VERSION || steps.defaults.outputs.IS_NEW_VERSION }}
+      version: ${{ steps.get_version.outputs.VERSION || steps.defaults.outputs.VERSION }}
+      build_date: ${{ steps.get_version.outputs.BUILD_DATE || steps.defaults.outputs.BUILD_DATE }}
+      is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE || steps.defaults.outputs.IS_PRERELEASE }}
     steps:
       - uses: actions/checkout@v6
+      - name: Set default outputs (lockfile maintenance PRs)
+        id: defaults
+        if: ${{ env.IS_LOCKFILE_MAINTENANCE == 'true' }}
+        run: |
+          echo "IS_NEW_VERSION=false" >> "$GITHUB_OUTPUT"
+          echo "VERSION=" >> "$GITHUB_OUTPUT"
+          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "IS_PRERELEASE=false" >> "$GITHUB_OUTPUT"
+
       - name: Check version
         id: get_version
+        if: ${{ env.IS_LOCKFILE_MAINTENANCE != 'true' }}
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

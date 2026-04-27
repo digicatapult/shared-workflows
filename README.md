@@ -146,6 +146,8 @@ Determines the versioning information of the repository, setting output values r
 
 This GitHub Actions workflow verifies and checks the versioning details of the repository. It uses the `digicatapult/check-version` action to assess the version information, outputting details such as whether it’s a new version, the version string, if it's a pre-release, and the build date. These outputs can be used by subsequent jobs to conditionally perform tasks based on the versioning state.
 
+For PRs that are only lockfile maintenance (e.g. Renovate “Lock file maintenance”), the workflow skips running the `digicatapult/check-version` action and instead returns safe default outputs (notably `is_new_version=false`).
+
 ### [Release Github](.github/workflows/release-github.yml) ([examples](examples/release-github.md))
 
 Automates the release process on GitHub, creating a versioned release based on the repository's current version. This workflow is typically called after merging to the main branch when a new version is detected. It creates two GitHub releases: one with the specific version tag (e.g., v1.2.3) and another that updates the `latest` tag to point to this release. Release notes are automatically generated from the most recent merged PR's body, extracting sections for linked tickets, high-level description, and detailed description.
