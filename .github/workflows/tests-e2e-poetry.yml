@@ -1,0 +1,81 @@
+name: Poetry E2E tests
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+      pre_test_command:
+        required: false
+        type: string
+        default: ""
+      pull_ghcr:
+        required: false
+        type: boolean
+        default: false
+      docker_compose_file:
+        required: false
+        type: string
+        default: docker-compose.yml
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
+      working_directory:
+        required: false
+        type: string
+        default: "."
+      test_command:
+        required: false
+        type: string
+        default: "poetry run pytest tests/e2e -v -s"
+jobs:
+  e2e-tests:
+    name: Run e2e tests
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.pull_ghcr == true }}
+        uses: docker/login-action@v4
+        with:
+         registry: ghcr.io
+         username: ${{ github.actor }}
+         password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+         buildkitd-flags: "--debug"
+        if: inputs.docker_compose_file != ''
+      - name: Build e2e containers
+        uses: docker/bake-action@v7
+        with:
+         builder: ${{ steps.buildx.outputs.name }}
+         files: ${{ inputs.docker_compose_file }}
+        if: inputs.docker_compose_file != ''
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          check-latest: true
+          cache: poetry
+      - name: Install poetry
+        run: pipx install poetry
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      - name: Run pre-test command
+        run: ${{ inputs.pre_test_command }}
+        if: inputs.pre_test_command != ''
+      - name: Run e2e tests
+        run: ${{ inputs.test_command }}

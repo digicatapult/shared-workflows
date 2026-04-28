@@ -36,6 +36,10 @@ This workflow also requires two secrets in order to run:
 | `bot-id`  | Id of the `Github App` to use when committing version updates |
 | `bot-key` | Private Key for the `Github App`                              |
 
+### [Synchronise PR Version (Poetry)](.github/workflows/synchronise-pr-version-poetry.yml) ([examples](examples/synchronise-pr-version-poetry.md))
+
+Synchronises the version in a `pyproject.toml` on a pull-request branch in relation to a trunk branch based on the presence of one of three labels: [`v:major`, `v:minor`, `v:patch`]. Like the NPM variant, it calculates the next version by incrementing the trunk branch version and commits corrections as needed.
+
 ### [Synchronise all PR versions](.github/workflows/synchronise-trunk-version-npm.yml) ([examples](examples/synchronise-trunk-version.md))
 
 Synchronises the version in `package.json` for all open pull-requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`]. This workflow finds all PRs with these labels and calls the Synchronise PR Version workflow for each one. It's useful after the trunk branch version changes to ensure all open PRs have the correct calculated versions. Like the single PR workflow, it removes the `v:stale` label and commits corrections as needed.
@@ -63,6 +67,10 @@ This workflow also requires two secrets in order to run:
 | --------- | ------------------------------------------------------------- |
 | `bot-id`  | Id of the `Github App` to use when committing version updates |
 | `bot-key` | Private Key for the `Github App`                              |
+
+### [Synchronise all PR versions (Poetry)](.github/workflows/synchronise-trunk-version-poetry.yml) ([examples](examples/synchronise-trunk-version-poetry.md))
+
+Synchronises the version in `pyproject.toml` for all open pull requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`].
 
 ### [Build Docker](.github/workflows/build-docker.yml) ([examples](examples/build-docker.md))
 
@@ -268,6 +276,22 @@ This GitHub Actions workflow generates an SBOM for an NPM project. It allows fle
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
 7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
+
+### [Poetry Generate SBOM](.github/workflows/generate-sbom-poetry.yml) ([examples](examples/generate-sbom-poetry.md))
+
+Generates a Software Bill of Materials (SBOM) for a Poetry project using CycloneDX tooling.
+
+### [Poetry Static checks](.github/workflows/static-checks-poetry.yml) ([examples](examples/static-checks-poetry.md))
+
+Runs static analysis for Poetry projects (default matrix includes `pylint`, `black`, `ruff`, `mypy`, and `bandit`).
+
+### [Poetry Tests](.github/workflows/tests-poetry.yml) ([examples](examples/tests-poetry.md))
+
+Runs unit/integration tests for Poetry projects using pytest and compares coverage between the PR branch and `main`.
+
+### [Poetry E2E tests](.github/workflows/tests-e2e-poetry.yml) ([examples](examples/tests-e2e-poetry.md))
+
+Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `docker bake`).
 
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml) ([examples](examples/static-checks.md))
 

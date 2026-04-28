@@ -1,0 +1,145 @@
+name: Poetry Generate SBOM
+on:
+  workflow_call:
+    inputs:
+      dtrack_project_name:
+        required: false
+        type: string
+        default: ${{ github.event.repository.name }}
+      enable_check_version:
+        required: false
+        type: boolean
+        default: false
+      enable_dtrack_project:
+        required: false
+        type: boolean
+        default: false
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
+      working_directory:
+        required: false
+        type: string
+        default: "."
+      poetry_install:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether to run `poetry install` before generating the SBOM"
+      poetry_install_args:
+        required: false
+        type: string
+        default: "--no-interaction --no-ansi --no-root"
+        description: "Arguments to pass to `poetry install` when `poetry_install` is true"
+      sbom_format:
+        required: false
+        type: string
+        default: "json"
+        description: "SBOM output format. Options: json, xml"
+      sbom_output_file:
+        required: false
+        type: string
+        default: ""
+        description: "Custom output filename. Defaults to {repo-name}.cdx.{format}"
+      additional_args:
+        required: false
+        type: string
+        default: ""
+        description: "Additional arguments to pass to the SBOM generation tool"
+      upload_artifact:
+        required: false
+        type: boolean
+        default: true
+        description: "Whether to upload the SBOM as a workflow artifact"
+    outputs:
+      sbom_file:
+        description: "The name of the generated SBOM file"
+        value: ${{ jobs.generate-sbom.outputs.sbom_file }}
+    secrets:
+      DTRACK_APIKEY:
+        required: false
+      DTRACK_HOSTNAME:
+        required: false
+jobs:
+  generate-sbom:
+    name: "Generate SBOM"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    outputs:
+      sbom_file: ${{ steps.set-filename.outputs.filename }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - id: get-version
+        if: inputs.enable_check_version
+        uses: digicatapult/check-version@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_same_version: false
+          package_manager: poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          check-latest: true
+          cache: poetry
+      - name: Install poetry
+        if: inputs.poetry_install
+        run: pipx install poetry
+      - name: Install dependencies
+        if: inputs.poetry_install
+        run: poetry install ${{ inputs.poetry_install_args }}
+      - name: Set output filename
+        id: set-filename
+        run: |
+          if [ -n "${{ inputs.sbom_output_file }}" ]; then
+            echo "filename=${{ inputs.sbom_output_file }}" >> $GITHUB_OUTPUT
+          else
+            echo "filename=${{ github.event.repository.name }}.cdx.${{ inputs.sbom_format }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Generate SBOM with CycloneDX for Poetry
+        run: |
+          FORMAT="${{ inputs.sbom_format }}"
+          if [ "$FORMAT" = "xml" ]; then
+            OF="XML"
+          else
+            OF="JSON"
+          fi
+
+          ARGS="--output-format $OF --output-file ${{ steps.set-filename.outputs.filename }}"
+          if [ -n "${{ inputs.additional_args }}" ]; then
+            ARGS="$ARGS ${{ inputs.additional_args }}"
+          fi
+
+          pipx run --spec cyclonedx-bom cyclonedx-py poetry $ARGS
+      - name: Upload SBOM artifact
+        if: inputs.upload_artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.set-filename.outputs.filename }}
+          path: ${{ steps.set-filename.outputs.filename }}
+          retention-days: 90
+      - uses: DependencyTrack/gh-upload-sbom@v3
+        if: |
+          success() &&
+          inputs.enable_check_version &&
+          inputs.enable_dtrack_project
+        with:
+          serverHostname: ${{ secrets.DTRACK_HOSTNAME }}
+          apiKey: ${{ secrets.DTRACK_APIKEY }}
+          projectName: ${{ inputs.dtrack_project_name }}
+          projectVersion: ${{ steps.get-version.outputs.version }}
+          projectTags: ${{ steps.get-version.outputs.version }}
+          bomFilename: ${{ steps.set-filename.outputs.filename }}
+          autoCreate: true
