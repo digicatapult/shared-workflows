@@ -96,7 +96,9 @@ jobs:
           cache: poetry
       - name: Install poetry
         if: inputs.poetry_install
-        run: pipx install poetry
+        run: |
+          pipx install poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Install dependencies
         if: inputs.poetry_install
         run: poetry install ${{ inputs.poetry_install_args }}

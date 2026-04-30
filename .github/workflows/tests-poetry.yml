@@ -104,13 +104,15 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Install poetry
+        run: |
+          pipx install poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python_version }}
           check-latest: true
           cache: poetry
-      - name: Install poetry
-        run: pipx install poetry
       - name: Install packages
         run: poetry install --no-interaction --no-ansi
       - name: Create environment file
