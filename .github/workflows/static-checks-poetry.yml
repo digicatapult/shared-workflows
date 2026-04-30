@@ -75,16 +75,8 @@ jobs:
         working-directory: ${{ inputs.working_directory }}
     steps:
       - uses: actions/checkout@v6
-      - name: Set environment variables from JSON
-        env:
-          ENV_VARS_JSON: "${{ inputs.env_vars }}"
-        run: |
-          echo "Parsing JSON environment variables..."
-          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - name: Install poetry
-        run: |
-          pipx install poetry
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: pipx install poetry
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python_version }}
