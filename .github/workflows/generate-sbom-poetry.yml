@@ -89,15 +89,15 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_same_version: false
           package_manager: poetry
+      - name: Install poetry
+        run: |
+          pipx install poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python_version }}
           check-latest: true
-      - name: Install poetry
-        if: inputs.poetry_install
-        run: |
-          pipx install poetry
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          cache: poetry
       - name: Install dependencies
         if: inputs.poetry_install
         run: poetry install ${{ inputs.poetry_install_args }}
