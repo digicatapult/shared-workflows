@@ -1,6 +1,6 @@
 # Generating SBOMs (Poetry)
 
-## Using [generate-sbom-poetry.yml](../.github/workflows/generate-sbom-poetry.yml) in callers
+## Using [generate-sbom-npm.yml](../.github/workflows/generate-sbom-npm.yml) in callers
 
 This workflow intentionally does **not** run `poetry install`. SBOM generation is performed from the Poetry project definition (and typically the `poetry.lock`), which avoids needing access to private package indexes and makes the SBOM reflect the lockfile.
 
@@ -11,10 +11,12 @@ If you want the shared workflow itself to install dependencies (closer to the NP
 ```yaml
 jobs:
   generate-sbom-poetry:
-    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-poetry.yml@main
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
     permissions:
       contents: read
     with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
       poetry_install: true
       poetry_install_args: "--no-interaction --no-ansi --no-root"
 ```
@@ -24,9 +26,12 @@ jobs:
 ```yaml
 jobs:
   generate-sbom-poetry:
-    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-poetry.yml@main
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
     permissions:
       contents: read
+    with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
 ```
 
 ### Minimal using Dependency Track
@@ -36,10 +41,12 @@ To invoke Dependency Track upload, provide `DTRACK_APIKEY` and `DTRACK_HOSTNAME`
 ```yaml
 jobs:
   generate-sbom-poetry:
-    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-poetry.yml@main
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
     permissions:
       contents: read
     with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
       enable_check_version: true
       enable_dtrack_project: true
     secrets:

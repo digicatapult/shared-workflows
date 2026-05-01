@@ -30,7 +30,7 @@ jobs:
 
 ### Customising which tools run
 
-By default the workflow runs: `pylint`, `black`, `ruff`, `mypy`, and `bandit`.
+By default the workflow runs a matrix of full commands under `poetry run`.
 
 ```yaml
 jobs:
@@ -39,7 +39,5 @@ jobs:
     permissions:
       contents: read
     with:
-      matrix_commands: '["pylint", "black", "mypy"]'
-      pylint_targets: "app"
-      mypy_targets: "app/"
+      matrix_commands: '["pylint app", "black --check .", "mypy app/"]'
 ```

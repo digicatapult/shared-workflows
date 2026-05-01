@@ -45,4 +45,25 @@ jobs:
     secrets:
       DTRACK_APIKEY: ${{ secrets.DTRACK_APIKEY }}
       DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
+
+### Python/Poetry projects (via cdxgen)
+
+`@cyclonedx/cdxgen` supports Poetry lockfiles (`poetry.lock` / `pyproject.toml`). This lets Python projects reuse the same SBOM workflow.
+
+```yaml
+jobs:
+  generate-sbom-python:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom-npm.yml@main
+    permissions:
+      contents: read
+    with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
+      sbom_format: "json"
+      enable_check_version: true
+      enable_dtrack_project: true
+    secrets:
+      DTRACK_APIKEY: ${{ secrets.DTRACK_APIKEY }}
+      DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
+```
 ```

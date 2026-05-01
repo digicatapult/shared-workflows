@@ -25,27 +25,7 @@ on:
       matrix_commands:
         required: false
         type: string
-        default: '["pylint", "black", "ruff", "mypy", "bandit"]'
-      pylint_targets:
-        required: false
-        type: string
-        default: "app"
-      black_targets:
-        required: false
-        type: string
-        default: "."
-      ruff_targets:
-        required: false
-        type: string
-        default: "."
-      mypy_targets:
-        required: false
-        type: string
-        default: "app/"
-      bandit_targets:
-        required: false
-        type: string
-        default: "app"
+        default: '["pylint app", "black --check .", "ruff check .", "mypy app/", "bandit -r app"]'
       semgrep_extra_args:
         required: false
         type: string
@@ -87,21 +67,8 @@ jobs:
           poetry --version
       - name: Install packages
         run: poetry install --no-interaction --no-ansi
-      - name: pylint
-        if: matrix.command == 'pylint'
-        run: poetry run pylint ${{ inputs.pylint_targets }}
-      - name: black --check
-        if: matrix.command == 'black'
-        run: poetry run black --check ${{ inputs.black_targets }}
-      - name: ruff
-        if: matrix.command == 'ruff'
-        run: poetry run ruff check ${{ inputs.ruff_targets }}
-      - name: mypy
-        if: matrix.command == 'mypy'
-        run: poetry run mypy ${{ inputs.mypy_targets }}
-      - name: bandit
-        if: matrix.command == 'bandit'
-        run: poetry run bandit -r ${{ inputs.bandit_targets }}
+      - name: ${{ matrix.command }}
+        run: poetry run ${{ matrix.command }}
 
   scan-secrets:
     if: ${{ inputs.enable_trufflehog_action == true }}

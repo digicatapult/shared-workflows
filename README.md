@@ -226,9 +226,9 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
 
-### [NPM Generate SBOM](.github/workflows/generate-sbom-npm.yml) ([examples](examples/generate-sbom.md))
+### [Generate SBOM](.github/workflows/generate-sbom-npm.yml) ([examples](examples/generate-sbom.md))
 
-Generates a Software Bill of Materials (SBOM) for an NPM project using CycloneDX tools. This workflow supports multiple generation tools, output formats, and optional build steps.
+Generates a Software Bill of Materials (SBOM) using CycloneDX tools. Despite the filename, this workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection.
 
 #### Inputs
 
@@ -276,10 +276,6 @@ This GitHub Actions workflow generates an SBOM for an NPM project. It allows fle
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
 7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
-
-### [Poetry Generate SBOM](.github/workflows/generate-sbom-poetry.yml) ([examples](examples/generate-sbom-poetry.md))
-
-Generates a Software Bill of Materials (SBOM) for a Poetry project using CycloneDX tooling.
 
 ### [Poetry Static checks](.github/workflows/static-checks-poetry.yml) ([examples](examples/static-checks-poetry.md))
 
