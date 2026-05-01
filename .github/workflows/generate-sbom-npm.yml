@@ -1,4 +1,4 @@
-name: Generate SBOM
+name: "[LEGACY ALIAS] Generate SBOM (generate-sbom-npm.yml)"
 on:
   workflow_call:
     inputs:
@@ -68,94 +68,20 @@ on:
         required: false
 jobs:
   generate-sbom:
-    name: "Generate SBOM"
-    runs-on: ubuntu-latest
-    outputs:
-      sbom_file: ${{ steps.set-filename.outputs.filename }}
-    steps:
-      - uses: actions/checkout@v6
-      - name: Set environment variables from JSON
-        env:
-          ENV_VARS_JSON: "${{ inputs.env_vars }}"
-        run: |
-          echo "Parsing JSON environment variables..."
-          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-      - id: get-version
-        if: inputs.enable_check_version
-        uses: digicatapult/check-version@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fail_on_same_version: false
-          package_manager: ${{ inputs.package_manager }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ inputs.node_version }}
-      - name: Cache Node.js modules
-        if: |
-          (inputs.sbom_tool == '@cyclonedx/cyclonedx-npm' || inputs.npm_build_command != '') &&
-          (hashFiles('**/package-lock.json') != '')
-        uses: actions/cache@v5
-        with:
-          path: ~/.npm
-          key: ${{ runner.OS }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.OS }}-node-
-            ${{ runner.OS }}-
-      - name: Install Packages
-        if: |
-          (inputs.sbom_tool == '@cyclonedx/cyclonedx-npm' || inputs.npm_build_command != '') &&
-          (hashFiles('**/package-lock.json') != '')
-        run: npm ci
-      - name: Build
-        run: ${{ inputs.npm_build_command }}
-        if: inputs.npm_build_command != ''
-      - name: Set output filename
-        id: set-filename
-        run: |
-          if [ -n "${{ inputs.sbom_output_file }}" ]; then
-            echo "filename=${{ inputs.sbom_output_file }}" >> $GITHUB_OUTPUT
-          else
-            echo "filename=${{ github.event.repository.name }}.cdx.${{ inputs.sbom_format }}" >> $GITHUB_OUTPUT
-          fi
-      - name: Generate SBOM with CycloneDX NPM
-        if: inputs.sbom_tool == '@cyclonedx/cyclonedx-npm'
-        run: |
-          ARGS="--output-file ${{ steps.set-filename.outputs.filename }}"
-          if [ "${{ inputs.sbom_format }}" = "xml" ]; then
-            ARGS="$ARGS --output-format XML"
-          fi
-          if [ -n "${{ inputs.additional_args }}" ]; then
-            ARGS="$ARGS ${{ inputs.additional_args }}"
-          fi
-          npx @cyclonedx/cyclonedx-npm $ARGS
-      - name: Generate SBOM with cdxgen
-        if: inputs.sbom_tool == '@cyclonedx/cdxgen'
-        run: |
-          ARGS="-o ${{ steps.set-filename.outputs.filename }}"
-          if [ "${{ inputs.sbom_format }}" = "xml" ]; then
-            ARGS="$ARGS --format xml"
-          fi
-          if [ -n "${{ inputs.additional_args }}" ]; then
-            ARGS="$ARGS ${{ inputs.additional_args }}"
-          fi
-          npx @cyclonedx/cdxgen $ARGS
-      - name: Upload SBOM artifact
-        if: inputs.upload_artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ steps.set-filename.outputs.filename }}
-          path: ${{ steps.set-filename.outputs.filename }}
-          retention-days: 90
-      - uses: DependencyTrack/gh-upload-sbom@v3
-        if: |
-          success() &&
-          inputs.enable_check_version &&
-          inputs.enable_dtrack_project
-        with:
-          serverHostname: ${{ secrets.DTRACK_HOSTNAME }}
-          apiKey: ${{ secrets.DTRACK_APIKEY }}
-          projectName: ${{ inputs.dtrack_project_name }}
-          projectVersion: ${{ steps.get-version.outputs.version }}
-          projectTags: ${{ steps.get-version.outputs.version }}
-          bomFilename: ${{ steps.set-filename.outputs.filename }}
-          autoCreate: true
+    uses: ./.github/workflows/generate-sbom.yml
+    with:
+      dtrack_project_name: ${{ inputs.dtrack_project_name }}
+      enable_check_version: ${{ inputs.enable_check_version }}
+      enable_dtrack_project: ${{ inputs.enable_dtrack_project }}
+      package_manager: ${{ inputs.package_manager }}
+      env_vars: ${{ inputs.env_vars }}
+      node_version: ${{ inputs.node_version }}
+      sbom_tool: ${{ inputs.sbom_tool }}
+      sbom_format: ${{ inputs.sbom_format }}
+      sbom_output_file: ${{ inputs.sbom_output_file }}
+      npm_build_command: ${{ inputs.npm_build_command }}
+      additional_args: ${{ inputs.additional_args }}
+      upload_artifact: ${{ inputs.upload_artifact }}
+    secrets:
+      DTRACK_APIKEY: ${{ secrets.DTRACK_APIKEY }}
+      DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}

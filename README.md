@@ -226,9 +226,11 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
 
-### [Generate SBOM](.github/workflows/generate-sbom-npm.yml) ([examples](examples/generate-sbom.md))
+### [Generate SBOM](.github/workflows/generate-sbom.yml) ([examples](examples/generate-sbom.md))
 
-Generates a Software Bill of Materials (SBOM) using CycloneDX tools. Despite the filename, this workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection.
+Generates a Software Bill of Materials (SBOM) using CycloneDX tools. This workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection.
+
+For backwards compatibility, the legacy filename [.github/workflows/generate-sbom-npm.yml](.github/workflows/generate-sbom-npm.yml) remains available as a thin wrapper around this workflow.
 
 #### Inputs
 
@@ -267,7 +269,7 @@ Generates a Software Bill of Materials (SBOM) using CycloneDX tools. Despite the
 
 #### Workflow Description
 
-This GitHub Actions workflow generates an SBOM for an NPM project. It allows flexibility in choosing the generation tool and format.
+This GitHub Actions workflow generates an SBOM for a project. It allows flexibility in choosing the generation tool and format.
 
 1. **Set Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Node Setup**: Configures the Node.js environment.
