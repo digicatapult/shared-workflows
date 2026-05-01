@@ -64,7 +64,9 @@ jobs:
           python-version: "3.14"
           check-latest: true
       - name: Install poetry
-        run: pipx install poetry
+        run: |
+          pipx install poetry
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Update version
         id: update
         if: ${{ steps.pr-details.outputs.version_label }}
@@ -101,17 +103,9 @@ jobs:
           }
 
           next_version=$(get_next_version $TRUNK_VERSION ${VERSION_LABEL:2})
-          current_version=$(python - << 'PY'
-          import tomllib
-
-            with open('pyproject.toml', 'rb') as f:
-              data = tomllib.load(f)
-          version = (data.get('tool', {}).get('poetry', {}) or {}).get('version') or (data.get('project', {}) or {}).get('version')
-          if not version:
-              raise SystemExit('Could not find version in pyproject.toml under [tool.poetry] or [project]')
-          print(version)
-          PY
-          )
+          current_version=$(python -c 'import tomllib; data = tomllib.load(open("pyproject.toml", "rb")); version = (data.get("tool", {}).get("poetry", {}) or {}).get("version") or (data.get("project", {}) or {}).get("version");\
+if not version: raise SystemExit("Could not find version in pyproject.toml under [tool.poetry] or [project]");\
+print(version)')
 
           if [ "$next_version" != "$current_version" ]; then
             poetry version $next_version
