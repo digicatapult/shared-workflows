@@ -2,11 +2,18 @@
 
 ## Using [generate-sbom.yml](../.github/workflows/generate-sbom.yml) in callers
 
-This workflow intentionally does **not** run `poetry install`. SBOM generation is performed from the Poetry project definition (and typically the `poetry.lock`), which avoids needing access to private package indexes and makes the SBOM reflect the lockfile.
+By default, this workflow does **not** run `poetry install`. SBOM generation is performed from project files (typically `pyproject.toml` and `poetry.lock`).
 
-If a repository does not commit `poetry.lock`, or needs lockfile generation as part of CI, you may want to add a repository-specific step to run `poetry lock` (or `poetry install`) before invoking this shared workflow.
+For repositories that require dependency installation before SBOM generation (for example private indexes or generated lockfiles), you can opt in with `install_python_deps: true`.
 
-If a repository needs dependency installation (e.g., private indexes, dynamic lockfile generation), add repository-specific steps before invoking this shared workflow.
+For mixed repositories that contain both Node/NPM and Python/Poetry, the recommended way to constrain `@cyclonedx/cdxgen` to Python dependencies is to pass `--type python` via `additional_args`.
+
+When `install_python_deps: true`:
+
+- `python_install_command` can be provided for full control.
+- If no custom command is provided, the workflow auto-detects install mode:
+  - `package_manager: poetry` + `pyproject.toml` => runs `poetry install --no-interaction --no-ansi`
+  - `requirements.txt` => runs `pip install -r requirements.txt`
 
 ### Minimal
 
@@ -19,6 +26,39 @@ jobs:
     with:
       package_manager: poetry
       sbom_tool: "@cyclonedx/cdxgen"
+      additional_args: "--type python"
+
+### With Python dependency installation
+
+```yaml
+jobs:
+  generate-sbom-poetry:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    permissions:
+      contents: read
+    with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
+      additional_args: "--type python"
+      install_python_deps: true
+      python_version: "3.14"
+```
+
+### With custom Python install command
+
+```yaml
+jobs:
+  generate-sbom-poetry:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    permissions:
+      contents: read
+    with:
+      package_manager: poetry
+      sbom_tool: "@cyclonedx/cdxgen"
+      additional_args: "--type python"
+      install_python_deps: true
+      python_install_command: "pip install poetry && poetry install --no-interaction --no-ansi"
+```
 ```
 
 ### Minimal using Dependency Track

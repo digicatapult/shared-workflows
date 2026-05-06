@@ -55,6 +55,8 @@ jobs:
 
 `@cyclonedx/cdxgen` supports Poetry lockfiles (`poetry.lock` / `pyproject.toml`). This lets Python projects reuse the same SBOM workflow.
 
+For mixed repositories that contain both Node/NPM and Python/Poetry, pass `--type python` via `additional_args` to ensure the generated SBOM only includes Python dependencies.
+
 ```yaml
 jobs:
   generate-sbom-python:
@@ -65,6 +67,7 @@ jobs:
       package_manager: poetry
       sbom_tool: "@cyclonedx/cdxgen"
       sbom_format: "json"
+      additional_args: "--type python"
       enable_check_version: true
       enable_dtrack_project: true
     secrets:

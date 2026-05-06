@@ -27,6 +27,10 @@ on:
         required: false
         type: string
         default: 24.x
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
       sbom_tool:
         required: false
         type: string
@@ -52,6 +56,16 @@ on:
         type: string
         default: ""
         description: "Additional arguments to pass to the SBOM generation tool"
+      install_python_deps:
+        required: false
+        type: boolean
+        default: false
+        description: "Install Python dependencies before SBOM generation"
+      python_install_command:
+        required: false
+        type: string
+        default: ""
+        description: "Optional custom command to install Python dependencies"
       upload_artifact:
         required: false
         type: boolean
@@ -90,6 +104,10 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
+      - uses: actions/setup-python@v6
+        if: inputs.install_python_deps
+        with:
+          python-version: ${{ inputs.python_version }}
       - name: Cache Node.js modules
         if: |
           (inputs.sbom_tool == '@cyclonedx/cyclonedx-npm' || inputs.npm_build_command != '') &&
@@ -106,6 +124,24 @@ jobs:
           (inputs.sbom_tool == '@cyclonedx/cyclonedx-npm' || inputs.npm_build_command != '') &&
           (hashFiles('**/package-lock.json') != '')
         run: npm ci
+      - name: Install Python dependencies (custom)
+        if: inputs.install_python_deps && inputs.python_install_command != ''
+        run: ${{ inputs.python_install_command }}
+      - name: Install Python dependencies (auto-detect)
+        if: inputs.install_python_deps && inputs.python_install_command == ''
+        run: |
+          if [ -f pyproject.toml ] && [ "${{ inputs.package_manager }}" = "poetry" ]; then
+            python -m pip install --upgrade pip
+            python -m pip install poetry
+            poetry install --no-interaction --no-ansi
+          elif [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            python -m pip install -r requirements.txt
+          else
+            echo "install_python_deps is true but no install method was detected."
+            echo "Provide python_install_command, or include pyproject.toml (with package_manager=poetry), or requirements.txt."
+            exit 1
+          fi
       - name: Build
         run: ${{ inputs.npm_build_command }}
         if: inputs.npm_build_command != ''

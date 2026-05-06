@@ -228,7 +228,7 @@ This workflow simplifies the process of publishing NPM packages by handling envi
 
 ### [Generate SBOM](.github/workflows/generate-sbom.yml) ([examples](examples/generate-sbom.md))
 
-Generates a Software Bill of Materials (SBOM) using CycloneDX tools. This workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection.
+Generates a Software Bill of Materials (SBOM) using CycloneDX tools. This workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection. In mixed repositories, prefer passing `--type python` via `additional_args` when generating a Poetry-focused SBOM so the output is constrained to Python dependencies.
 
 For backwards compatibility, the legacy filename [.github/workflows/generate-sbom-npm.yml](.github/workflows/generate-sbom-npm.yml) remains available as a thin wrapper around this workflow.
 
