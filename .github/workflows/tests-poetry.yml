@@ -1,0 +1,266 @@
+name: Poetry Tests
+on:
+  workflow_call:
+    inputs:
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+      pre_test_command:
+        required: false
+        type: string
+        default: ""
+      pull_ghcr:
+        required: false
+        type: boolean
+        default: false
+      docker_compose_file:
+        required: false
+        type: string
+        default: docker-compose.yml
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
+      working_directory:
+        required: false
+        type: string
+        default: "."
+      tests:
+        required: false
+        type: string
+        default: '["tests/unit", "tests/integration"]'
+      pytest_args:
+        required: false
+        type: string
+        default: "-v -s"
+      coverage:
+        required: false
+        type: boolean
+        default: true
+      coverage_fail_under:
+        required: false
+        type: number
+        default: 50
+      coverage_max_drop:
+        required: false
+        type: number
+        default: 0
+jobs:
+  setup:
+    name: Setup branch matrix
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.set-branches.outputs.branches }}
+      is-main: ${{ steps.check-branch.outputs.is-main }}
+      artifact-prefix: ${{ steps.set-prefix.outputs.prefix }}
+    steps:
+      - name: Check if running on main
+        id: check-branch
+        run: |
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
+          if [ "$CURRENT_BRANCH" = "main" ]; then
+            echo "is-main=true" >> $GITHUB_OUTPUT
+          else
+            echo "is-main=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set branch matrix
+        id: set-branches
+        run: |
+          CURRENT_BRANCH="${{ github.head_ref || github.ref_name }}"
+
+          if [ "${{ inputs.coverage }}" = "false" ] || [ "$CURRENT_BRANCH" = "main" ]; then
+            BRANCHES="[\"$CURRENT_BRANCH\"]"
+          else
+            BRANCHES="[\"$CURRENT_BRANCH\", \"main\"]"
+          fi
+
+          echo "branches=$BRANCHES" >> "$GITHUB_OUTPUT"
+
+      - name: Generate artifact prefix
+        id: set-prefix
+        run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
+
+  tests:
+    name: Run tests - ${{ matrix.test_path }} - ${{ matrix.branch }}
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        test_path: ${{ fromJson(inputs.tests) }}
+        branch: ${{ fromJson(needs.setup.outputs.branches) }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ matrix.branch }}
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          check-latest: true
+      - name: Install poetry
+        run: |
+          python -m pip install --user pipx
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          pipx install poetry
+          poetry --version
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      - name: Create environment file
+        run: touch .env
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.pull_ghcr == true }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup dependencies
+        run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
+        if: inputs.docker_compose_file != ''
+      - name: Sleep
+        uses: kibertoad/wait-action@1.0.1
+        with:
+          time: "30s"
+        if: inputs.docker_compose_file != ''
+      - name: Run pre-test command
+        run: ${{ inputs.pre_test_command }}
+        if: inputs.pre_test_command != ''
+      - name: Set test identifier
+        id: test-id
+        run: |
+          TEST_SAFE=$(echo "${{ matrix.test_path }}" | sed 's/[:";<>|*?\/\\ \r\n]/-/g')
+          echo "test_safe=$TEST_SAFE" >> $GITHUB_OUTPUT
+      - name: Run tests with coverage
+        if: inputs.coverage
+        run: |
+          mkdir -p coverage/tmp
+          poetry run coverage run --parallel-mode -m pytest ${{ matrix.test_path }} ${{ inputs.pytest_args }}
+          poetry run coverage combine
+          poetry run coverage json -o coverage/tmp/coverage-${{ steps.test-id.outputs.test_safe }}.json
+      - name: Run tests without coverage
+        if: ${{ !inputs.coverage }}
+        run: poetry run pytest ${{ matrix.test_path }} ${{ inputs.pytest_args }}
+      - name: Set artifact name
+        id: artifact-name
+        run: |
+          if [ "${{ needs.setup.outputs.is-main }}" = "true" ]; then
+            echo "name=${{ needs.setup.outputs.artifact-prefix }}-coverage-current-${{ steps.test-id.outputs.test_safe }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${{ needs.setup.outputs.artifact-prefix }}-coverage-${{ matrix.branch == 'main' && 'main' || 'current' }}-${{ steps.test-id.outputs.test_safe }}" >> $GITHUB_OUTPUT
+          fi
+        if: inputs.coverage
+      - name: Upload coverage JSON summary
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: coverage/tmp
+        if: inputs.coverage
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: [tests, setup]
+    if: inputs.coverage
+    env:
+      COVERAGE_CURRENT_DIR: coverage
+      COVERAGE_MAIN_DIR: coverage-main
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          check-latest: true
+
+      - name: Download current branch coverage summaries
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ env.COVERAGE_CURRENT_DIR }}/tmp
+          pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-current-*
+          merge-multiple: true
+
+      - name: Download main branch coverage summaries
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ env.COVERAGE_MAIN_DIR }}/tmp
+          pattern: ${{ needs.setup.outputs.artifact-prefix }}-coverage-main-*
+          merge-multiple: true
+        if: needs.setup.outputs.is-main == 'false'
+
+      - name: Compare and enforce coverage
+        env:
+          FAIL_UNDER: ${{ inputs.coverage_fail_under }}
+          MAX_DROP: ${{ inputs.coverage_max_drop }}
+          IS_MAIN: ${{ needs.setup.outputs.is-main }}
+        run: |
+          python - << 'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          current_dir = pathlib.Path(os.environ["COVERAGE_CURRENT_DIR"]) / "tmp"
+          main_dir = pathlib.Path(os.environ["COVERAGE_MAIN_DIR"]) / "tmp"
+          fail_under = float(os.environ.get("FAIL_UNDER", "0") or "0")
+          max_drop = float(os.environ.get("MAX_DROP", "0") or "0")
+          is_main = os.environ.get("IS_MAIN", "false") == "true"
+
+          def percent_from(path: pathlib.Path) -> float:
+              data = json.loads(path.read_text())
+              totals = data.get("totals") or {}
+              pct = totals.get("percent_covered")
+              if pct is None:
+                  raise RuntimeError(f"Missing totals.percent_covered in {path}")
+              return float(pct)
+
+          current_files = sorted(current_dir.glob("coverage-*.json"))
+          if not current_files:
+              raise SystemExit(f"No coverage JSON files found in {current_dir}")
+
+          lines = ["## Coverage summary", "", "| Test group | Current | Main | Δ |", "|---|---:|---:|---:|"]
+          failures: list[str] = []
+
+          for cur in current_files:
+              group = cur.stem.replace("coverage-", "", 1)
+              cur_pct = percent_from(cur)
+              main_pct = None
+              delta = None
+
+              if not is_main:
+                  main_path = main_dir / cur.name
+                  if main_path.exists():
+                      main_pct = percent_from(main_path)
+                      delta = cur_pct - main_pct
+
+              lines.append(
+                  "| {} | {:.2f}% | {} | {} |".format(
+                      group,
+                      cur_pct,
+                      "{:.2f}%".format(main_pct) if main_pct is not None else "-",
+                      "{:+.2f}%".format(delta) if delta is not None else "-",
+                  )
+              )
+
+              if cur_pct < fail_under:
+                  failures.append(f"{group}: {cur_pct:.2f}% < fail-under {fail_under:.2f}%")
+
+              if (delta is not None) and (delta < -max_drop):
+                  failures.append(f"{group}: drop {delta:.2f}% exceeds max-drop {max_drop:.2f}%")
+
+          summary_path = pathlib.Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary_path.write_text("\n".join(lines) + "\n")
+
+          if failures:
+              print("Coverage checks failed:\n- " + "\n- ".join(failures))
+              sys.exit(1)
+          PY
