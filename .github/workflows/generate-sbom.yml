@@ -80,6 +80,8 @@ on:
         required: false
       DTRACK_HOSTNAME:
         required: false
+      DTRACK_PARENT_GUID:
+        required: false
 jobs:
   generate-sbom:
     name: "Generate SBOM"
@@ -182,11 +184,24 @@ jobs:
           name: ${{ steps.set-filename.outputs.filename }}
           path: ${{ steps.set-filename.outputs.filename }}
           retention-days: 90
-      - uses: DependencyTrack/gh-upload-sbom@v3
+      - name: Check Dependency-Track project status
+        id: check_dtrack_project_status
+        shell: bash
+        run: |
+          if [ \"$DTRACK_PARENT_GUID\" == \"\" ]; then
+            echo \"dtrack_parent_guid_set=NO\" >> $GITHUB_OUTPUT
+          else
+            echo \"dtrack_parent_guid_set=YES\" >> $GITHUB_OUTPUT
+          fi
+        env:
+          DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
+      - name: Upload SBOM to Dependency-Track
+        uses: DependencyTrack/gh-upload-sbom@v3
         if: |
           success() &&
           inputs.enable_check_version &&
-          inputs.enable_dtrack_project
+          inputs.enable_dtrack_project &&
+          steps.check_dtrack_project_status.dtrack_parent_guid_set == 'YES'
         with:
           serverhostname: ${{ secrets.DTRACK_HOSTNAME }}
           apikey: ${{ secrets.DTRACK_APIKEY }}
@@ -195,3 +210,4 @@ jobs:
           projecttags: ${{ steps.get-version.outputs.version }}
           bomfilename: ${{ steps.set-filename.outputs.filename }}
           autocreate: true
+          parent: ${{ secrets.DTRACK_PARENT_GUID }}

@@ -48,6 +48,7 @@ jobs:
     secrets:
       DTRACK_APIKEY: ${{ secrets.DTRACK_APIKEY }}
       DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
+      DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
 
 ```
 
@@ -73,4 +74,5 @@ jobs:
     secrets:
       DTRACK_APIKEY: ${{ secrets.DTRACK_APIKEY }}
       DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
+      DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
 ```

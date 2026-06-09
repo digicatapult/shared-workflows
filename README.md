@@ -256,10 +256,11 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 
 #### Secrets
 
-| Secret            | Description                                                                                                                                     |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DTRACK_APIKEY`   | The Dependency Track API key; requires both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions                                          |
-| `DTRACK_HOSTNAME` | The hostname of the Dependency Track server; the HTTP schema is set separately with the inputs `protocol` (default: `https`) and `port` (`443`) |
+| Secret               | Description                                                                                                                                     |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DTRACK_APIKEY`      | The Dependency Track API key; requires both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions                                          |
+| `DTRACK_HOSTNAME`    | The hostname of the Dependency Track server; the HTTP schema is set separately with the inputs `protocol` (default: `https`) and `port` (`443`) |
+| `DTRACK_PARENT_GUID` | The project GUID for the parent project within Dependency Track, typically named after the project repository and tagged with 'parent'          |
 
 #### Outputs
 
