@@ -187,11 +187,12 @@ jobs:
       - name: Check Dependency-Track project status
         id: check_dtrack_project_status
         shell: bash
+        if: inputs.enable_dtrack_project
         run: |
-          if [ \"$DTRACK_PARENT_GUID\" == \"\" ]; then
-            echo \"dtrack_parent_guid_set=NO\" >> $GITHUB_OUTPUT
+          if [ -z "$DTRACK_PARENT_GUID" ]; then
+            echo "dtrack_parent_guid_set=NO" >> "$GITHUB_OUTPUT"
           else
-            echo \"dtrack_parent_guid_set=YES\" >> $GITHUB_OUTPUT
+            echo "dtrack_parent_guid_set=YES" >> "$GITHUB_OUTPUT"
           fi
         env:
           DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
@@ -201,7 +202,7 @@ jobs:
           success() &&
           inputs.enable_check_version &&
           inputs.enable_dtrack_project &&
-          steps.check_dtrack_project_status.dtrack_parent_guid_set == 'YES'
+          steps.check_dtrack_project_status.outputs.dtrack_parent_guid_set == 'YES'
         with:
           serverhostname: ${{ secrets.DTRACK_HOSTNAME }}
           apikey: ${{ secrets.DTRACK_APIKEY }}

@@ -33,7 +33,7 @@ jobs:
 
 ### Minimal using Dependency Track
 
-To invoke the use of Dependency Track as a destination for the SBOMs, it's necessary to provide the secrets `DTRACK_APIKEY` and `DTRACK_HOSTNAME` and the ensure that `inputs.enable_check_version` and `inputs.enable_dtrack_project` both resolve to `true`.
+To invoke the use of Dependency Track as a destination for the SBOMs, it's necessary to provide the secrets `DTRACK_APIKEY`, `DTRACK_HOSTNAME`, `DTRACK_PARENT_GUID`, and ensure that `inputs.enable_check_version` and `inputs.enable_dtrack_project` both resolve to `true`.
 
 ```yaml
 jobs:
