@@ -197,7 +197,7 @@ jobs:
         env:
           DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
       - name: Upload SBOM to Dependency-Track
-        uses: DependencyTrack/gh-upload-sbom@v3
+        uses: DependencyTrack/gh-upload-sbom@v4
         if: |
           success() &&
           inputs.enable_check_version &&
