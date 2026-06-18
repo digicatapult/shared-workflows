@@ -489,3 +489,45 @@ This GitHub Actions workflow runs Semgrep CE vulnerability scans.
 2. **Upload Semgrep CE's SARIF Results**: Upload the results to GitHub either as a SARIF report directly to the GitHub Advanced Security panel or as an artefact.
 
 This workflow can be complemented with rulesets from the Semgrep [registry](https://semgrep.dev/r) of first- and third-party rules.
+
+### [ZAP Scan](.github/workflows/scan-zap.yml) ([examples](examples/scan-zap.md))
+
+Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a running web application. Supports four scan types: `baseline`, `full`, `api`, and `automation-framework`, which are selectable via a JSON array matrix input. Multiple scan types can run in parallel. The workflow handles the initialisation of the application stack via a Docker Compose file and/or an arbitrary pre-scan command, then waits for the target URL to be reachable before handing off to ZAP.
+
+#### Inputs
+
+| Input                 | Type      | Description                                                                                          | Default                 | Required |
+| --------------------- | --------- | ---------------------------------------------------------------------------------------------------- | ----------------------- | -------- |
+| `matrix_scans`        | `string`  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`               | `'["baseline"]'`        | false    |
+| `target`              | `string`  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                | `http://localhost:3000` | false    |
+| `env_vars`            | `string`  | JSON object of extra environment variables to inject                                                 | `{}`                    | false    |
+| `docker_compose_file` | `string`  | Docker Compose file used to bring up the application stack before scanning                           | `""`                    | false    |
+| `pull_ghcr`           | `boolean` | Log in to GitHub Container Registry before pulling images                                            | `false`                 | false    |
+| `pre_scan_command`    | `string`  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                      | `""`                    | false    |
+| `target_wait_timeout` | `number`  | Seconds to poll `target` for a successful response before failing                                    | `60`                    | false    |
+| `rules_file_name`     | `string`  | Relative path to a ZAP rules TSV file for suppressing known alerts                                   | `""`                    | false    |
+| `cmd_options`         | `string`  | Additional ZAP CLI options passed to all scan types                                                  | `""`                    | false    |
+| `docker_name`         | `string`  | Custom ZAP Docker image name; defaults to the stable ZAP image                                       | `""`                    | false    |
+| `allow_issue_writing` | `boolean` | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`        | `false`                 | false    |
+| `fail_action`         | `boolean` | Fail the job if ZAP identifies any alerts                                                            | `false`                 | false    |
+| `artifact_name`       | `string`  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`) | `zap_scan`              | false    |
+| `api_scan_format`     | `string`  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                       | `openapi`               | false    |
+| `automation_plan`     | `string`  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`    | `""`                    | false    |
+
+#### Permissions
+
+| Access           | Jobs used  | Level    | Reason                                                                 | When                        |
+| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- | --------------------------- |
+| `contents: read` | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | Always                      |
+| `packages: read` | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `pull_ghcr: true`           |
+| `issues: write`  | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `allow_issue_writing: true` |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs OWASP ZAP DAST scans against a locally running web application.
+
+1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
+2. **Start Application Stack** _(optional)_: Authenticates with GHCR if `pull_ghcr` is set, then brings up the application using `docker/bake-action` against `docker_compose_file`.
+3. **Run Pre-Scan Command** _(optional)_: Executes `pre_scan_command` on the runner for use cases where the application is started directly rather than via Docker Compose.
+4. **Wait for Target** _(skipped for `automation-framework`)_: Polls `target` with `curl` at two-second intervals until it responds successfully or `target_wait_timeout` is reached.
+5. **ZAP Scan**: Runs the selected ZAP action for each `matrix.scan_type`. Report artifacts are uploaded under `artifact_name-<scan_type>` to avoid collisions when multiple types run in parallel.
