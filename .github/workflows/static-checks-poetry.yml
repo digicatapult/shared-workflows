@@ -54,7 +54,7 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python_version }}
@@ -75,7 +75,7 @@ jobs:
     name: Secrets scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: TruffleHog PR scan
         uses: trufflesecurity/trufflehog@v3.95.5
         with:
@@ -90,7 +90,7 @@ jobs:
     name: Vulnerability scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v6

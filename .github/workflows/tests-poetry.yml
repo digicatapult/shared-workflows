@@ -95,7 +95,7 @@ jobs:
       run:
         working-directory: ${{ inputs.working_directory }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.branch }}
       - name: Set environment variables from JSON
@@ -176,7 +176,7 @@ jobs:
       COVERAGE_CURRENT_DIR: coverage
       COVERAGE_MAIN_DIR: coverage-main
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ inputs.python_version }}

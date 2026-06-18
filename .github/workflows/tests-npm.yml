@@ -84,7 +84,7 @@ jobs:
         branch: ${{ fromJson(needs.setup.outputs.branches) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.branch }}
       - name: Set environment variables from JSON
@@ -161,7 +161,7 @@ jobs:
       COVERAGE_CURRENT_DIR: coverage
       COVERAGE_MAIN_DIR: coverage-main
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
