@@ -11,7 +11,7 @@ jobs:
       build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
       is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Check version
         id: get_version
         uses: digicatapult/check-version@v1
