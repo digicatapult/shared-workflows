@@ -31,9 +31,7 @@ jobs:
       contents: read
     with:
       matrix_scans: '["baseline", "api"]'
-      target: "http://localhost:3000/openapi.json"
-      api_scan_format: "openapi"
-      docker_compose_file: docker-compose.yml
+      target: "http://localhost:3000"
 ```
 
 ### Pre-scan command to start the application
@@ -99,6 +97,7 @@ jobs:
       packages: read
     with:
       pull_ghcr: true
+      docker_name: 'ghcr.io/digicatapult/alternative_zaproxy:stable'
       docker_compose_file: docker-compose.yml
       target: "http://localhost:3000"
 ```

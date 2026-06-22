@@ -37,11 +37,11 @@ on:
       cmd_options:
         required: false
         type: string
-        default: ""
+        default: "-a"
       docker_name:
         required: false
         type: string
-        default: ""
+        default: "ghcr.io/zaproxy/zaproxy:stable"
       allow_issue_writing:
         required: false
         type: boolean
