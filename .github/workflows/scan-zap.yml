@@ -78,6 +78,23 @@ jobs:
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Validate scan inputs
+        shell: bash
+        run: |
+          case "${{ matrix.scan_type }}" in
+            baseline|full|api)
+              ;;
+            automation-framework)
+              if [ -z "${{ inputs.automation_plan }}" ]; then
+                echo "inputs.automation_plan must be set when matrix.scan_type is 'automation-framework'"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Invalid matrix.scan_type '${{ matrix.scan_type }}'. Must be one of: baseline, full, api, automation-framework."
+              exit 1
+              ;;
+          esac
       - name: Login to GitHub Container Registry
         if: ${{ inputs.pull_ghcr == true }}
         uses: docker/login-action@v4
