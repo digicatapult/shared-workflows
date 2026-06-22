@@ -37,7 +37,7 @@ on:
       cmd_options:
         required: false
         type: string
-        default: "-a"
+        default: ""
       docker_name:
         required: false
         type: string
