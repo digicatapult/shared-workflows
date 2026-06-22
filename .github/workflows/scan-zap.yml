@@ -85,17 +85,8 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: "--debug"
-        if: inputs.docker_compose_file != ''
-      - name: Start application stack
-        uses: docker/bake-action@v7
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          files: ${{ inputs.docker_compose_file }}
+      - name: Setup dependencies
+        run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
         if: inputs.docker_compose_file != ''
       - name: Run pre-scan command
         run: ${{ inputs.pre_scan_command }}
