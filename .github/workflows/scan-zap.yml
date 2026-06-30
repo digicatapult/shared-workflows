@@ -70,7 +70,7 @@ jobs:
         scan_type: ${{ fromJson(inputs.matrix_scans) }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Validate scan inputs
         shell: bash
         env:
