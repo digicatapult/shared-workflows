@@ -2,6 +2,37 @@
 
 Shared github workflows created by the `digicatapult` organisation.
 
+## Contents
+
+**Version synchronisation**
+
+- [Synchronise PR Version](#synchronise-pr-version-examples)
+- [Synchronise PR Version (Poetry)](#synchronise-pr-version-poetry-examples)
+- [Synchronise all PR versions](#synchronise-all-pr-versions-examples)
+- [Synchronise all PR versions (Poetry)](#synchronise-all-pr-versions-poetry-examples)
+
+**Build & release**
+
+- [Build Docker](#build-docker-examples)
+- [Check Version](#check-version-examples)
+- [Release Github](#release-github-examples)
+- [Release Module NPM](#release-module-npm-examples)
+
+**Testing & quality**
+
+- [Poetry Static checks](#poetry-static-checks-examples)
+- [Poetry Tests](#poetry-tests-examples)
+- [Poetry E2E tests](#poetry-e2e-tests-examples)
+- [NPM Static Checks](#npm-static-checks-examples)
+- [NPM E2E Tests](#npm-e2e-tests-examples)
+- [NPM Tests](#npm-tests-examples)
+
+**Security & analysis**
+
+- [Generate SBOM](#generate-sbom-examples)
+- [Scan Secrets](#scan-secrets-examples)
+- [Scan Vulnerabilities](#scan-vulnerabilities-examples)
+
 ## Workflows
 
 > [!IMPORTANT]
@@ -40,6 +71,29 @@ This workflow also requires two secrets in order to run:
 
 Synchronises the version in a `pyproject.toml` on a pull-request branch in relation to a trunk branch based on the presence of one of three labels: [`v:major`, `v:minor`, `v:patch`]. Like the NPM variant, it calculates the next version by incrementing the trunk branch version and commits corrections as needed.
 
+#### Inputs
+
+| Input          | Type     | Description                             | Default |
+| -------------- | -------- | --------------------------------------- | ------- |
+| `pr-number`    | `number` | The PR to run this workflow for         |         |
+| `trunk-branch` | `string` | The trunk branch to synchronise against | `main`  |
+
+#### Permissions
+
+| Access                 | Jobs used             | Level    | Reason                                                                            |
+| ---------------------- | --------------------- | -------- | --------------------------------------------------------------------------------- |
+| `contents: write`      | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` |
+| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                      |
+
+#### Secrets
+
+This workflow also requires two secrets in order to run:
+
+| Secret    | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| `bot-id`  | Id of the `Github App` to use when committing version updates |
+| `bot-key` | Private Key for the `Github App`                              |
+
 ### [Synchronise all PR versions](.github/workflows/synchronise-trunk-version-npm.yml) ([examples](examples/synchronise-trunk-version.md))
 
 Synchronises the version in `package.json` for all open pull-requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`]. This workflow finds all PRs with these labels and calls the Synchronise PR Version workflow for each one. It's useful after the trunk branch version changes to ensure all open PRs have the correct calculated versions. Like the single PR workflow, it removes the `v:stale` label and commits corrections as needed.
@@ -70,7 +124,31 @@ This workflow also requires two secrets in order to run:
 
 ### [Synchronise all PR versions (Poetry)](.github/workflows/synchronise-trunk-version-poetry.yml) ([examples](examples/synchronise-trunk-version-poetry.md))
 
-Synchronises the version in `pyproject.toml` for all open pull requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`].
+Synchronises the version in `pyproject.toml` for all open pull requests that have one of the version labels: [`v:major`, `v:minor`, `v:patch`]. This workflow finds all PRs with these labels and calls the Synchronise PR Version (Poetry) workflow for each one. It removes the `v:stale` label and commits corrections as needed.
+
+#### Inputs
+
+| Input          | Type     | Description                             | Default |
+| -------------- | -------- | --------------------------------------- | ------- |
+| `trunk-branch` | `string` | The trunk branch to synchronise against | `main`  |
+
+#### Permissions
+
+| Access                 | Jobs used                   | Level | Reason                                                                                        |
+| ---------------------- | --------------------------- | ----- | --------------------------------------------------------------------------------------------- |
+| `contents: read`       | `find-pull-requests`        | Job   | To GET repository contents                                                                    |
+| `pull-requests: read`  | `find-pull-requests`        | Job   | To GET open pull requests                                                                     |
+| `contents: write`      | `synchronise-pull-requests` | Job   | To invoke `synchronise-pr-version-poetry.yml` and POST commits against all open pull requests |
+| `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs        |
+
+#### Secrets
+
+This workflow also requires two secrets in order to run:
+
+| Secret    | Description                                                   |
+| --------- | ------------------------------------------------------------- |
+| `bot-id`  | Id of the `Github App` to use when committing version updates |
+| `bot-key` | Private Key for the `Github App`                              |
 
 ### [Build Docker](.github/workflows/build-docker.yml) ([examples](examples/build-docker.md))
 
@@ -239,13 +317,17 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 | dtrack_project_name   | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
 | enable_check_version  | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
 | enable_dtrack_project | boolean | An option to enable the use of Dependency Track                                                                                           | `false`                               | false    |
+| package_manager       | string  | Package manager for version detection. Options: `npm`, `poetry`                                                                          | `npm`                                 | false    |
 | env_vars              | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
 | node_version          | string  | The node version to use                                                                                                                   | `24.x`                                | false    |
+| python_version        | string  | The Python version to use (for Poetry / `cdxgen` SBOMs)                                                                                    | `3.14`                                | false    |
 | sbom_tool             | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`            | false    |
 | sbom_format           | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                                | false    |
 | sbom_output_file      | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                                  | false    |
 | npm_build_command     | string  | Optional build command to run before generating SBOM                                                                                      | `""`                                  | false    |
 | additional_args       | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                                  | false    |
+| install_python_deps   | boolean | Install Python dependencies before SBOM generation                                                                                       | `false`                               | false    |
+| python_install_command | string | Optional custom command to install Python dependencies                                                                                   | `""`                                  | false    |
 | upload_artifact       | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
 
 #### Permissions
@@ -282,15 +364,115 @@ This GitHub Actions workflow generates an SBOM for a project. It allows flexibil
 
 ### [Poetry Static checks](.github/workflows/static-checks-poetry.yml) ([examples](examples/static-checks-poetry.md))
 
-Runs static analysis for Poetry projects (default matrix includes `pylint`, `black`, `ruff`, `mypy`, and `bandit`).
+Runs static analysis for Poetry projects (default matrix includes `pylint`, `black`, `ruff`, `mypy`, and `bandit`). Each command runs as a separate matrix job so a single failing check does not interrupt the others. Optional TruffleHog (secrets) and Semgrep CE (vulnerabilities) scans can be enabled alongside the static analysis matrix.
+
+#### Inputs
+
+| Input                    | Type      | Description                                                                                                                               | Default                                                                  | Required |
+| ------------------------ | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | -------- |
+| enable_semgrep_action    | `boolean` | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                                                                   | false    |
+| enable_trufflehog_action | `boolean` | An option to enable a TruffleHog GitHub Action, scanning for exposed secrets                                                              | `false`                                                                  | false    |
+| env_vars                 | `string`  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                     | false    |
+| python_version           | `string`  | The Python version to use                                                                                                                 | `3.14`                                                                   | false    |
+| working_directory        | `string`  | The working directory to run the checks from                                                                                              | `.`                                                                      | false    |
+| matrix_commands          | `string`  | A JSON array of commands to run in the static checks matrix, each executed via `poetry run`                                              | `["pylint app", "black --check .", "ruff check .", "mypy app/", "bandit -r app"]` | false    |
+| semgrep_extra_args       | `string`  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`                                                 | false    |
+| semgrep_sarif_path       | `string`  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                                                          | false    |
+| semgrep_upload_type      | `string`  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                                                                  | false    |
+| trufflehog_extra_args    | `string`  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `--results=verified,unknown`                                             | false    |
+
+#### Permissions
+
+| Access                   | Jobs used       | Level | Reason                                                      | Conditions                          |
+| ------------------------ | --------------- | ----- | ----------------------------------------------------------- | ----------------------------------- |
+| `contents: read`         | `static-checks` | Job   | To GET repository contents for static analysis              | N/A                                 |
+| `contents: read`         | `scan-secrets`  | Job   | To GET repository contents and history for secret scanning  | `inputs.enable_trufflehog_action`   |
+| `contents: read`         | `scan-vulns`    | Job   | To GET repository contents for vulnerability scanning       | `inputs.enable_semgrep_action`      |
+| `actions: read`          | `scan-vulns`    | Job   | To GET actions metadata for the scan                        | `inputs.enable_semgrep_action`      |
+| `security-events: write` | `scan-vulns`    | Job   | To POST new code scanning alerts based on the SARIF report  | `inputs.semgrep_upload_type: sarif` |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs a configurable matrix of static checks on a Poetry project, optionally accompanied by secret and vulnerability scanning.
+
+1. **Static Checks**: For each command in `matrix_commands`, sets up Python, installs Poetry and the project dependencies, then runs the command via `poetry run` in a dedicated matrix job (`fail-fast: false`).
+2. **Secrets Scanning (Optional)**: When `enable_trufflehog_action` is `true`, runs TruffleHog against the branch for both verified and unverified secrets.
+3. **Vulnerability Scanning (Optional)**: When `enable_semgrep_action` is `true` (and the actor is not `dependabot[bot]`), runs Semgrep CE and uploads the results either as a SARIF report to GitHub Advanced Security or as an artefact, depending on `semgrep_upload_type`.
 
 ### [Poetry Tests](.github/workflows/tests-poetry.yml) ([examples](examples/tests-poetry.md))
 
-Runs unit/integration tests for Poetry projects using pytest and compares coverage between the PR branch and `main`.
+Runs unit/integration tests for Poetry projects using pytest and compares coverage between the PR branch and `main`. Each test path runs as a separate matrix job. When coverage is enabled, coverage is collected per test group on both the current branch and `main`, and a comparison summary is published to the job summary, failing the run if coverage drops below the configured thresholds.
+
+#### Inputs
+
+| Input                | Type      | Description                                                                                                                               | Default                              | Required |
+| -------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ | -------- |
+| env_vars             | `string`  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                 | false    |
+| pre_test_command     | `string`  | Optional command to execute before the main test command                                                                                  | `""`                                 | false    |
+| pull_ghcr            | `boolean` | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                              | false    |
+| docker_compose_file  | `string`  | The Docker Compose file to use for setting up dependencies                                                                                 | `docker-compose.yml`                 | false    |
+| python_version       | `string`  | The Python version to use                                                                                                                 | `3.14`                               | false    |
+| working_directory    | `string`  | The working directory to run the tests from                                                                                               | `.`                                  | false    |
+| tests                | `string`  | JSON array of test paths to run with pytest                                                                                               | `["tests/unit", "tests/integration"]` | false    |
+| pytest_args          | `string`  | Extra arguments to pass to pytest                                                                                                          | `-v -s`                              | false    |
+| coverage             | `boolean` | Whether to collect and report code coverage                                                                                               | `true`                               | false    |
+| coverage_fail_under  | `number`  | Fail the run if coverage for a test group falls below this percentage                                                                     | `50`                                 | false    |
+| coverage_max_drop    | `number`  | Fail the run if coverage for a test group drops more than this many percentage points relative to `main`                                  | `0`                                  | false    |
+
+#### Permissions
+
+| Access           | Jobs used  | Level | Reason                                                                 | Conditions         |
+| ---------------- | ---------- | ----- | ---------------------------------------------------------------------- | ------------------ |
+| `contents: read` | `setup`    | Job   | To GET repository contents and determine branch information           | N/A                |
+| `contents: read` | `tests`    | Job   | To GET repository contents and checkout different branches for testing | N/A                |
+| `packages: read` | `tests`    | Job   | To GET packages from GitHub Container Registry when pulling images     | `inputs.pull_ghcr` |
+| `contents: read` | `coverage` | Job   | To GET repository contents for coverage comparison                     | `inputs.coverage`  |
+
+> [!NOTE]
+> Unlike the [NPM Tests](#npm-tests-examples) workflow, the coverage comparison is written to the GitHub Actions job summary rather than posted as a pull-request comment, so `pull-requests: write` is not required.
+
+#### Workflow Description
+
+This GitHub Actions workflow runs pytest in a matrix strategy and, when enabled, compares coverage between the current branch and `main`.
+
+1. **Setup**: Determines whether the run is on `main`, builds the branch matrix (current branch plus `main` for comparison when coverage is enabled), and generates a unique artifact prefix.
+2. **Tests**: For each test path and branch, sets up Python, installs Poetry and dependencies, sets environment variables from `env_vars`, optionally logs in to GHCR and brings up Docker Compose dependencies, runs an optional `pre_test_command`, then runs pytest (under `coverage` when enabled) and uploads the coverage JSON per test group.
+3. **Coverage**: Downloads the current-branch and `main` coverage summaries, builds a per-group comparison table in the job summary, and fails the run if any group is below `coverage_fail_under` or drops by more than `coverage_max_drop` relative to `main`.
 
 ### [Poetry E2E tests](.github/workflows/tests-e2e-poetry.yml) ([examples](examples/tests-e2e-poetry.md))
 
-Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `docker bake`).
+Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `docker bake`). Supports building dependency containers with Docker Bake, optionally setting up Node.js alongside Python, and running a customisable test command.
+
+#### Inputs
+
+| Input               | Type      | Description                                                                                                                               | Default                             | Required |
+| ------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| env_vars            | `string`  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                | false    |
+| pre_test_command    | `string`  | Optional command to execute before the main test command                                                                                  | `""`                                | false    |
+| pull_ghcr           | `boolean` | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                             | false    |
+| docker_compose_file | `string`  | The Docker Compose file used for building the testing environment                                                                         | `docker-compose.yml`                | false    |
+| python_version      | `string`  | The Python version to use                                                                                                                 | `3.14`                              | false    |
+| setup_node          | `boolean` | Whether to also set up Node.js (e.g. for projects whose E2E tests use a Node-based runner)                                                 | `false`                             | false    |
+| node_version        | `string`  | The node version to use when `setup_node` is enabled                                                                                      | `24.x`                              | false    |
+| working_directory   | `string`  | The working directory to run the tests from                                                                                               | `.`                                 | false    |
+| test_command        | `string`  | Command used to run E2E tests, which can be customised as needed                                                                          | `poetry run pytest tests/e2e -v -s` | false    |
+
+#### Permissions
+
+| Access           | Jobs used   | Level | Reason                                                             | Conditions         |
+| ---------------- | ----------- | ----- | ------------------------------------------------------------------ | ------------------ |
+| `contents: read` | `e2e-tests` | Job   | To GET repository contents                                         | N/A                |
+| `packages: read` | `e2e-tests` | Job   | To GET packages from GitHub Container Registry when pulling images | `inputs.pull_ghcr` |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs end-to-end tests for a Poetry project within a Dockerised environment.
+
+1. **Set Environment Variables**: Parses `env_vars` from JSON and applies them to the workflow environment.
+2. **Container Setup (Optional)**: Optionally logs in to GHCR, then configures Docker Buildx and builds the E2E containers with Docker Bake from the provided Docker Compose file.
+3. **Toolchain Setup**: Optionally sets up Node.js (when `setup_node` is `true`), then sets up Python and installs Poetry and the project dependencies.
+4. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
+5. **Run E2E Tests**: Executes `test_command`.
 
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml) ([examples](examples/static-checks.md))
 
