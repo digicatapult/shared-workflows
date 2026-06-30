@@ -4,6 +4,8 @@
 
 The `matrix_scans` input accepts a JSON array of ZAP scan types to run. Valid values are `baseline`, `full`, `api`, and `automation-framework`. Each scan type runs as a separate parallel job.
 
+`docker_name` is required. Use a versioned tag (e.g. `ghcr.io/zaproxy/zaproxy:2.17.0`) so Renovate in the caller repository can track and bump it in automated PRs. Avoid floating tags such as `:stable` as they make scan results non-reproducible across runs.
+
 ### Minimal baseline scan against a docker-compose stack
 
 The most common case: spin up the application stack via a `docker_compose_file`, then run a passive baseline scan against it. Scan results are uploaded as a workflow artifact (`zap_scan-baseline`).
@@ -15,6 +17,7 @@ jobs:
     permissions:
       contents: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       docker_compose_file: docker-compose.yml
       target: "http://localhost:3000"
 ```
@@ -30,6 +33,7 @@ jobs:
     permissions:
       contents: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       matrix_scans: '["baseline", "api"]'
       target: "http://localhost:3000"
 ```
@@ -45,6 +49,7 @@ jobs:
     permissions:
       contents: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       pre_scan_command: "npm ci && npm run build && npm start &"
       target: "http://localhost:3000"
       target_wait_timeout: 120
@@ -62,6 +67,7 @@ jobs:
       contents: read
       issues: write
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       matrix_scans: '["full"]'
       target: "http://localhost:3000"
       docker_compose_file: docker-compose.yml
@@ -79,6 +85,7 @@ jobs:
     permissions:
       contents: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       matrix_scans: '["automation-framework"]'
       automation_plan: ".zap/plan.yml"
       docker_compose_file: docker-compose.yml
@@ -88,6 +95,8 @@ jobs:
 
 If the application stack pulls images from GitHub Container Registry, set `pull_ghcr: true` to authenticate before bringing up the stack. Add `packages: read` to the permissions block.
 
+> **Note:** `secrets.GITHUB_TOKEN` only authenticates to GHCR images owned by the **same repository**, or to public images. For images from a different `digicatapult` repository, a package admin must explicitly grant access: navigate to the package → **Package settings** → **Manage Actions access** → **Add repository**, and add the calling repository with **Read** access.
+
 ```yaml
 jobs:
   scan-zap:
@@ -96,8 +105,8 @@ jobs:
       contents: read
       packages: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       pull_ghcr: true
-      docker_name: 'ghcr.io/digicatapult/alternative_zaproxy:stable'
       docker_compose_file: docker-compose.yml
       target: "http://localhost:3000"
 ```
@@ -113,6 +122,7 @@ jobs:
     permissions:
       contents: read
     with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
       docker_compose_file: docker-compose.yml
       target: "http://localhost:3000"
       rules_file_name: ".zap/rules.tsv"

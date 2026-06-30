@@ -39,9 +39,8 @@ on:
         type: string
         default: ""
       docker_name:
-        required: false
+        required: true
         type: string
-        default: "ghcr.io/zaproxy/zaproxy:stable"
       allow_issue_writing:
         required: false
         type: boolean
@@ -72,29 +71,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - name: Validate scan inputs
+        shell: bash
+        env:
+          SCAN_TYPE: ${{ matrix.scan_type }}
+          AUTOMATION_PLAN: ${{ inputs.automation_plan }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          case "$SCAN_TYPE" in
+            baseline|full|api)
+              if [[ -z "$TARGET" ]]; then
+                echo "inputs.target must be set for scan type '$SCAN_TYPE'"
+                exit 1
+              fi
+              if [[ ! "$TARGET" =~ ^https?://(localhost|127\.[0-9]+\.[0-9]+\.[0-9]+)(:[0-9]+)?(/|$) ]]; then
+                echo "inputs.target must point to a localhost address (got '$TARGET')"
+                exit 1
+              fi
+              ;;
+            automation-framework)
+              if [[ -z "$AUTOMATION_PLAN" ]]; then
+                echo "inputs.automation_plan must be set when scan type is 'automation-framework'"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Invalid scan type '$SCAN_TYPE'. Must be one of: baseline, full, api, automation-framework."
+              exit 1
+              ;;
+          esac
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
         run: |
           echo "Parsing JSON environment variables..."
           echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
-      - name: Validate scan inputs
-        shell: bash
-        run: |
-          case "${{ matrix.scan_type }}" in
-            baseline|full|api)
-              ;;
-            automation-framework)
-              if [ -z "${{ inputs.automation_plan }}" ]; then
-                echo "inputs.automation_plan must be set when matrix.scan_type is 'automation-framework'"
-                exit 1
-              fi
-              ;;
-            *)
-              echo "Invalid matrix.scan_type '${{ matrix.scan_type }}'. Must be one of: baseline, full, api, automation-framework."
-              exit 1
-              ;;
-          esac
       - name: Login to GitHub Container Registry
         if: ${{ inputs.pull_ghcr == true }}
         uses: docker/login-action@v4
@@ -103,8 +114,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup dependencies
-        run: docker compose -f ${{ inputs.docker_compose_file }} up -d --quiet-pull
         if: inputs.docker_compose_file != ''
+        env:
+          DOCKER_COMPOSE_FILE: ${{ inputs.docker_compose_file }}
+        run: docker compose -f "$DOCKER_COMPOSE_FILE" up -d --quiet-pull
       - name: Run pre-scan command
         run: ${{ inputs.pre_scan_command }}
         if: inputs.pre_scan_command != ''
@@ -115,7 +128,7 @@ jobs:
           TIMEOUT: ${{ inputs.target_wait_timeout }}
         run: |
           ELAPSED=0
-          until curl -sf "$TARGET" > /dev/null 2>&1; do
+          until curl -s -o /dev/null -w '%{http_code}' "$TARGET" | grep -qE '^[1-5][0-9][0-9]$'; do
             if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
               echo "Timed out waiting for $TARGET after ${TIMEOUT}s"
               exit 1
@@ -126,7 +139,10 @@ jobs:
           echo "Target $TARGET is ready (waited ${ELAPSED}s)"
       - name: Set artifact name
         id: artifact
-        run: printf 'name=%s-%s\n' "${{ inputs.artifact_name }}" "${{ matrix.scan_type }}" >> "$GITHUB_OUTPUT"
+        env:
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          SCAN_TYPE: ${{ matrix.scan_type }}
+        run: printf 'name=%s-%s\n' "$ARTIFACT_NAME" "$SCAN_TYPE" >> "$GITHUB_OUTPUT"
       - name: ZAP Baseline Scan
         if: matrix.scan_type == 'baseline'
         uses: zaproxy/action-baseline@v0.15.0
@@ -171,3 +187,6 @@ jobs:
           plan: ${{ inputs.automation_plan }}
           docker_name: ${{ inputs.docker_name }}
           cmd_options: ${{ inputs.cmd_options }}
+          rules_file_name: ${{ inputs.rules_file_name }}
+          fail_action: ${{ inputs.fail_action }}
+          artifact_name: ${{ steps.artifact.outputs.name }}
