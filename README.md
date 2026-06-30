@@ -57,7 +57,7 @@ Synchronises the version in a `package.json` on a pull-request branch in relatio
 | Access                 | Jobs used             | Level    | Reason                                                                            | Conditions |
 | ---------------------- | --------------------- | -------- | --------------------------------------------------------------------------------- | ---------- |
 | `contents: write`      | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` | N/A        |
-| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                      | N/A        |
+| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                     | N/A        |
 
 #### Secrets
 
@@ -84,7 +84,7 @@ Synchronises the version in a `pyproject.toml` on a pull-request branch in relat
 | Access                 | Jobs used             | Level    | Reason                                                                            | Conditions |
 | ---------------------- | --------------------- | -------- | --------------------------------------------------------------------------------- | ---------- |
 | `contents: write`      | `synchronise-version` | Workflow | To POST commits against a pull request; required by `planetscale@ghcommit-action` | N/A        |
-| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                      | N/A        |
+| `pull-requests: write` | `synchronise-version` | Workflow | To use `gh pr` to DELETE labels (`v:stale`) from affected PRs                     | N/A        |
 
 #### Secrets
 
@@ -140,7 +140,7 @@ Synchronises the version in `pyproject.toml` for all open pull requests that hav
 | `contents: read`       | `find-pull-requests`        | Job   | To GET repository contents                                                                    | N/A        |
 | `pull-requests: read`  | `find-pull-requests`        | Job   | To GET open pull requests                                                                     | N/A        |
 | `contents: write`      | `synchronise-pull-requests` | Job   | To invoke `synchronise-pr-version-poetry.yml` and POST commits against all open pull requests | N/A        |
-| `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs         | N/A        |
+| `pull-requests: write` | `synchronise-pull-requests` | Job   | To use `gh pr` in the upstream workflow to DELETE labels (`v:stale`) from affected PRs        | N/A        |
 
 #### Secrets
 
@@ -157,13 +157,13 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Inputs
 
-| Input            | Type    | Description                                                                                                            | Default                     | Required |
+| Input            | Type    | Description                                                                                                           | Default                     | Required |
 | ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
 | build_args       | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
 | env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
 | pull_dhi         | boolean | Whether to login to Docker Hardened Images registry before building                                                   | `false`                     | false    |
-| push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                           | `false`                     | false    |
-| push_ghcr        | boolean | Whether to push the built image to GHCR                                                                                | `false`                     | false    |
+| push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
+| push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
 | docker_platforms | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
 | docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
 
@@ -313,23 +313,23 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 
 #### Inputs
 
-| Input                  | Type    | Description                                                                                                                                | Default                               | Required |
-| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | -------- |
-| dtrack_project_name    | string  | A project name to use within Dependency Track                                                                                              | `${{ github.event.repository.name }}` | false    |
-| enable_check_version   | boolean | An option to enable the use of the digicatapult/check-version action                                                                       | `false`                               | false    |
-| enable_dtrack_project  | boolean | An option to enable the use of Dependency Track                                                                                            | `false`                               | false    |
-| package_manager        | string  | Package manager for version detection. Options: `npm`, `poetry`                                                                            | `npm`                                 | false    |
-| env_vars               | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run  | `{}`                                  | false    |
-| node_version           | string  | The node version to use                                                                                                                    | `24.x`                                | false    |
-| python_version         | string  | The Python version to use (for Poetry / `cdxgen` SBOMs)                                                                                    | `3.14`                                | false    |
-| sbom_tool              | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                       | `@cyclonedx/cyclonedx-npm`            | false    |
-| sbom_format            | string  | SBOM output format. Options: `json`, `xml`                                                                                                 | `json`                                | false    |
-| sbom_output_file       | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                             | `""`                                  | false    |
-| npm_build_command      | string  | Optional build command to run before generating SBOM                                                                                       | `""`                                  | false    |
-| additional_args        | string  | Additional arguments to pass to the SBOM generation tool                                                                                   | `""`                                  | false    |
-| install_python_deps    | boolean | Install Python dependencies before SBOM generation                                                                                         | `false`                               | false    |
-| python_install_command | string  | Optional custom command to install Python dependencies                                                                                     | `""`                                  | false    |
-| upload_artifact        | boolean | Whether to upload the SBOM as a workflow artifact                                                                                          | `true`                                | false    |
+| Input                  | Type    | Description                                                                                                                               | Default                               | Required |
+| ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| dtrack_project_name    | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
+| enable_check_version   | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
+| enable_dtrack_project  | boolean | An option to enable the use of Dependency Track                                                                                           | `false`                               | false    |
+| package_manager        | string  | Package manager for version detection. Options: `npm`, `poetry`                                                                           | `npm`                                 | false    |
+| env_vars               | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
+| node_version           | string  | The node version to use                                                                                                                   | `24.x`                                | false    |
+| python_version         | string  | The Python version to use (for Poetry / `cdxgen` SBOMs)                                                                                   | `3.14`                                | false    |
+| sbom_tool              | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`            | false    |
+| sbom_format            | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                                | false    |
+| sbom_output_file       | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                                  | false    |
+| npm_build_command      | string  | Optional build command to run before generating SBOM                                                                                      | `""`                                  | false    |
+| additional_args        | string  | Additional arguments to pass to the SBOM generation tool                                                                                  | `""`                                  | false    |
+| install_python_deps    | boolean | Install Python dependencies before SBOM generation                                                                                        | `false`                               | false    |
+| python_install_command | string  | Optional custom command to install Python dependencies                                                                                    | `""`                                  | false    |
+| upload_artifact        | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
 
 #### Permissions
 
@@ -369,18 +369,18 @@ Runs static analysis for Poetry projects (default matrix includes `pylint`, `bla
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                                                                                | Default                                                                           | Required |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------- | -------- |
-| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                            | `true`                                                                            | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Action, scanning for exposed secrets                                                               | `false`                                                                           | false    |
-| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run  | `{}`                                                                              | false    |
-| python_version           | string  | The Python version to use                                                                                                                  | `3.14`                                                                            | false    |
-| working_directory        | string  | The working directory to run the checks from                                                                                               | `.`                                                                               | false    |
-| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each executed via `poetry run`                                                | `["pylint app", "black --check .", "ruff check .", "mypy app/", "bandit -r app"]` | false    |
-| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                         | `'--config="p/default"'`                                                          | false    |
-| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                        | `semgrep.sarif`                                                                   | false    |
-| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips  | `sarif`                                                                           | false    |
-| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                         | `--results=verified,unknown`                                                      | false    |
+| Input                    | Type    | Description                                                                                                                               | Default                                                                           | Required |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------- |
+| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                                                                            | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Action, scanning for exposed secrets                                                              | `false`                                                                           | false    |
+| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                              | false    |
+| python_version           | string  | The Python version to use                                                                                                                 | `3.14`                                                                            | false    |
+| working_directory        | string  | The working directory to run the checks from                                                                                              | `.`                                                                               | false    |
+| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each executed via `poetry run`                                               | `["pylint app", "black --check .", "ruff check .", "mypy app/", "bandit -r app"]` | false    |
+| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`                                                          | false    |
+| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                                                                   | false    |
+| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                                                                           | false    |
+| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `--results=verified,unknown`                                                      | false    |
 
 #### Permissions
 
@@ -406,19 +406,19 @@ Runs unit/integration tests for Poetry projects using pytest and compares covera
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                                                | Default                                | Required |
-| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------- | -------- |
-| env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run  | `{}`                                   | false    |
-| pre_test_command    | string  | Optional command to execute before the main test command                                                                                   | `""`                                   | false    |
-| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                        | `false`                                | false    |
-| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                                                  | `docker-compose.yml`                   | false    |
-| python_version      | string  | The Python version to use                                                                                                                  | `3.14`                                 | false    |
-| working_directory   | string  | The working directory to run the tests from                                                                                                | `.`                                    | false    |
-| tests               | string  | JSON array of test paths to run with pytest                                                                                                | `["tests/unit", "tests/integration"]`  | false    |
-| pytest_args         | string  | Extra arguments to pass to pytest                                                                                                           | `-v -s`                                | false    |
-| coverage            | boolean | Whether to collect and report code coverage                                                                                                | `true`                                 | false    |
-| coverage_fail_under | number  | Fail the run if coverage for a test group falls below this percentage                                                                      | `50`                                   | false    |
-| coverage_max_drop   | number  | Fail the run if coverage for a test group drops more than this many percentage points relative to `main`                                   | `0`                                    | false    |
+| Input               | Type    | Description                                                                                                                               | Default                               | Required |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
+| pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                  | false    |
+| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                               | false    |
+| docker_compose_file | string  | The Docker Compose file to use for setting up dependencies                                                                                | `docker-compose.yml`                  | false    |
+| python_version      | string  | The Python version to use                                                                                                                 | `3.14`                                | false    |
+| working_directory   | string  | The working directory to run the tests from                                                                                               | `.`                                   | false    |
+| tests               | string  | JSON array of test paths to run with pytest                                                                                               | `["tests/unit", "tests/integration"]` | false    |
+| pytest_args         | string  | Extra arguments to pass to pytest                                                                                                         | `-v -s`                               | false    |
+| coverage            | boolean | Whether to collect and report code coverage                                                                                               | `true`                                | false    |
+| coverage_fail_under | number  | Fail the run if coverage for a test group falls below this percentage                                                                     | `50`                                  | false    |
+| coverage_max_drop   | number  | Fail the run if coverage for a test group drops more than this many percentage points relative to `main`                                  | `0`                                   | false    |
 
 #### Permissions
 
@@ -446,17 +446,17 @@ Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                                                | Default                             | Required |
-| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------- | -------- |
-| env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run  | `{}`                                | false    |
-| pre_test_command    | string  | Optional command to execute before the main test command                                                                                   | `""`                                | false    |
-| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                        | `false`                             | false    |
-| docker_compose_file | string  | The Docker Compose file used for building the testing environment                                                                          | `docker-compose.yml`                | false    |
-| python_version      | string  | The Python version to use                                                                                                                  | `3.14`                              | false    |
-| setup_node          | boolean | Whether to also set up Node.js (e.g. for projects whose E2E tests use a Node-based runner)                                                  | `false`                             | false    |
-| node_version        | string  | The node version to use when `setup_node` is enabled                                                                                       | `24.x`                              | false    |
-| working_directory   | string  | The working directory to run the tests from                                                                                                | `.`                                 | false    |
-| test_command        | string  | Command used to run E2E tests, which can be customised as needed                                                                           | `poetry run pytest tests/e2e -v -s` | false    |
+| Input               | Type    | Description                                                                                                                               | Default                             | Required |
+| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                | false    |
+| pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                | false    |
+| pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                             | false    |
+| docker_compose_file | string  | The Docker Compose file used for building the testing environment                                                                         | `docker-compose.yml`                | false    |
+| python_version      | string  | The Python version to use                                                                                                                 | `3.14`                              | false    |
+| setup_node          | boolean | Whether to also set up Node.js (e.g. for projects whose E2E tests use a Node-based runner)                                                | `false`                             | false    |
+| node_version        | string  | The node version to use when `setup_node` is enabled                                                                                      | `24.x`                              | false    |
+| working_directory   | string  | The working directory to run the tests from                                                                                               | `.`                                 | false    |
+| test_command        | string  | Command used to run E2E tests, which can be customised as needed                                                                          | `poetry run pytest tests/e2e -v -s` | false    |
 
 #### Permissions
 
@@ -481,17 +481,17 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                                                                                | Default                          | Required |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- | -------- |
-| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                            | `true`                           | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                              | `false`                          | false    |
-| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run  | `{}`                             | false    |
-| node_version             | string  | The node version to use                                                                                                                    | `24.x`                           | false    |
-| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                        | `["lint", "depcheck", "check"]`  | false    |
-| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                         | `'--config="p/default"'`         | false    |
-| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                        | `semgrep.sarif`                  | false    |
-| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips  | `sarif`                          | false    |
-| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                         | `"--results=verified,unknown"`   | false    |
+| Input                    | Type    | Description                                                                                                                               | Default                         | Required |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------- |
+| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                          | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | `false`                         | false    |
+| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                            | false    |
+| node_version             | string  | The node version to use                                                                                                                   | `24.x`                          | false    |
+| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint", "depcheck", "check"]` | false    |
+| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`        | false    |
+| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                 | false    |
+| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                         | false    |
+| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"`  | false    |
 
 #### Permissions
 
@@ -523,7 +523,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                                | Default              | Required |
+| Input               | Type    | Description                                                                                                               | Default              | Required |
 | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
 | env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
 | npm_build_command   | string  | Optional command to build the application before running tests                                                            | `""`                 | false    |
@@ -561,7 +561,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Inputs
 
-| Input                | Type    | Description                                                                                                            | Default                            | Required |
+| Input                | Type    | Description                                                                                                           | Default                            | Required |
 | -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
 | env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                               | false    |
 | npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                               | false    |
@@ -649,20 +649,20 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 
 #### Inputs
 
-| Input                 | Type    | Description                                                                                                                                | Default                  | Required |
-| --------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | -------- |
-| enable_semgrep_action | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                            | `true`                   | false    |
-| extra_args            | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                         | `'--config="p/default"'` | false    |
-| sarif_path            | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                        | `semgrep.sarif`          | false    |
-| upload_type           | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips  | `sarif`                  | false    |
+| Input                 | Type    | Description                                                                                                                               | Default                  | Required |
+| --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------- |
+| enable_semgrep_action | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                   | false    |
+| extra_args            | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'` | false    |
+| sarif_path            | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`          | false    |
+| upload_type           | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                  | false    |
 
 #### Permissions
 
-| Access                   | Jobs used | Level    | Reason                                                     | Conditions                   |
-| ------------------------ | --------- | -------- | ---------------------------------------------------------- | ---------------------------- |
-| `security-events: write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report | `inputs.upload_type: sarif`  |
-| `contents: read`         | `semgrep` | Workflow | To GET repository contents for vulnerability scanning      | N/A                          |
-| `actions: read`          | `semgrep` | Workflow | To GET actions metadata for the scan                       | N/A                          |
+| Access                   | Jobs used | Level    | Reason                                                     | Conditions                  |
+| ------------------------ | --------- | -------- | ---------------------------------------------------------- | --------------------------- |
+| `security-events: write` | `semgrep` | Workflow | To POST new code scanning alerts based on the SARIF report | `inputs.upload_type: sarif` |
+| `contents: read`         | `semgrep` | Workflow | To GET repository contents for vulnerability scanning      | N/A                         |
+| `actions: read`          | `semgrep` | Workflow | To GET actions metadata for the scan                       | N/A                         |
 
 #### Workflow Description
 
@@ -686,13 +686,13 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | env_vars            | string  | JSON object of extra environment variables to inject                                                 | `{}`                               | false    |
 | docker_compose_file | string  | Docker Compose file used to bring up the application stack before scanning                           | `""`                               | false    |
 | pull_ghcr           | boolean | Log in to GitHub Container Registry before pulling images (e.g. if using private/custom proxy image) | `false`                            | false    |
-| pre_scan_command    | string  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                       | `""`                               | false    |
+| pre_scan_command    | string  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                      | `""`                               | false    |
 | target_wait_timeout | number  | Seconds to poll `target` for a successful response before failing                                    | `60`                               | false    |
 | rules_file_name     | string  | Relative path to a ZAP rules TSV file for suppressing known alerts                                   | `""`                               | false    |
 | cmd_options         | string  | Additional ZAP CLI options passed to all scan types                                                  | `""`                               | false    |
 | docker_name         | string  | Custom ZAP Docker image name; defaults to the stable ZAP image                                       | `"ghcr.io/zaproxy/zaproxy:stable"` | false    |
 | allow_issue_writing | boolean | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`        | `false`                            | false    |
-| fail_action         | boolean | Fail the job if ZAP identifies any alerts                                                             | `false`                            | false    |
+| fail_action         | boolean | Fail the job if ZAP identifies any alerts                                                            | `false`                            | false    |
 | artifact_name       | string  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`) | `zap_scan`                         | false    |
 | api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                       | `openapi`                          | false    |
 | automation_plan     | string  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`    | `""`                               | false    |
