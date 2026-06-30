@@ -32,6 +32,7 @@ Shared github workflows created by the `digicatapult` organisation.
 - [Generate SBOM](#generate-sbom-examples)
 - [Scan Secrets](#scan-secrets-examples)
 - [Scan Vulnerabilities](#scan-vulnerabilities-examples)
+- [ZAP Scan](#zap-scan-examples)
 
 ## Workflows
 
@@ -678,31 +679,31 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 
 #### Inputs
 
-| Input                 | Type      | Description                                                                                          | Default                            | Required |
-| --------------------- | --------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| `matrix_scans`        | `string`  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`               | `'["baseline"]'`                   | false    |
-| `target`              | `string`  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                | `http://localhost:3000`            | false    |
-| `env_vars`            | `string`  | JSON object of extra environment variables to inject                                                 | `{}`                               | false    |
-| `docker_compose_file` | `string`  | Docker Compose file used to bring up the application stack before scanning                           | `""`                               | false    |
-| `pull_ghcr`           | `boolean` | Log in to GitHub Container Registry before pulling images (e.g. if using private/custom proxy image) | `false`                            | false    |
-| `pre_scan_command`    | `string`  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                      | `""`                               | false    |
-| `target_wait_timeout` | `number`  | Seconds to poll `target` for a successful response before failing                                    | `60`                               | false    |
-| `rules_file_name`     | `string`  | Relative path to a ZAP rules TSV file for suppressing known alerts                                   | `""`                               | false    |
-| `cmd_options`         | `string`  | Additional ZAP CLI options passed to all scan types                                                  | `""`                               | false    |
-| `docker_name`         | `string`  | Custom ZAP Docker image name; defaults to the stable ZAP image                                       | `"ghcr.io/zaproxy/zaproxy:stable"` | false    |
-| `allow_issue_writing` | `boolean` | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`        | `false`                            | false    |
-| `fail_action`         | `boolean` | Fail the job if ZAP identifies any alerts                                                            | `false`                            | false    |
-| `artifact_name`       | `string`  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`) | `zap_scan`                         | false    |
-| `api_scan_format`     | `string`  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                       | `openapi`                          | false    |
-| `automation_plan`     | `string`  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`    | `""`                               | false    |
+| Input               | Type    | Description                                                                                          | Default                            | Required |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| matrix_scans        | string  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`               | `'["baseline"]'`                   | false    |
+| target              | string  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                | `http://localhost:3000`            | false    |
+| env_vars            | string  | JSON object of extra environment variables to inject                                                 | `{}`                               | false    |
+| docker_compose_file | string  | Docker Compose file used to bring up the application stack before scanning                           | `""`                               | false    |
+| pull_ghcr           | boolean | Log in to GitHub Container Registry before pulling images (e.g. if using private/custom proxy image) | `false`                            | false    |
+| pre_scan_command    | string  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                       | `""`                               | false    |
+| target_wait_timeout | number  | Seconds to poll `target` for a successful response before failing                                    | `60`                               | false    |
+| rules_file_name     | string  | Relative path to a ZAP rules TSV file for suppressing known alerts                                   | `""`                               | false    |
+| cmd_options         | string  | Additional ZAP CLI options passed to all scan types                                                  | `""`                               | false    |
+| docker_name         | string  | Custom ZAP Docker image name; defaults to the stable ZAP image                                       | `"ghcr.io/zaproxy/zaproxy:stable"` | false    |
+| allow_issue_writing | boolean | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`        | `false`                            | false    |
+| fail_action         | boolean | Fail the job if ZAP identifies any alerts                                                             | `false`                            | false    |
+| artifact_name       | string  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`) | `zap_scan`                         | false    |
+| api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                       | `openapi`                          | false    |
+| automation_plan     | string  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`    | `""`                               | false    |
 
 #### Permissions
 
-| Access           | Jobs used  | Level    | Reason                                                                 | When                        |
-| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- | --------------------------- |
-| `contents: read` | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | Always                      |
-| `packages: read` | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `pull_ghcr: true`           |
-| `issues: write`  | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `allow_issue_writing: true` |
+| Access           | Jobs used  | Level    | Reason                                                                 | Conditions                   |
+| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- | ---------------------------- |
+| `contents: read` | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | N/A                          |
+| `packages: read` | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `inputs.pull_ghcr`           |
+| `issues: write`  | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `inputs.allow_issue_writing` |
 
 #### Workflow Description
 
