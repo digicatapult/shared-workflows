@@ -1,0 +1,192 @@
+name: ZAP Scan
+on:
+  workflow_call:
+    inputs:
+      matrix_scans:
+        required: false
+        type: string
+        default: '["baseline"]'
+      target:
+        required: false
+        type: string
+        default: "http://localhost:3000"
+      env_vars:
+        required: false
+        type: string
+        default: "{}"
+      docker_compose_file:
+        required: false
+        type: string
+        default: ""
+      pull_ghcr:
+        required: false
+        type: boolean
+        default: false
+      pre_scan_command:
+        required: false
+        type: string
+        default: ""
+      target_wait_timeout:
+        required: false
+        type: number
+        default: 60
+      rules_file_name:
+        required: false
+        type: string
+        default: ""
+      cmd_options:
+        required: false
+        type: string
+        default: ""
+      docker_name:
+        required: true
+        type: string
+      allow_issue_writing:
+        required: false
+        type: boolean
+        default: false
+      fail_action:
+        required: false
+        type: boolean
+        default: false
+      artifact_name:
+        required: false
+        type: string
+        default: "zap_scan"
+      api_scan_format:
+        required: false
+        type: string
+        default: "openapi"
+      automation_plan:
+        required: false
+        type: string
+        default: ""
+jobs:
+  zap-scan:
+    name: ZAP ${{ matrix.scan_type }} scan
+    strategy:
+      fail-fast: false
+      matrix:
+        scan_type: ${{ fromJson(inputs.matrix_scans) }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate scan inputs
+        shell: bash
+        env:
+          SCAN_TYPE: ${{ matrix.scan_type }}
+          AUTOMATION_PLAN: ${{ inputs.automation_plan }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          case "$SCAN_TYPE" in
+            baseline|full|api)
+              if [[ -z "$TARGET" ]]; then
+                echo "inputs.target must be set for scan type '$SCAN_TYPE'"
+                exit 1
+              fi
+              if [[ ! "$TARGET" =~ ^https?://(localhost|127\.[0-9]+\.[0-9]+\.[0-9]+)(:[0-9]+)?(/|$) ]]; then
+                echo "inputs.target must point to a localhost address (got '$TARGET')"
+                exit 1
+              fi
+              ;;
+            automation-framework)
+              if [[ -z "$AUTOMATION_PLAN" ]]; then
+                echo "inputs.automation_plan must be set when scan type is 'automation-framework'"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Invalid scan type '$SCAN_TYPE'. Must be one of: baseline, full, api, automation-framework."
+              exit 1
+              ;;
+          esac
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.pull_ghcr == true }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup dependencies
+        if: inputs.docker_compose_file != ''
+        env:
+          DOCKER_COMPOSE_FILE: ${{ inputs.docker_compose_file }}
+        run: docker compose -f "$DOCKER_COMPOSE_FILE" up -d --quiet-pull
+      - name: Run pre-scan command
+        run: ${{ inputs.pre_scan_command }}
+        if: inputs.pre_scan_command != ''
+      - name: Wait for target to be ready
+        if: matrix.scan_type != 'automation-framework'
+        env:
+          TARGET: ${{ inputs.target }}
+          TIMEOUT: ${{ inputs.target_wait_timeout }}
+        run: |
+          ELAPSED=0
+          until curl -s -o /dev/null -w '%{http_code}' "$TARGET" | grep -qE '^[1-5][0-9][0-9]$'; do
+            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+              echo "Timed out waiting for $TARGET after ${TIMEOUT}s"
+              exit 1
+            fi
+            sleep 2
+            ELAPSED=$((ELAPSED + 2))
+          done
+          echo "Target $TARGET is ready (waited ${ELAPSED}s)"
+      - name: Set artifact name
+        id: artifact
+        env:
+          ARTIFACT_NAME: ${{ inputs.artifact_name }}
+          SCAN_TYPE: ${{ matrix.scan_type }}
+        run: printf 'name=%s-%s\n' "$ARTIFACT_NAME" "$SCAN_TYPE" >> "$GITHUB_OUTPUT"
+      - name: ZAP Baseline Scan
+        if: matrix.scan_type == 'baseline'
+        uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: ${{ inputs.target }}
+          docker_name: ${{ inputs.docker_name }}
+          rules_file_name: ${{ inputs.rules_file_name }}
+          cmd_options: ${{ inputs.cmd_options }}
+          allow_issue_writing: ${{ inputs.allow_issue_writing }}
+          fail_action: ${{ inputs.fail_action }}
+          artifact_name: ${{ steps.artifact.outputs.name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: ZAP Full Scan
+        if: matrix.scan_type == 'full'
+        uses: zaproxy/action-full-scan@v0.13.0
+        with:
+          target: ${{ inputs.target }}
+          docker_name: ${{ inputs.docker_name }}
+          rules_file_name: ${{ inputs.rules_file_name }}
+          cmd_options: ${{ inputs.cmd_options }}
+          allow_issue_writing: ${{ inputs.allow_issue_writing }}
+          fail_action: ${{ inputs.fail_action }}
+          artifact_name: ${{ steps.artifact.outputs.name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: ZAP API Scan
+        if: matrix.scan_type == 'api'
+        uses: zaproxy/action-api-scan@v0.10.0
+        with:
+          target: ${{ inputs.target }}
+          format: ${{ inputs.api_scan_format }}
+          docker_name: ${{ inputs.docker_name }}
+          rules_file_name: ${{ inputs.rules_file_name }}
+          cmd_options: ${{ inputs.cmd_options }}
+          allow_issue_writing: ${{ inputs.allow_issue_writing }}
+          fail_action: ${{ inputs.fail_action }}
+          artifact_name: ${{ steps.artifact.outputs.name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: ZAP Automation Framework Scan
+        if: matrix.scan_type == 'automation-framework'
+        uses: zaproxy/action-af@v0.3.0
+        with:
+          plan: ${{ inputs.automation_plan }}
+          docker_name: ${{ inputs.docker_name }}
+          cmd_options: ${{ inputs.cmd_options }}
+          rules_file_name: ${{ inputs.rules_file_name }}
+          fail_action: ${{ inputs.fail_action }}
+          artifact_name: ${{ steps.artifact.outputs.name }}
