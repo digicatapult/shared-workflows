@@ -30,23 +30,47 @@ on:
         required: false
         type: string
         default: Dockerfile
+      package_manager:
+        required: false
+        type: string
+        default: "npm"
+        description: "Package manager for version detection (passed to check-version). Options: npm, poetry"
+      arm64_runner:
+        required: false
+        type: string
+        default: "ubuntu-24.04-arm"
+        description: "Runner label used for native linux/arm64 builds. Must exist as a GitHub-hosted runner in the org before this is used - see ENG-309."
     secrets:
       DOCKERHUB_USERNAME:
         required: false
       DOCKERHUB_TOKEN:
         required: false
 jobs:
-  repo_ids:
-    name: Repo IDs
+  prepare:
+    name: Prepare build
     runs-on: ubuntu-latest
     outputs:
       repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
       org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
+      version: ${{ steps.get_version.outputs.VERSION }}
+      build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
+      is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE }}
+      image_names: ${{ steps.image-names.outputs.names }}
+      ghcr_version_tag: ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
+      ghcr_latest_tag: ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
+      dockerhub_version_tag: ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
+      dockerhub_latest_tag: ${{ steps.generate-tags.outputs.DOCKERHUB_LATEST_TAG }}
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "Parsing JSON environment variables..."
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - name: Get repository identifiers
         id: repo_ids
         run: |
@@ -54,32 +78,22 @@ jobs:
           ORG_NAME=$(echo "${{ github.event.repository.owner.name }}" | tr '[:upper:]' '[:lower:]')
           echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
-  build-docker:
-    name: "Build docker image"
-    needs: repo_ids
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v7
-      - name: Set environment variables from JSON
-        env:
-          ENV_VARS_JSON: "${{ inputs.env_vars }}"
-        run: |
-          echo "Parsing JSON environment variables..."
-          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
       - id: get_version
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup QEMU
-        uses: docker/setup-qemu-action@v4
-        with:
-          platforms: all
-      - name: Setup Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v4
-        with:
-          buildkitd-flags: "--debug"
+          package_manager: ${{ inputs.package_manager }}
+      - name: Compute image names to push
+        id: image-names
+        run: |
+          NAMES=""
+          if [ "${{ inputs.push_ghcr }}" = "true" ]; then
+            NAMES="ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}"
+          fi
+          if [ "${{ inputs.push_dockerhub }}" = "true" ]; then
+            NAMES="${NAMES:+$NAMES,}${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}"
+          fi
+          echo "names=$NAMES" >> $GITHUB_OUTPUT
       - name: Generate tags
         id: generate-tags
         if: ${{ inputs.push_dockerhub == true || inputs.push_ghcr == true }}
@@ -88,30 +102,66 @@ jobs:
           IS_NEW_VERSION: ${{ steps.get_version.outputs.IS_NEW_VERSION }}
           IS_PRERELEASE: ${{ steps.get_version.outputs.IS_PRERELEASE }}
         run: |
-          # Reset all tag variables
           echo "GHCR_VERSION_TAG=" >> $GITHUB_OUTPUT
           echo "DOCKERHUB_VERSION_TAG=" >> $GITHUB_OUTPUT
           echo "GHCR_LATEST_TAG=" >> $GITHUB_OUTPUT
           echo "DOCKERHUB_LATEST_TAG=" >> $GITHUB_OUTPUT
-
-          # Check if it is a new version
           if [ "$IS_NEW_VERSION" == "true" ]; then
-            # Generate tags for GHCR if enabled
             if [ "${{ inputs.push_ghcr }}" == "true" ]; then
-              echo "GHCR_VERSION_TAG=ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:$VERSION" >> $GITHUB_OUTPUT
+              echo "GHCR_VERSION_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:$VERSION" >> $GITHUB_OUTPUT
               if [ "$IS_PRERELEASE" == "false" ]; then
-                echo "GHCR_LATEST_TAG=ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:latest" >> $GITHUB_OUTPUT
+                echo "GHCR_LATEST_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:latest" >> $GITHUB_OUTPUT
               fi
             fi
-
-            # Generate tags for Dockerhub if enabled
             if [ "${{ inputs.push_dockerhub }}" == "true" ]; then
-              echo "DOCKERHUB_VERSION_TAG=${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:$VERSION" >> $GITHUB_OUTPUT
+              echo "DOCKERHUB_VERSION_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:$VERSION" >> $GITHUB_OUTPUT
               if [ "$IS_PRERELEASE" == "false" ]; then
-                echo "DOCKERHUB_LATEST_TAG=${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:latest" >> $GITHUB_OUTPUT
+                echo "DOCKERHUB_LATEST_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:latest" >> $GITHUB_OUTPUT
               fi
             fi
           fi
+      - name: Build platform matrix
+        id: build-matrix
+        run: |
+          IFS=',' read -ra PLATS <<< "${{ inputs.docker_platforms }}"
+          ENTRIES=()
+          for p in "${PLATS[@]}"; do
+            case "$p" in
+              linux/amd64) runner="ubuntu-latest"; native=true ;;
+              linux/arm64) runner="${{ inputs.arm64_runner }}"; native=true ;;
+              *) runner="ubuntu-latest"; native=false ;;
+            esac
+            slug=$(echo "$p" | tr '/' '-')
+            ENTRIES+=("{\"platform\":\"$p\",\"runner\":\"$runner\",\"native\":$native,\"slug\":\"$slug\"}")
+          done
+          MATRIX=$(IFS=,; echo "[${ENTRIES[*]}]")
+          echo "matrix=$MATRIX" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build - ${{ matrix.platform }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set environment variables from JSON
+        env:
+          ENV_VARS_JSON: "${{ inputs.env_vars }}"
+        run: |
+          echo "$ENV_VARS_JSON" | jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' >> $GITHUB_ENV
+      - name: Setup QEMU
+        if: ${{ matrix.native == false }}
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: all
+      - name: Setup Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-flags: "--debug"
       - name: Login to GitHub Container Registry
         if: ${{ inputs.push_ghcr == true }}
         uses: docker/login-action@v4
@@ -132,82 +182,34 @@ jobs:
           registry: dhi.io
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      # Case 1: Only GHCR enabled
-      - name: Build and push image to GHCR only
-        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == false }}
+
+      - name: Build and push by digest
+        if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
+        id: build
         uses: docker/build-push-action@v7
         with:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
           file: ${{ inputs.docker_file }}
-          platforms: ${{ inputs.docker_platforms }}
+          platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build_args }}
-          push: true
           sbom: true
-          tags: |
-            ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
-            ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
-            ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
-          labels: |
-            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
-            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
-      # Case 2: Only DockerHub enabled
-      - name: Build and push image to DockerHub only
-        if: ${{ inputs.push_ghcr == false && inputs.push_dockerhub == true }}
-        uses: docker/build-push-action@v7
+          outputs: type=image,name=${{ needs.prepare.outputs.image_names }},push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+      - name: Upload digest
+        if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
+        uses: actions/upload-artifact@v7
         with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          file: ${{ inputs.docker_file }}
-          platforms: ${{ inputs.docker_platforms }}
-          build-args: ${{ inputs.build_args }}
-          push: true
-          sbom: true
-          tags: |
-            ${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
-            ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
-            ${{ steps.generate-tags.outputs.DOCKERHUB_LATEST_TAG }}
-          labels: |
-            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
-            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
-      # Case 3: Both GHCR and DockerHub enabled
-      - name: Build and push image to both GHCR and DockerHub
-        if: ${{ inputs.push_ghcr == true && inputs.push_dockerhub == true }}
-        uses: docker/build-push-action@v7
-        with:
-          builder: ${{ steps.buildx.outputs.name }}
-          context: .
-          file: ${{ inputs.docker_file }}
-          platforms: ${{ inputs.docker_platforms }}
-          build-args: ${{ inputs.build_args }}
-          push: true
-          sbom: true
-          tags: |
-            ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
-            ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
-            ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
-            ${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ github.sha }}
-            ${{ steps.generate-tags.outputs.DOCKERHUB_VERSION_TAG }}
-            ${{ steps.generate-tags.outputs.DOCKERHUB_LATEST_TAG }}
-          labels: |
-            org.opencontainers.image.title=${{ needs.repo_ids.outputs.repo_name }}
-            org.opencontainers.image.description=${{ github.event.repository.description }}
-            org.opencontainers.image.source=${{ github.event.repository.html_url }}
-            org.opencontainers.image.url=${{ github.event.repository.html_url }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.get_version.outputs.VERSION }}
-            org.opencontainers.image.created=${{ steps.get_version.outputs.BUILD_DATE }}
-      # Case 4: Build only
+          name: digests-${{ matrix.slug }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build only
         if: ${{ inputs.push_ghcr == false && inputs.push_dockerhub == false }}
         uses: docker/build-push-action@v7
@@ -215,10 +217,58 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           context: .
           file: ${{ inputs.docker_file }}
-          platforms: ${{ inputs.docker_platforms }}
+          platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build_args }}
           push: false
-      # Generate and upload CVEs
+
+  merge:
+    name: Merge manifests & scan
+    needs: [prepare, build]
+    if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download digests
+        uses: actions/download-artifact@v8
+        with:
+          path: /tmp/digests
+          pattern: digests-*
+          merge-multiple: true
+      - name: Login to GitHub Container Registry
+        if: ${{ inputs.push_ghcr == true }}
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Login to Dockerhub Registry
+        if: ${{ inputs.push_dockerhub == true }}
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Create GHCR manifest list
+        if: ${{ inputs.push_ghcr == true }}
+        working-directory: /tmp/digests
+        run: |
+          IMAGE="ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}"
+          TAGS="-t $IMAGE:${{ github.sha }}"
+          [ -n "${{ needs.prepare.outputs.ghcr_version_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.ghcr_version_tag }}"
+          [ -n "${{ needs.prepare.outputs.ghcr_latest_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.ghcr_latest_tag }}"
+          docker buildx imagetools create $TAGS $(printf "$IMAGE@sha256:%s " *)
+
+      - name: Create DockerHub manifest list
+        if: ${{ inputs.push_dockerhub == true }}
+        working-directory: /tmp/digests
+        run: |
+          IMAGE="${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}"
+          TAGS="-t $IMAGE:${{ github.sha }}"
+          [ -n "${{ needs.prepare.outputs.dockerhub_version_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.dockerhub_version_tag }}"
+          [ -n "${{ needs.prepare.outputs.dockerhub_latest_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.dockerhub_latest_tag }}"
+          docker buildx imagetools create $TAGS $(printf "$IMAGE@sha256:%s " *)
+
       - name: Generate CVEs with Docker Scout (Docker Hub)
         if: ${{ !github.event.repository.private && inputs.push_dockerhub == true }}
         uses: docker/scout-action@v1
@@ -226,8 +276,8 @@ jobs:
           command: cves
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-          image: registry://${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
-          organization: ${{ needs.repo_ids.outputs.org_name }}
+          image: registry://${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}:${{ needs.prepare.outputs.version }}
+          organization: ${{ needs.prepare.outputs.org_name }}
           exit-code: false
           sarif-file: scout.sarif
       - name: Generate CVEs with Docker Scout (GHCR only)
@@ -237,8 +287,8 @@ jobs:
           command: cves
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image: ghcr.io/${{ needs.repo_ids.outputs.org_name }}/${{ needs.repo_ids.outputs.repo_name }}:${{ steps.get_version.outputs.VERSION }}
-          organization: ${{ needs.repo_ids.outputs.org_name }}
+          image: ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}:${{ needs.prepare.outputs.version }}
+          organization: ${{ needs.prepare.outputs.org_name }}
           exit-code: false
           sarif-file: scout.sarif
       - name: Upload Scout's SARIF results directly to GHAS
