@@ -166,15 +166,19 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
 | docker_platforms | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
 | docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
+| package_manager  | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                            | `"npm"`                     | false    |
+| arm64_runner     | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo       | `"ubuntu-24.04-arm"`        | false    |
+
+Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
 #### Permissions
 
-| Access                   | Jobs used      | Level | Reason                                                                   | Conditions                                 |
-| ------------------------ | -------------- | ----- | ------------------------------------------------------------------------ | ------------------------------------------ |
-| `contents: read`         | `repo_ids`     | Job   | To GET repository contents                                               | N/A                                        |
-| `contents: read`         | `build-docker` | Job   | To GET contents to include along with the upload to a container registry | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `packages: write`        | `build-docker` | Job   | To POST built packages to one or more container registries               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `security-events: write` | `build-docker` | Job   | To POST new code scanning alerts based on the SARIF report               | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| Access                   | Jobs used             | Level | Reason                                                                    | Conditions                                 |
+| ------------------------ | ---------------------- | ----- | -------------------------------------------------------------------------- | ------------------------------------------- |
+| `contents: read`         | `prepare`               | Job   | To GET repository contents                                                | N/A                                         |
+| `contents: read`         | `build`                 | Job   | To GET repository contents                                                | N/A                                         |
+| `packages: write`        | `build`, `merge`        | Job   | To POST built packages/manifests to one or more container registries      | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
+| `security-events: write` | `merge`                 | Job   | To POST new code scanning alerts based on the SARIF report                | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
 
 #### Secrets
 
