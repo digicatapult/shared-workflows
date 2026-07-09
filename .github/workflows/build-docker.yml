@@ -54,7 +54,6 @@ jobs:
       org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
       version: ${{ steps.get_version.outputs.VERSION }}
       build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
-      is_prerelease: ${{ steps.get_version.outputs.IS_PRERELEASE }}
       image_names: ${{ steps.image-names.outputs.names }}
       ghcr_version_tag: ${{ steps.generate-tags.outputs.GHCR_VERSION_TAG }}
       ghcr_latest_tag: ${{ steps.generate-tags.outputs.GHCR_LATEST_TAG }}
@@ -122,13 +121,17 @@ jobs:
           fi
       - name: Build platform matrix
         id: build-matrix
+        env:
+          DOCKER_PLATFORMS: ${{ inputs.docker_platforms }}
+          ARM64_RUNNER: ${{ inputs.arm64_runner }}
         run: |
-          IFS=',' read -ra PLATS <<< "${{ inputs.docker_platforms }}"
+          IFS=',' read -ra PLATS <<< "$DOCKER_PLATFORMS"
           ENTRIES=()
-          for p in "${PLATS[@]}"; do
+          for raw in "${PLATS[@]}"; do
+            p=$(echo "$raw" | xargs)
             case "$p" in
               linux/amd64) runner="ubuntu-latest"; native=true ;;
-              linux/arm64) runner="${{ inputs.arm64_runner }}"; native=true ;;
+              linux/arm64) runner="$ARM64_RUNNER"; native=true ;;
               *) runner="ubuntu-latest"; native=false ;;
             esac
             slug=$(echo "$p" | tr '/' '-')
@@ -145,6 +148,7 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
       - name: Set environment variables from JSON
@@ -194,7 +198,15 @@ jobs:
           platforms: ${{ matrix.platform }}
           build-args: ${{ inputs.build_args }}
           sbom: true
-          outputs: type=image,name=${{ needs.prepare.outputs.image_names }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,"name=${{ needs.prepare.outputs.image_names }}",push-by-digest=true,name-canonical=true,push=true
+          labels: |
+            org.opencontainers.image.title=${{ needs.prepare.outputs.repo_name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.created=${{ needs.prepare.outputs.build_date }}
       - name: Export digest
         if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
         run: |
