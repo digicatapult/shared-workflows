@@ -54,17 +54,12 @@ on:
         required: false
         type: string
         default: "CRITICAL"
-        description: "Comma-separated severities that fail the container scan job."
-      scan_report_severity:
-        required: false
-        type: string
-        default: "CRITICAL,HIGH"
-        description: "Comma-separated severities included in the uploaded report artifact."
+        description: "Comma-separated severities that fail the build (gate). The uploaded report always contains every severity."
       scan_ignore_unfixed:
         required: false
         type: boolean
         default: true
-        description: "Ignore vulnerabilities that have no fix available, so the gate stays actionable."
+        description: "When gating, ignore vulnerabilities that have no fix available so the gate stays actionable. Does not affect the report, which always lists fixed and unfixed."
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -393,24 +388,25 @@ jobs:
         with:
           name: scan-image
           path: ${{ runner.temp }}/scan
-      - name: Generate CVE report artifact
+      # One comprehensive scan: every severity, fixed and unfixed. The JSON is
+      # the report artifact and the full table is printed to the log; the gate
+      # below is computed from this same report so we never re-scan.
+      - name: Scan image for CVEs
         env:
           TRIVY_IMAGE: ${{ inputs.trivy_image }}
-          REPORT_SEVERITY: ${{ inputs.scan_report_severity }}
-          IGNORE_UNFIXED: ${{ inputs.scan_ignore_unfixed }}
           SCAN_DIR: ${{ runner.temp }}/scan
         run: |
           set -euo pipefail
-          extra=()
-          [ "${IGNORE_UNFIXED}" = "true" ] && extra+=(--ignore-unfixed)
           docker run --rm -v "${SCAN_DIR}:/scan" "${TRIVY_IMAGE}" image \
             --input /scan/scan-image.tar \
             --scanners vuln \
-            --severity "${REPORT_SEVERITY}" \
-            "${extra[@]}" \
             --format json \
             --output /scan/trivy-report.json \
             --exit-code 0
+          echo "::group::Trivy report (all severities)"
+          docker run --rm -v "${SCAN_DIR}:/scan" "${TRIVY_IMAGE}" convert \
+            --format table /scan/trivy-report.json || true
+          echo "::endgroup::"
       - name: Upload CVE report
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -419,20 +415,22 @@ jobs:
           path: ${{ runner.temp }}/scan/trivy-report.json
           if-no-files-found: warn
           retention-days: 30
-      - name: Fail on high-severity vulnerabilities
+      - name: Fail on gating vulnerabilities
         env:
-          TRIVY_IMAGE: ${{ inputs.trivy_image }}
           FAIL_SEVERITY: ${{ inputs.scan_fail_severity }}
           IGNORE_UNFIXED: ${{ inputs.scan_ignore_unfixed }}
-          SCAN_DIR: ${{ runner.temp }}/scan
+          REPORT: ${{ runner.temp }}/scan/trivy-report.json
         run: |
           set -euo pipefail
-          extra=()
-          [ "${IGNORE_UNFIXED}" = "true" ] && extra+=(--ignore-unfixed)
-          docker run --rm -v "${SCAN_DIR}:/scan" "${TRIVY_IMAGE}" image \
-            --input /scan/scan-image.tar \
-            --scanners vuln \
-            --severity "${FAIL_SEVERITY}" \
-            "${extra[@]}" \
-            --format table \
-            --exit-code 1
+          count=$(jq --arg sevs "${FAIL_SEVERITY}" --arg iu "${IGNORE_UNFIXED}" '
+            ($sevs | split(",")) as $s
+            | [ .Results[]?.Vulnerabilities // [] | .[]
+                | select( .Severity as $v | $s | index($v) )
+                | select( ($iu != "true") or ((.FixedVersion // "") != "") ) ]
+            | length' "${REPORT}")
+          echo "Gating vulnerabilities (${FAIL_SEVERITY}, ignore_unfixed=${IGNORE_UNFIXED}): ${count}"
+          if [ "${count}" -gt 0 ]; then
+            echo "::error::${count} vulnerabilit(y/ies) at ${FAIL_SEVERITY} with a fix available. See the trivy-container-report artifact."
+            exit 1
+          fi
+          echo "No gating vulnerabilities found."
