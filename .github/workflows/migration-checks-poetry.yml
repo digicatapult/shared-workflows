@@ -58,11 +58,11 @@ jobs:
     name: Resolve base and head
     runs-on: ubuntu-latest
     outputs:
-      has_base: ${{ steps.r.outputs.has_base }}
-      base_sha: ${{ steps.r.outputs.base_sha }}
-      head_sha: ${{ steps.r.outputs.head_sha }}
+      has_base: ${{ steps.resolve_refs.outputs.has_base }}
+      base_sha: ${{ steps.resolve_refs.outputs.base_sha }}
+      head_sha: ${{ steps.resolve_refs.outputs.head_sha }}
     steps:
-      - id: r
+      - id: resolve_refs
         env:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
