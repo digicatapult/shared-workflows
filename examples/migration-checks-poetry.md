@@ -2,7 +2,7 @@
 
 ## Using [migration-checks-poetry.yml](../.github/workflows/migration-checks-poetry.yml) in callers
 
-The Alembic sibling of [migration-checks-npm.yml](../.github/workflows/migration-checks.md). Runs three jobs against a Poetry + Alembic project on `pull_request`:
+The Alembic sibling of [migration-checks-npm.yml](../.github/workflows/migration-checks-npm.yml). Runs three jobs against a Poetry + Alembic project:
 
 - **lint-migrations** — merged revisions are immutable (no modify/rename/delete of a version file already on the base branch), and the revision graph must have exactly **one head**. Alembic orders revisions by `down_revision`, not filename, so the failure mode equivalent to a knex "reorder" is two revisions branching from the same parent and producing multiple heads; `alembic upgrade head` then refuses to run.
 - **migrate-roundtrip** — `alembic upgrade head` → `alembic downgrade base` → `alembic upgrade head` against a fresh database, exercising every `downgrade()`.
