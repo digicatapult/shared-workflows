@@ -178,7 +178,11 @@ jobs:
           MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
         run: |
           set -euo pipefail
-          count=$(find "${MIGRATIONS_DIR}" -maxdepth 1 -type f 2>/dev/null | wc -l | tr -d ' ')
+          if [[ -d "${MIGRATIONS_DIR}" ]]; then
+            count=$(find "${MIGRATIONS_DIR}" -maxdepth 1 -type f | wc -l | tr -d ' ')
+          else
+            count=0
+          fi
           if [[ "${count}" -gt 0 ]]; then
             echo "has_base=true" >> "${GITHUB_OUTPUT}"
           else

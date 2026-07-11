@@ -24,7 +24,12 @@ jobs:
       contents: read
 ```
 
-### With a pgvector service and SQL seeds
+### With SQL seeds
+
+Seeds run after `alembic upgrade head` at the base ref, so they must only
+target tables that the migrations create. Data for tables created at
+application runtime (for example a vector store table auto-created by an ORM
+or embedding library) will not exist yet and should not be seeded here.
 
 ```yaml
 jobs:
@@ -36,6 +41,6 @@ jobs:
       postgres_service: postgres
       seed_command: |
         for f in seeds/seed_*.sql; do
-          PGPASSWORD=postgres psql -h localhost -U postgres -d spec-rag -v ON_ERROR_STOP=1 -f "$f"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d my-app -v ON_ERROR_STOP=1 -f "$f"
         done
 ```
