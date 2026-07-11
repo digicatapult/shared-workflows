@@ -1,0 +1,219 @@
+name: Poetry Migration checks
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
+      versions_dir:
+        description: Path to the alembic versions directory, used by the file lint job
+        required: false
+        type: string
+        default: alembic/versions
+      migrate_command:
+        description: Command that applies all outstanding revisions
+        required: false
+        type: string
+        default: poetry run alembic upgrade head
+      rollback_command:
+        description: Command that downgrades to the base (empty) revision
+        required: false
+        type: string
+        default: poetry run alembic downgrade base
+      seed_command:
+        description: Seed command for the seeded-upgrade job. Empty string skips seeding.
+        required: false
+        type: string
+        default: ""
+      postgres_compose_file:
+        description: Compose file whose postgres service is started for the DB-backed jobs
+        required: false
+        type: string
+        default: docker-compose.yml
+      postgres_service:
+        description: Name of the postgres service within the compose file
+        required: false
+        type: string
+        default: postgres
+      postgres_image:
+        description: >-
+          Fallback Postgres image. When set, a container from this image is
+          started instead of the caller's compose service. Prefer the compose
+          service so the CI database version tracks what the app runs.
+        required: false
+        type: string
+        default: ""
+      db_name:
+        description: Database to create when using the postgres_image fallback
+        required: false
+        type: string
+        default: postgres
+jobs:
+  lint-migrations:
+    name: Lint migration files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Merged revisions must be immutable
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          VERSIONS_DIR: ${{ inputs.versions_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${BASE_REF}" ]]; then
+            echo "No base ref (not a pull_request event); skipping revision lint."
+            exit 0
+          fi
+          git fetch origin "${BASE_REF}" --quiet
+          changed=$(git diff --name-status --diff-filter=MRD \
+            "origin/${BASE_REF}...HEAD" -- "${VERSIONS_DIR}")
+          if [[ -n "${changed}" ]]; then
+            echo "Alembic revisions already on ${BASE_REF} must not be modified, renamed, or deleted."
+            echo "Editing a merged revision (especially its down_revision) breaks the chain for"
+            echo "every database that already applied it. Add a NEW revision instead."
+            echo ""
+            echo "${changed}"
+            exit 1
+          fi
+          echo "No merged revisions were modified."
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      - name: Revision graph must have a single head
+        run: |
+          set -euo pipefail
+          heads=$(poetry run alembic heads 2>/dev/null | grep -c '(head)' || true)
+          if [[ "${heads}" -ne 1 ]]; then
+            echo "Revision graph has ${heads} heads; expected exactly 1."
+            echo "A second revision merged since this branch was cut. Rebase and point your"
+            echo "revision's down_revision at the new head so the graph is linear again."
+            poetry run alembic heads || true
+            exit 1
+          fi
+          echo "Revision graph has a single head."
+
+  migrate-roundtrip:
+    name: Upgrade / downgrade / upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      - name: Start Postgres
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      - name: Upgrade to head
+        run: ${{ inputs.migrate_command }}
+      - name: Downgrade to base
+        run: ${{ inputs.rollback_command }}
+      - name: Upgrade to head again
+        run: ${{ inputs.migrate_command }}
+
+  seeded-upgrade:
+    name: Upgrade seeded base-branch database
+    runs-on: ubuntu-latest
+    if: ${{ github.base_ref != '' }}
+    steps:
+      # Phase 1: reconstruct the production-like starting state from the base branch.
+      - name: Check out base ref
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.base_ref }}
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      - name: Start Postgres
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages (base ref)
+        run: poetry install --no-interaction --no-ansi
+      - name: Upgrade to head at base ref
+        run: ${{ inputs.migrate_command }}
+      - name: Seed at base ref
+        if: ${{ inputs.seed_command != '' }}
+        run: ${{ inputs.seed_command }}
+      # Phase 2: apply only the PR's new revisions on top of the seeded data.
+      - name: Check out PR head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          clean: true
+      - name: Install packages (PR head)
+        run: poetry install --no-interaction --no-ansi
+      - name: Apply new revisions against seeded data
+        run: ${{ inputs.migrate_command }}
