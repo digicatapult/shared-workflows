@@ -8,13 +8,25 @@ Runs three jobs against a knex project on `pull_request`:
 - **migrate-roundtrip** — `migrate:latest` → `migrate:rollback` → `migrate:latest` against a fresh database, so broken or asymmetric `down()` functions surface here.
 - **seeded-upgrade** — migrate and seed the database at the **base ref**, then apply only the PR's new migrations on top. This reproduces what deployment does (migrating a database that already has data), which an empty-database CI run never exercises.
 
-`contents: read` is all that is required. The job must run on a `pull_request` event: the lint and seeded-upgrade jobs compare against `github.base_ref`, and self-skip when it is empty.
+`contents: read` is all that is required. The workflow runs on both `pull_request` and `push` callers: on `pull_request` it compares the PR base against the PR head, and on `push` (for example a `release.yml` on `main`) it compares the commit before the push against the pushed commit — so seeded-upgrade becomes a final "upgrade the previously deployed commit to this one" check. `migrate-roundtrip` runs on any event.
 
 By default Postgres is started from the caller's own `docker-compose.yml` `postgres` service, so the CI database version matches what the application runs (and is kept current by renovate).
 
-The seeded-upgrade job no-ops when the base ref has no migrations yet, so the PR that introduces a repo's first migration passes cleanly; the job becomes active once at least one migration is on the base branch.
+The seeded-upgrade job no-ops when there is no base to compare against (a first push to a new branch) or when the base commit has no migrations yet, so the change that introduces a repo's first migration passes cleanly; the job becomes active once at least one migration is on the base.
 
-### Minimal
+### Minimal (pull request)
+
+```yaml
+jobs:
+  migration-checks:
+    uses: digicatapult/shared-workflows/.github/workflows/migration-checks-npm.yml@main
+    permissions:
+      contents: read
+```
+
+### Final check on release (push to main)
+
+Called from a `push`-triggered `release.yml`, seeded-upgrade migrates the previously deployed commit's schema and data, then applies the migrations introduced by this push on top — the same upgrade the deploy is about to perform.
 
 ```yaml
 jobs:

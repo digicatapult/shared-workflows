@@ -623,9 +623,9 @@ This workflow provides a comprehensive testing and coverage solution with branch
 
 ### [NPM Migration Checks](.github/workflows/migration-checks-npm.yml) ([examples](examples/migration-checks.md))
 
-Guards knex database migrations on a pull request. Our other CI only ever migrates an empty database, and migrations run at container startup in production, so a migration that only fails against existing data (for example an `UPDATE` that violates a still-active `CHECK` constraint) is first exercised at deploy time. This workflow moves that failure into CI. It runs three jobs: a file lint (merged migrations are immutable, and new migrations must sort after existing ones), an up/down/up rollback roundtrip, and a seeded-upgrade job that migrates and seeds a database at the base ref, then applies only the PR's new migrations on top. Postgres is started from the caller's own compose service by default so the CI version tracks what the application runs, with an image fallback.
+Guards knex database migrations. Our other CI only ever migrates an empty database, and migrations run at container startup in production, so a migration that only fails against existing data (for example an `UPDATE` that violates a still-active `CHECK` constraint) is first exercised at deploy time. This workflow moves that failure into CI. It runs three jobs: a file lint (merged migrations are immutable, and new migrations must sort after existing ones), an up/down/up rollback roundtrip, and a seeded-upgrade job that migrates and seeds a database at the base commit, then applies only the new migrations on top. Postgres is started from the caller's own compose service by default so the CI version tracks what the application runs, with an image fallback.
 
-This workflow must be called on a `pull_request` event; the lint and seeded-upgrade jobs compare against `github.base_ref` and self-skip when it is empty.
+Works on both `pull_request` and `push` callers. On `pull_request` the base and head are the PR base and head; on `push` (for example a `release.yml` on `main`) they are the commit before the push and the pushed commit, making seeded-upgrade a final pre-deploy "upgrade the previously deployed commit to this one" check. `migrate-roundtrip` runs on any event; the lint and seeded-upgrade jobs no-op when there is no base to compare against.
 
 #### Inputs
 
@@ -651,7 +651,7 @@ This workflow must be called on a `pull_request` event; the lint and seeded-upgr
 
 The Alembic sibling of [NPM Migration Checks](#npm-migration-checks-examples), for Poetry projects. Same three jobs and the same rationale, with two mechanical differences: rollbacks use `alembic downgrade base`, and the file lint enforces that the revision graph has exactly one head (Alembic orders revisions by `down_revision`, not filename, so multiple heads are the equivalent of a knex "reorder" hazard) rather than a filename sort.
 
-This workflow must be called on a `pull_request` event; the lint and seeded-upgrade jobs compare against `github.base_ref` and self-skip when it is empty.
+Works on both `pull_request` and `push` callers, the same way as the NPM variant. The single-head lint and `migrate-roundtrip` run on any event; the immutability lint and seeded-upgrade need a base commit to compare against.
 
 #### Inputs
 

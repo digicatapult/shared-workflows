@@ -50,28 +50,63 @@ on:
         type: string
         default: postgres
 jobs:
+  # Works on both pull_request and push callers. On pull_request the base/head
+  # are the PR base and head; on push (e.g. release.yml on main) they are the
+  # commit before the push and the pushed commit, so seeded-upgrade becomes a
+  # final "upgrade the previously deployed commit to this one" check.
+  resolve:
+    name: Resolve base and head
+    runs-on: ubuntu-latest
+    outputs:
+      has_base: ${{ steps.r.outputs.has_base }}
+      base_sha: ${{ steps.r.outputs.base_sha }}
+      head_sha: ${{ steps.r.outputs.head_sha }}
+    steps:
+      - id: r
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT}" == "pull_request" ]]; then
+            base="${PR_BASE}"
+            head="${PR_HEAD}"
+          else
+            base="${PUSH_BEFORE}"
+            head="${PUSH_AFTER}"
+          fi
+          if [[ -z "${base}" || "${base}" =~ ^0+$ ]]; then
+            echo "No base commit to compare against; lint and seeded-upgrade no-op."
+            echo "has_base=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_base=true" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "base_sha=${base}" >> "${GITHUB_OUTPUT}"
+          echo "head_sha=${head}" >> "${GITHUB_OUTPUT}"
+
   lint-migrations:
     name: Lint migration files
+    needs: resolve
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Merged migrations must be immutable
+        if: ${{ needs.resolve.outputs.has_base == 'true' }}
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
           MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
         run: |
           set -euo pipefail
-          if [[ -z "${BASE_REF}" ]]; then
-            echo "No base ref (not a pull_request event); skipping migration lint."
-            exit 0
-          fi
-          git fetch origin "${BASE_REF}" --quiet
           changed=$(git diff --name-status --diff-filter=MRD \
-            "origin/${BASE_REF}...HEAD" -- "${MIGRATIONS_DIR}")
+            "${BASE_SHA}...${HEAD_SHA}" -- "${MIGRATIONS_DIR}")
           if [[ -n "${changed}" ]]; then
-            echo "Migrations already on ${BASE_REF} must not be modified, renamed, or deleted."
+            echo "Migrations already present on the base must not be modified, renamed, or deleted."
             echo "Knex records applied migrations by filename; changing one desyncs every"
             echo "database that already ran it. Add a NEW forward migration instead."
             echo ""
@@ -80,18 +115,17 @@ jobs:
           fi
           echo "No merged migrations were modified."
       - name: New migrations must sort after existing ones
+        if: ${{ needs.resolve.outputs.has_base == 'true' }}
         env:
-          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
           MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
         run: |
           set -euo pipefail
-          if [[ -z "${BASE_REF}" ]]; then
-            exit 0
-          fi
-          newest_on_base=$(git ls-tree -r --name-only "origin/${BASE_REF}" -- "${MIGRATIONS_DIR}" \
+          newest_on_base=$(git ls-tree -r --name-only "${BASE_SHA}" -- "${MIGRATIONS_DIR}" \
             | xargs -r -n1 basename | sort | tail -1)
           added=$(git diff --name-only --diff-filter=A \
-            "origin/${BASE_REF}...HEAD" -- "${MIGRATIONS_DIR}" | xargs -r -n1 basename)
+            "${BASE_SHA}...${HEAD_SHA}" -- "${MIGRATIONS_DIR}" | xargs -r -n1 basename)
           if [[ -z "${added}" || -z "${newest_on_base}" ]]; then
             echo "No new migrations to order-check."
             exit 0
@@ -158,21 +192,23 @@ jobs:
         run: ${{ inputs.migrate_command }}
 
   seeded-upgrade:
-    name: Upgrade seeded base-branch database
+    name: Upgrade seeded base database
+    needs: resolve
+    if: ${{ needs.resolve.outputs.has_base == 'true' }}
     runs-on: ubuntu-latest
-    if: ${{ github.base_ref != '' }}
     steps:
-      # Phase 1: reconstruct the production-like starting state from the base branch.
-      - name: Check out base ref
+      # Phase 1: reconstruct the production-like starting state from the base commit.
+      - name: Check out base
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.base_ref }}
+          ref: ${{ needs.resolve.outputs.base_sha }}
+          fetch-depth: 0
       - uses: actions/setup-node@v6
         with:
           node-version: ${{ inputs.node_version }}
       # A repo introducing its first migration has nothing to upgrade from, so
       # the rest of this job is skipped rather than failing on a missing setup.
-      - name: Detect base-ref migrations
+      - name: Detect base migrations
         id: base
         env:
           MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
@@ -184,13 +220,13 @@ jobs:
             count=0
           fi
           if [[ "${count}" -gt 0 ]]; then
-            echo "has_base=true" >> "${GITHUB_OUTPUT}"
+            echo "has_migrations=true" >> "${GITHUB_OUTPUT}"
           else
-            echo "No migrations on ${{ github.base_ref }}; nothing to upgrade from. Skipping."
-            echo "has_base=false" >> "${GITHUB_OUTPUT}"
+            echo "No migrations on the base commit; nothing to upgrade from. Skipping."
+            echo "has_migrations=false" >> "${GITHUB_OUTPUT}"
           fi
       - name: Start Postgres
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         env:
           IMAGE: ${{ inputs.postgres_image }}
           COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
@@ -210,7 +246,7 @@ jobs:
             docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
           fi
       - name: Wait for Postgres
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         run: |
           set -euo pipefail
           for i in $(seq 1 30); do
@@ -223,25 +259,25 @@ jobs:
           done
           echo "Postgres did not become ready in time"
           exit 1
-      - name: Install packages (base ref)
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+      - name: Install packages (base)
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         run: npm ci
-      - name: Migrate at base ref
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+      - name: Migrate at base
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         run: ${{ inputs.migrate_command }}
-      - name: Seed at base ref
-        if: ${{ steps.base.outputs.has_base == 'true' && inputs.seed_command != '' }}
+      - name: Seed at base
+        if: ${{ steps.base.outputs.has_migrations == 'true' && inputs.seed_command != '' }}
         run: ${{ inputs.seed_command }}
-      # Phase 2: apply only the PR's new migrations on top of the seeded data.
-      - name: Check out PR head
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+      # Phase 2: apply only the new migrations on top of the seeded data.
+      - name: Check out head
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ needs.resolve.outputs.head_sha }}
           clean: true
-      - name: Install packages (PR head)
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+      - name: Install packages (head)
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         run: npm ci
       - name: Apply new migrations against seeded data
-        if: ${{ steps.base.outputs.has_base == 'true' }}
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
         run: ${{ inputs.migrate_command }}

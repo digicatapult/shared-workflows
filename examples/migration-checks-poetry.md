@@ -8,11 +8,11 @@ The Alembic sibling of [migration-checks-npm.yml](../.github/workflows/migration
 - **migrate-roundtrip** — `alembic upgrade head` → `alembic downgrade base` → `alembic upgrade head` against a fresh database, exercising every `downgrade()`.
 - **seeded-upgrade** — upgrade and seed at the **base ref**, then apply only the PR's new revisions on top, reproducing the deploy-time upgrade against existing data.
 
-`contents: read` is all that is required. The job must run on a `pull_request` event; the lint and seeded-upgrade jobs compare against `github.base_ref` and self-skip when it is empty.
+`contents: read` is all that is required. The workflow runs on both `pull_request` and `push` callers: on `pull_request` it compares the PR base against the PR head, and on `push` (for example a `release.yml` on `main`) it compares the commit before the push against the pushed commit — so seeded-upgrade becomes a final "upgrade the previously deployed commit to this one" check. The single-head lint and `migrate-roundtrip` run on any event; the immutability lint and seeded-upgrade need a base to compare against.
 
 By default Postgres is started from the caller's own `docker-compose.yml` `postgres` service, so the CI database version matches what the application runs.
 
-The seeded-upgrade job no-ops when the base ref has no revisions yet, so the PR that introduces a repo's first revision passes cleanly; the job becomes active once at least one revision is on the base branch.
+The seeded-upgrade job no-ops when there is no base to compare against or when the base commit has no revisions yet, so the change that introduces a repo's first revision passes cleanly; the job becomes active once at least one revision is on the base.
 
 ### Minimal
 
