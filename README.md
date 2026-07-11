@@ -168,8 +168,15 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
 | package_manager  | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                            | `"npm"`                     | false    |
 | arm64_runner     | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo       | `"ubuntu-24.04-arm"`        | false    |
+| scan_container       | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release). | `false`                     | false    |
+| trivy_image          | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                            | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false |
+| scan_fail_severity   | string  | Comma-separated severities that fail the scan job                                                                     | `CRITICAL`                  | false    |
+| scan_report_severity | string  | Comma-separated severities included in the uploaded report artifact                                                   | `CRITICAL,HIGH`             | false    |
+| scan_ignore_unfixed  | boolean | Ignore vulnerabilities with no fix available, so the gate stays actionable                                            | `true`                      | false    |
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
+
+When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy, uploading a JSON report artifact and failing on `scan_fail_severity` (default `CRITICAL`). The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only — there is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release).
 
 #### Permissions
 
@@ -179,6 +186,7 @@ Each platform in `docker_platforms` is built on its own native runner where one 
 | `contents: read`         | `build`                 | Job   | To GET repository contents                                                | N/A                                         |
 | `packages: write`        | `build`, `merge`        | Job   | To POST built packages/manifests to one or more container registries      | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
 | `security-events: write` | `merge`                 | Job   | To POST new code scanning alerts based on the SARIF report                | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
+| `contents: read`         | `scan-image`            | Job   | To download the exported image artifact and scan it (no secrets required) | `inputs.scan_container`                     |
 
 #### Secrets
 

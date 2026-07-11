@@ -40,6 +40,31 @@ on:
         type: string
         default: "ubuntu-24.04-arm"
         description: "Runner label used for native linux/arm64 builds. Must exist as a GitHub-hosted runner in the org before this is used - see ENG-309."
+      scan_container:
+        required: false
+        type: boolean
+        default: false
+        description: "Scan the built linux/amd64 image for CVEs with Trivy and fail on scan_fail_severity. Runs in an isolated least-privilege job; results are uploaded as an artifact (no GHAS upload). See ENG-314."
+      trivy_image:
+        required: false
+        type: string
+        default: "aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
+        description: "Trivy scanner image, pinned by digest (renovate-updatable). Deliberately not the aquasecurity/trivy-action, which was supply-chain compromised in March 2026 - see ENG-314."
+      scan_fail_severity:
+        required: false
+        type: string
+        default: "CRITICAL"
+        description: "Comma-separated severities that fail the container scan job."
+      scan_report_severity:
+        required: false
+        type: string
+        default: "CRITICAL,HIGH"
+        description: "Comma-separated severities included in the uploaded report artifact."
+      scan_ignore_unfixed:
+        required: false
+        type: boolean
+        default: true
+        description: "Ignore vulnerabilities that have no fix available, so the gate stays actionable."
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -233,6 +258,42 @@ jobs:
           build-args: ${{ inputs.build_args }}
           push: false
 
+      # Export the linux/amd64 image as a tarball for the isolated scan-image
+      # job. This reuses the buildx cache from the build above (a cache hit),
+      # and reuses the registry logins already performed in this job for
+      # private base images. The scan itself runs in a separate least-privilege
+      # job so Trivy never sees this job's push credentials. See ENG-314.
+      - name: Export amd64 image for scanning
+        if: ${{ inputs.scan_container && matrix.platform == 'linux/amd64' }}
+        env:
+          DOCKERFILE: ${{ inputs.docker_file }}
+          BUILD_ARGS: ${{ inputs.build_args }}
+          BUILDER: ${{ steps.buildx.outputs.name }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r line; do
+            [ -z "${line}" ] && continue
+            args+=(--build-arg "${line}")
+          done <<< "${BUILD_ARGS}"
+          docker buildx build \
+            --builder "${BUILDER}" \
+            --platform linux/amd64 \
+            --file "${DOCKERFILE}" \
+            "${args[@]}" \
+            --load \
+            --tag scan-image:amd64 \
+            .
+          docker save scan-image:amd64 -o "${RUNNER_TEMP}/scan-image.tar"
+      - name: Upload amd64 image for scanning
+        if: ${{ inputs.scan_container && matrix.platform == 'linux/amd64' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: scan-image
+          path: ${{ runner.temp }}/scan-image.tar
+          retention-days: 1
+          if-no-files-found: error
+
   merge:
     name: Merge manifests & scan
     needs: [prepare, build]
@@ -313,3 +374,65 @@ jobs:
           sarif_file: scout.sarif
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Isolated container CVE scan (ENG-314). Consumes the amd64 image tarball the
+  # build job exported and scans it with a digest-pinned Trivy image. Runs
+  # least-privilege (contents: read, no secrets) so a compromised scanner has
+  # nothing to steal; results are an uploaded artifact only (no GHAS upload),
+  # and the job fails on scan_fail_severity.
+  scan-image:
+    name: Scan image for CVEs
+    needs: build
+    if: ${{ inputs.scan_container }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Download amd64 image
+        uses: actions/download-artifact@v8
+        with:
+          name: scan-image
+          path: ${{ runner.temp }}/scan
+      - name: Generate CVE report artifact
+        env:
+          TRIVY_IMAGE: ${{ inputs.trivy_image }}
+          REPORT_SEVERITY: ${{ inputs.scan_report_severity }}
+          IGNORE_UNFIXED: ${{ inputs.scan_ignore_unfixed }}
+          SCAN_DIR: ${{ runner.temp }}/scan
+        run: |
+          set -euo pipefail
+          extra=()
+          [ "${IGNORE_UNFIXED}" = "true" ] && extra+=(--ignore-unfixed)
+          docker run --rm -v "${SCAN_DIR}:/scan" "${TRIVY_IMAGE}" image \
+            --input /scan/scan-image.tar \
+            --scanners vuln \
+            --severity "${REPORT_SEVERITY}" \
+            "${extra[@]}" \
+            --format json \
+            --output /scan/trivy-report.json \
+            --exit-code 0
+      - name: Upload CVE report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-container-report
+          path: ${{ runner.temp }}/scan/trivy-report.json
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Fail on high-severity vulnerabilities
+        env:
+          TRIVY_IMAGE: ${{ inputs.trivy_image }}
+          FAIL_SEVERITY: ${{ inputs.scan_fail_severity }}
+          IGNORE_UNFIXED: ${{ inputs.scan_ignore_unfixed }}
+          SCAN_DIR: ${{ runner.temp }}/scan
+        run: |
+          set -euo pipefail
+          extra=()
+          [ "${IGNORE_UNFIXED}" = "true" ] && extra+=(--ignore-unfixed)
+          docker run --rm -v "${SCAN_DIR}:/scan" "${TRIVY_IMAGE}" image \
+            --input /scan/scan-image.tar \
+            --scanners vuln \
+            --severity "${FAIL_SEVERITY}" \
+            "${extra[@]}" \
+            --format table \
+            --exit-code 1
