@@ -12,6 +12,8 @@ The Alembic sibling of [migration-checks-npm.yml](../.github/workflows/migration
 
 By default Postgres is started from the caller's own `docker-compose.yml` `postgres` service, so the CI database version matches what the application runs.
 
+The seeded-upgrade job no-ops when the base ref has no revisions yet, so the PR that introduces a repo's first revision passes cleanly; the job becomes active once at least one revision is on the base branch.
+
 ### Minimal
 
 ```yaml

@@ -12,6 +12,8 @@ Runs three jobs against a knex project on `pull_request`:
 
 By default Postgres is started from the caller's own `docker-compose.yml` `postgres` service, so the CI database version matches what the application runs (and is kept current by renovate).
 
+The seeded-upgrade job no-ops when the base ref has no migrations yet, so the PR that introduces a repo's first migration passes cleanly; the job becomes active once at least one migration is on the base branch.
+
 ### Minimal
 
 ```yaml
