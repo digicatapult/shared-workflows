@@ -42,7 +42,7 @@ jobs:
 
 ### Image fallback
 
-For a repo with no postgres service in its compose file, provision a service container from an image instead. The CI version then no longer tracks the app, so prefer the compose service where one exists.
+For a repo with no postgres service in its compose file — or one whose compose file cannot be brought up in CI without extra bootstrap (for example bind-mounted TLS certs or required environment variables, since `docker compose up <service>` still validates the whole file) — provision a service container from an image instead. The CI version then no longer tracks the app, so pin it to match the compose image and prefer the compose service where one starts cleanly.
 
 ```yaml
 jobs:
