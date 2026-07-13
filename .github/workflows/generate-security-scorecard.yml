@@ -95,6 +95,35 @@ jobs:
           GITHUB_AUTH_TOKEN: ${{ secrets.repo_token }}
           ENABLE_SARIF: ${{ inputs.results_format == 'sarif' && '1' || '' }}
         run: |
+          # Generate a Scorecard policy file that enables all checks specified in `custom_checks`.
+          ALL_CHECKS="Binary-Artifacts Branch-Protection CI-Tests CII-Best-Practices Code-Review \
+            Contributors Dangerous-Workflow Dependency-Update-Tool Fuzzing License Maintained \
+            Packaging Pinned-Dependencies SAST Security-Policy Signed-Releases Token-Permissions \
+            Vulnerabilities Webhooks"
+
+          IFS=',' read -ra ENABLED <<< "${{ inputs.custom_checks }}"
+
+          {
+            echo "version: 1"
+            echo "policies:"
+            for check in $ALL_CHECKS; do
+              trimmed_check="$check"
+              enabled=false
+              for e in "${ENABLED[@]}"; do
+                if [ "$(echo "$e" | xargs)" = "$trimmed_check" ]; then
+                  enabled=true
+                fi
+              done
+              echo "  $trimmed_check:"
+              if $enabled; then
+                echo "    mode: enforced"
+                echo "    score: 1"
+              else
+                echo "    mode: disabled"
+              fi
+            done
+          } > scorecard-policy.yml
+
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             -e GITHUB_AUTH_TOKEN \
@@ -104,6 +133,7 @@ jobs:
             "ghcr.io/ossf/scorecard:${{ inputs.scorecard_version }}" \
             --repo="github.com/${{ github.repository }}" \
             --checks="${{ inputs.custom_checks }}" \
+            --policy="scorecard-policy.yml" \
             --format="${{ inputs.results_format }}" \
             --file-mode="${{ inputs.file_mode }}" \
             --show-details \
