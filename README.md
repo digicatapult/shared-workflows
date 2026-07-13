@@ -30,6 +30,7 @@ Shared github workflows created by the `digicatapult` organisation.
 **Security & analysis**
 
 - [Generate SBOM](#generate-sbom-examples)
+- [Generate Security Scorecard](#generate-security-scorecard-examples)
 - [Scan Secrets](#scan-secrets-examples)
 - [Scan Vulnerabilities](#scan-vulnerabilities-examples)
 - [ZAP Scan](#zap-scan-examples)
@@ -366,6 +367,53 @@ This GitHub Actions workflow generates an SBOM for a project. It allows flexibil
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
 7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
+
+### [Generate Security Scorecard](.github/workflows/generate-security-scorecard.yml) ([examples](examples/generate-security-scorecard.md))
+
+Runs an [OpenSSF Scorecard](https://github.com/ossf/scorecard) analysis against the callee repository. By default this runs the full `ossf/scorecard-action` check suite. When `custom_scan` is `true`, it instead runs the Scorecard CLI directly (via Docker), restricted to the checks listed in `custom_checks` (e.g. `Branch-Protection`), since `ossf/scorecard-action` has no input for selecting individual checks.
+
+#### Inputs
+
+| Input             | Type    | Description                                                                                                                                                                | Default         | Required |
+| ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| results_file      | string  | File path to store the Scorecard results                                                                                                                                   | `results.sarif` | true     |
+| results_format    | string  | Format of the results. Options: `sarif`, `json`                                                                                                                            | `sarif`         | true     |
+| upload_type       | string  | How results are published. Options: `artifact`/`artefact` uploads a workflow artifact, `dashboard` uploads to GitHub Code Scanning                                         | `artifact`      | false    |
+| publish_results   | boolean | Publishes results to the public [Scorecard REST API](https://api.scorecard.dev) and enables the Scorecard badge. Only supported by the default path - see the note below   | `false`         | false    |
+| file_mode         | string  | Method used to fetch repository files. Options: `archive`, `git`                                                                                                           | `archive`       | false    |
+| repo_token        | string  | GitHub token with read access, used to authenticate Scorecard's GitHub API calls                                                                                           | `""`            | false    |
+| custom_scan       | boolean | Runs the Scorecard CLI directly (via Docker), restricted to `custom_checks`, instead of the full `ossf/scorecard-action` suite                                             | `false`         | false    |
+| custom_checks     | string  | Comma-separated list of Scorecard check names to run when `custom_scan` is `true`, e.g. `Branch-Protection,Code-Review`. Required (non-empty) when `custom_scan` is `true` | `""`            | false    |
+| scorecard_version | string  | Pinned tag of the `ghcr.io/ossf/scorecard` CLI image, used only when `custom_scan` is `true`                                                                               | `v5.5.0`        | false    |
+
+#### Permissions
+
+| Access                   | Jobs used  | Level    | Reason                                                            | Conditions |
+| ------------------------ | ---------- | -------- | ----------------------------------------------------------------- | ---------- |
+| `security-events: write` | `analysis` | Workflow | To POST new code scanning alerts based on the SARIF report        | N/A        |
+| `id-token: write`        | `analysis` | Workflow | Required by `ossf/scorecard-action` to publish results/OIDC flows | N/A        |
+
+#### Workflow Description
+
+This GitHub Actions workflow runs an OpenSSF Scorecard analysis and publishes the results.
+
+1. **Checkout code**: Checks out the callee repository.
+2. **Validate custom scan inputs**: Fails fast with a clear error if `custom_scan` is `true` but `custom_checks` is empty, rather than letting the CLI silently run all checks.
+3. **Run analysis** _(default path, `custom_scan: false`)_: Runs `ossf/scorecard-action`, which always executes the complete set of Scorecard checks.
+4. **Run custom analysis** _(`custom_scan: true`)_: Runs the pinned `ghcr.io/ossf/scorecard` CLI image directly via `docker run`, passing `--checks` for the `custom_checks` list, `--format`/`--file-mode` matching the other inputs, and `--output` to the shared `results_file` path so the upload steps below work unchanged. `ENABLE_SARIF=1` is set automatically when `results_format` is `sarif`, since SARIF output is feature-flagged in the CLI.
+5. **Upload artifact** / **Upload to code-scanning**: Uploads `results_file` as a workflow artifact or to GitHub's Code Scanning dashboard, depending on `upload_type`.
+
+#### `custom_scan` limitations
+
+> [!NOTE]
+> `publish_results` and the Scorecard badge/REST API integration are **not available** when `custom_scan` is `true`.
+>
+> `ossf/scorecard-action`'s `publish_results` input does two things that cannot be reimplemented with the Scorecard CLI:
+>
+> 1. It submits results for public repositories to the [Scorecard REST API](https://api.scorecard.dev), which OSSF ingests for cross-project analysis at scale.
+> 2. It's a prerequisite for displaying a [Scorecard badge](https://openssf.org/blog/2022/09/08/show-off-your-security-score-announcing-scorecards-badges/) that gets updated in real time, thanks to the above REST API.
+>
+> Both integrations are tied to the full check suite produced by `ossf/scorecard-action`; a partial, custom-checks run isn't a valid input for either. If you need `publish_results`, use the default (`custom_scan: false`) path instead.
 
 ### [Poetry Static checks](.github/workflows/static-checks-poetry.yml) ([examples](examples/static-checks-poetry.md))
 

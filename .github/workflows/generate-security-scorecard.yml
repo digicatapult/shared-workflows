@@ -1,0 +1,125 @@
+name: Scorecard analysis workflow
+
+# Only use on public/private repositories where Code Scanning has been enabled.
+on:
+  workflow_call:
+    inputs:
+      results_file:
+        required: true
+        type: string
+        default: "results.sarif"
+      results_format:
+        required: true
+        type: string
+        default: "sarif"  # sarif or json only
+      upload_type:
+        required: false
+        type: string
+        default: "artifact"  # art(i|e)fact or dashboard only
+      publish_results:
+        required: false
+        type: boolean
+        default: false
+      file_mode:
+        required: false
+        type: string
+        default: "archive"  # archive or git only
+      repo_token:
+        required: false
+        type: string
+      custom_scan:
+        required: false
+        type: boolean
+        default: false
+        description: >-
+          When true, run the Scorecard CLI directly (via Docker) restricted to the checks in
+          `custom_checks`, instead of the full `ossf/scorecard-action` suite. Note that
+          `publish_results` has no effect in this mode - see the workflow's README section.
+      custom_checks:
+        required: false
+        type: string
+        default: ""
+        description: >-
+          Comma-separated list of Scorecard check names to run when `custom_scan` is true,
+          e.g. "Branch-Protection,Code-Review". Required (non-empty) when `custom_scan` is true.
+      scorecard_version:
+        required: false
+        type: string
+        default: "v5.5.0"
+        description: >-
+          Pinned tag of the `ghcr.io/ossf/scorecard` CLI image used only when `custom_scan` is
+          true. Does not affect the version of `ossf/scorecard-action` used for the default scan.
+
+# Use workflow-level read-all in caller workflows.
+# permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: "Validate custom scan inputs"
+        if: ${{ inputs.custom_scan == true && inputs.custom_checks == '' }}
+        run: |
+          echo "::error::custom_checks must be a non-empty, comma-separated list of check names when custom_scan is true (e.g. 'Branch-Protection,Code-Review')."
+          exit 1
+
+      - name: "Run analysis"
+        if: ${{ inputs.custom_scan != true }}
+        uses: ossf/scorecard-action@v2.4.3
+        with:
+          file_mode: ${{inputs.file_mode}}
+          publish_results: ${{inputs.publish_results}}
+          results_file: ${{inputs.results_file}}
+          results_format: ${{inputs.results_format}}
+          repo_token: ${{inputs.repo_token}}
+
+      # Runs the Scorecard CLI directly so that `--checks` can restrict the run to
+      # `custom_checks`. `ossf/scorecard-action` has no equivalent input - see the
+      # workflow's README section for why `publish_results` is not supported here.
+      - name: "Run custom analysis"
+        if: ${{ inputs.custom_scan == true }}
+        env:
+          GITHUB_AUTH_TOKEN: ${{ inputs.repo_token }}
+          ENABLE_SARIF: ${{ inputs.results_format == 'sarif' && '1' || '' }}
+        run: |
+          docker run --rm \
+            -e GITHUB_AUTH_TOKEN \
+            -e ENABLE_SARIF \
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            "ghcr.io/ossf/scorecard:${{ inputs.scorecard_version }}" \
+            --repo="github.com/${{ github.repository }}" \
+            --checks="${{ inputs.custom_checks }}" \
+            --format="${{ inputs.results_format }}" \
+            --file-mode="${{ inputs.file_mode }}" \
+            --show-details \
+            --output="${{ inputs.results_file }}"
+
+      # Upload the results as artifacts.
+      # Commenting out will disable uploads of run results in SARIF format to the repository Actions tab.
+      # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v7.0.1
+        if: ${{inputs.upload_type == 'artifact' || inputs.upload_type == 'artefact'}}
+        with:
+          name: SARIF file
+          path: ${{inputs.results_file}}
+          retention-days: 5
+
+      # Upload the results to GitHub's code scanning dashboard.
+      # Commenting out will disable upload of results to your repo's Code Scanning dashboard.
+      - name: "Upload to code-scanning"
+        uses: github/codeql-action/upload-sarif@v4.35.3
+        if: ${{inputs.upload_type == 'dashboard'}}
+        with:
+          sarif_file: ${{inputs.results_file}}
