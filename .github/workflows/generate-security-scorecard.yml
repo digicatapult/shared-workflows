@@ -3,6 +3,9 @@ name: Scorecard analysis workflow
 # Only use on public/private repositories where Code Scanning has been enabled.
 on:
   workflow_call:
+    secrets:
+      repo_token:
+        required: false
     inputs:
       results_file:
         required: true
@@ -81,7 +84,7 @@ jobs:
           publish_results: ${{inputs.publish_results}}
           results_file: ${{inputs.results_file}}
           results_format: ${{inputs.results_format}}
-          repo_token: ${{inputs.repo_token}}
+          repo_token: ${{secrets.repo_token}}
 
       # Runs the Scorecard CLI directly so that `--checks` can restrict the run to
       # `custom_checks`. `ossf/scorecard-action` has no equivalent input - see the
@@ -89,7 +92,7 @@ jobs:
       - name: "Run custom analysis"
         if: ${{ inputs.custom_scan == true }}
         env:
-          GITHUB_AUTH_TOKEN: ${{ inputs.repo_token }}
+          GITHUB_AUTH_TOKEN: ${{ secrets.repo_token }}
           ENABLE_SARIF: ${{ inputs.results_format == 'sarif' && '1' || '' }}
         run: |
           docker run --rm \

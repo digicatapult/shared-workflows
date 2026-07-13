@@ -17,8 +17,11 @@ jobs:
       id-token: write
     with:
       publish_results: true
-      upload_type: dashboard
-    secrets: inherit
+      upload_type: artifact
+      results_format: sarif
+      results_file: ${{ github.event.repository.name }}-scorecard.sarif
+    secrets:
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 ### Custom scan (restricted check set)
@@ -35,8 +38,11 @@ jobs:
     with:
       custom_scan: true
       custom_checks: "Branch-Protection,Code-Review"
-      upload_type: dashboard
-    secrets: inherit
+      upload_type: artifact
+      results_format: sarif
+      results_file: ${{ github.event.repository.name }}-scorecard.sarif
+    secrets:
+      repo_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 > [!IMPORTANT]
