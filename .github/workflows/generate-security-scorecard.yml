@@ -96,6 +96,7 @@ jobs:
           ENABLE_SARIF: ${{ inputs.results_format == 'sarif' && '1' || '' }}
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
             -e GITHUB_AUTH_TOKEN \
             -e ENABLE_SARIF \
             -v "${{ github.workspace }}:/workspace" \
