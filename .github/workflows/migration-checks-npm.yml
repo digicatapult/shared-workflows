@@ -1,0 +1,283 @@
+name: NPM Migration checks
+on:
+  workflow_call:
+    inputs:
+      node_version:
+        required: false
+        type: string
+        default: 24.x
+      migrations_dir:
+        description: Path to the knex migrations directory, used by the file lint job
+        required: false
+        type: string
+        default: db/migrations
+      migrate_command:
+        description: Command that applies all outstanding migrations
+        required: false
+        type: string
+        default: npm run db:migrate
+      rollback_command:
+        description: Command that rolls back the most recent migration batch
+        required: false
+        type: string
+        default: npm run db:rollback
+      seed_command:
+        description: Seed command for the seeded-upgrade job. Empty string skips seeding.
+        required: false
+        type: string
+        default: ""
+      postgres_compose_file:
+        description: Compose file whose postgres service is started for the DB-backed jobs
+        required: false
+        type: string
+        default: docker-compose.yml
+      postgres_service:
+        description: Name of the postgres service within the compose file
+        required: false
+        type: string
+        default: postgres
+      postgres_image:
+        description: >-
+          Fallback Postgres image. When set, a container from this image is
+          started instead of the caller's compose service. Prefer the compose
+          service so the CI database version tracks what the app runs.
+        required: false
+        type: string
+        default: ""
+      db_name:
+        description: Database to create when using the postgres_image fallback
+        required: false
+        type: string
+        default: postgres
+jobs:
+  # Works on both pull_request and push callers. On pull_request the base/head
+  # are the PR base and head; on push (e.g. release.yml on main) they are the
+  # commit before the push and the pushed commit, so seeded-upgrade becomes a
+  # final "upgrade the previously deployed commit to this one" check.
+  resolve:
+    name: Resolve base and head
+    runs-on: ubuntu-latest
+    outputs:
+      has_base: ${{ steps.resolve_refs.outputs.has_base }}
+      base_sha: ${{ steps.resolve_refs.outputs.base_sha }}
+      head_sha: ${{ steps.resolve_refs.outputs.head_sha }}
+    steps:
+      - id: resolve_refs
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT}" == "pull_request" ]]; then
+            base="${PR_BASE}"
+            head="${PR_HEAD}"
+          else
+            base="${PUSH_BEFORE}"
+            head="${PUSH_AFTER}"
+          fi
+          if [[ -z "${base}" || "${base}" =~ ^0+$ ]]; then
+            echo "No base commit to compare against; lint and seeded-upgrade no-op."
+            echo "has_base=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_base=true" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "base_sha=${base}" >> "${GITHUB_OUTPUT}"
+          echo "head_sha=${head}" >> "${GITHUB_OUTPUT}"
+
+  lint-migrations:
+    name: Lint migration files
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Merged migrations must be immutable
+        if: ${{ needs.resolve.outputs.has_base == 'true' }}
+        env:
+          BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+          MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-status --diff-filter=MRD \
+            "${BASE_SHA}...${HEAD_SHA}" -- "${MIGRATIONS_DIR}")
+          if [[ -n "${changed}" ]]; then
+            echo "Migrations already present on the base must not be modified, renamed, or deleted."
+            echo "Knex records applied migrations by filename; changing one desyncs every"
+            echo "database that already ran it. Add a NEW forward migration instead."
+            echo ""
+            echo "${changed}"
+            exit 1
+          fi
+          echo "No merged migrations were modified."
+      - name: New migrations must sort after existing ones
+        if: ${{ needs.resolve.outputs.has_base == 'true' }}
+        env:
+          BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+          MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
+        run: |
+          set -euo pipefail
+          newest_on_base=$(git ls-tree -r --name-only "${BASE_SHA}" -- "${MIGRATIONS_DIR}" \
+            | xargs -r -n1 basename | sort | tail -1)
+          added=$(git diff --name-only --diff-filter=A \
+            "${BASE_SHA}...${HEAD_SHA}" -- "${MIGRATIONS_DIR}" | xargs -r -n1 basename)
+          if [[ -z "${added}" || -z "${newest_on_base}" ]]; then
+            echo "No new migrations to order-check."
+            exit 0
+          fi
+          failed=0
+          while IFS= read -r new_file; do
+            [[ -z "${new_file}" ]] && continue
+            if [[ ! "${new_file}" > "${newest_on_base}" ]]; then
+              echo "New migration ${new_file} does not sort after ${newest_on_base}."
+              echo "Knex runs migrations in filename order; one that sorts before a migration"
+              echo "already applied will run out of order on existing databases."
+              failed=1
+            fi
+          done <<< "${added}"
+          exit "${failed}"
+
+  migrate-roundtrip:
+    name: Migrate up / down / up
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+      - name: Start Postgres
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages
+        run: npm ci
+      - name: Migrate up
+        run: ${{ inputs.migrate_command }}
+      - name: Roll back
+        run: ${{ inputs.rollback_command }}
+      - name: Migrate up again
+        run: ${{ inputs.migrate_command }}
+
+  seeded-upgrade:
+    name: Upgrade seeded base database
+    needs: resolve
+    if: ${{ needs.resolve.outputs.has_base == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Phase 1: reconstruct the production-like starting state from the base commit.
+      - name: Check out base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.base_sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ inputs.node_version }}
+      # A repo introducing its first migration has nothing to upgrade from, so
+      # the rest of this job is skipped rather than failing on a missing setup.
+      - name: Detect base migrations
+        id: base
+        env:
+          MIGRATIONS_DIR: ${{ inputs.migrations_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -d "${MIGRATIONS_DIR}" ]]; then
+            count=$(find "${MIGRATIONS_DIR}" -maxdepth 1 -type f | wc -l | tr -d ' ')
+          else
+            count=0
+          fi
+          if [[ "${count}" -gt 0 ]]; then
+            echo "has_migrations=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No migrations on the base commit; nothing to upgrade from. Skipping."
+            echo "has_migrations=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Start Postgres
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages (base)
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        run: npm ci
+      - name: Migrate at base
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        run: ${{ inputs.migrate_command }}
+      - name: Seed at base
+        if: ${{ steps.base.outputs.has_migrations == 'true' && inputs.seed_command != '' }}
+        run: ${{ inputs.seed_command }}
+      # Phase 2: apply only the new migrations on top of the seeded data.
+      - name: Check out head
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.head_sha }}
+          clean: true
+      - name: Install packages (head)
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        run: npm ci
+      - name: Apply new migrations against seeded data
+        if: ${{ steps.base.outputs.has_migrations == 'true' }}
+        run: ${{ inputs.migrate_command }}

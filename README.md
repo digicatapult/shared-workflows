@@ -23,9 +23,11 @@ Shared github workflows created by the `digicatapult` organisation.
 - [Poetry Static checks](#poetry-static-checks-examples)
 - [Poetry Tests](#poetry-tests-examples)
 - [Poetry E2E tests](#poetry-e2e-tests-examples)
+- [Poetry Migration Checks](#poetry-migration-checks-examples)
 - [NPM Static Checks](#npm-static-checks-examples)
 - [NPM E2E Tests](#npm-e2e-tests-examples)
 - [NPM Tests](#npm-tests-examples)
+- [NPM Migration Checks](#npm-migration-checks-examples)
 
 **Security & analysis**
 
@@ -618,6 +620,58 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 8. **Fail if Under Thresholds**: Runs c8's threshold check, failing the workflow if coverage is below configured thresholds.
 
 This workflow provides a comprehensive testing and coverage solution with branch comparison, custom build commands, Docker-based dependencies, and detailed coverage reporting including trend analysis.
+
+### [NPM Migration Checks](.github/workflows/migration-checks-npm.yml) ([examples](examples/migration-checks.md))
+
+Guards knex database migrations. Our other CI only ever migrates an empty database, and migrations run at container startup in production, so a migration that only fails against existing data (for example an `UPDATE` that violates a still-active `CHECK` constraint) is first exercised at deploy time. This workflow moves that failure into CI. It runs three jobs: a file lint (merged migrations are immutable, and new migrations must sort after existing ones), an up/down/up rollback roundtrip, and a seeded-upgrade job that migrates and seeds a database at the base commit, then applies only the new migrations on top. Postgres is started from the caller's own compose service by default so the CI version tracks what the application runs, with an image fallback.
+
+Works on both `pull_request` and `push` callers. On `pull_request` the base and head are the PR base and head; on `push` (for example a `release.yml` on `main`) they are the commit before the push and the pushed commit, making seeded-upgrade a final pre-deploy "upgrade the previously deployed commit to this one" check. `migrate-roundtrip` runs on any event; the lint and seeded-upgrade jobs no-op when there is no base to compare against.
+
+#### Inputs
+
+| Input                 | Type   | Description                                                                                                | Default              | Required |
+| --------------------- | ------ | --------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| node_version          | string | The node version to use                                                                                   | `24.x`               | false    |
+| migrations_dir        | string | Path to the knex migrations directory, used by the file lint job                                          | `db/migrations`      | false    |
+| migrate_command       | string | Command that applies all outstanding migrations                                                           | `npm run db:migrate` | false    |
+| rollback_command      | string | Command that rolls back the most recent migration batch                                                   | `npm run db:rollback`| false    |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                       | `""`                 | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                     | `docker-compose.yml` | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                     | `postgres`           | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service     | `""`                 | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                               | `postgres`           | false    |
+
+#### Permissions
+
+| Access           | Jobs used                                             | Level    | Reason                                                             | Conditions |
+| ---------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------ | ---------- |
+| `contents: read` | `lint-migrations`, `migrate-roundtrip`, `seeded-upgrade` | Workflow | To GET repository contents and check out the base ref and PR head | N/A        |
+
+### [Poetry Migration Checks](.github/workflows/migration-checks-poetry.yml) ([examples](examples/migration-checks-poetry.md))
+
+The Alembic sibling of [NPM Migration Checks](#npm-migration-checks-examples), for Poetry projects. Same three jobs and the same rationale, with two mechanical differences: rollbacks use `alembic downgrade base`, and the file lint enforces that the revision graph has exactly one head (Alembic orders revisions by `down_revision`, not filename, so multiple heads are the equivalent of a knex "reorder" hazard) rather than a filename sort.
+
+Works on both `pull_request` and `push` callers, the same way as the NPM variant. The single-head lint and `migrate-roundtrip` run on any event; the immutability lint and seeded-upgrade need a base commit to compare against.
+
+#### Inputs
+
+| Input                 | Type   | Description                                                                                            | Default                          | Required |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | -------------------------------- | -------- |
+| python_version        | string | The python version to use                                                                             | `3.14`                           | false    |
+| versions_dir          | string | Path to the alembic versions directory, used by the file lint job                                     | `alembic/versions`               | false    |
+| migrate_command       | string | Command that applies all outstanding revisions                                                        | `poetry run alembic upgrade head`| false    |
+| rollback_command      | string | Command that downgrades to the base (empty) revision                                                  | `poetry run alembic downgrade base`| false  |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                             | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`             | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                 | `postgres`                       | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                             | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`                       | false    |
+
+#### Permissions
+
+| Access           | Jobs used                                             | Level    | Reason                                                             | Conditions |
+| ---------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------ | ---------- |
+| `contents: read` | `lint-migrations`, `migrate-roundtrip`, `seeded-upgrade` | Workflow | To GET repository contents and check out the base ref and PR head | N/A        |
 
 ### [Scan Secrets](.github/workflows/scan-secrets.yml) ([examples](examples/scan-secrets.md))
 

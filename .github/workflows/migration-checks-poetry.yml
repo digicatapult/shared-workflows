@@ -1,0 +1,284 @@
+name: Poetry Migration checks
+on:
+  workflow_call:
+    inputs:
+      python_version:
+        required: false
+        type: string
+        default: "3.14"
+      versions_dir:
+        description: Path to the alembic versions directory, used by the file lint job
+        required: false
+        type: string
+        default: alembic/versions
+      migrate_command:
+        description: Command that applies all outstanding revisions
+        required: false
+        type: string
+        default: poetry run alembic upgrade head
+      rollback_command:
+        description: Command that downgrades to the base (empty) revision
+        required: false
+        type: string
+        default: poetry run alembic downgrade base
+      seed_command:
+        description: Seed command for the seeded-upgrade job. Empty string skips seeding.
+        required: false
+        type: string
+        default: ""
+      postgres_compose_file:
+        description: Compose file whose postgres service is started for the DB-backed jobs
+        required: false
+        type: string
+        default: docker-compose.yml
+      postgres_service:
+        description: Name of the postgres service within the compose file
+        required: false
+        type: string
+        default: postgres
+      postgres_image:
+        description: >-
+          Fallback Postgres image. When set, a container from this image is
+          started instead of the caller's compose service. Prefer the compose
+          service so the CI database version tracks what the app runs.
+        required: false
+        type: string
+        default: ""
+      db_name:
+        description: Database to create when using the postgres_image fallback
+        required: false
+        type: string
+        default: postgres
+jobs:
+  # Works on both pull_request and push callers. On pull_request the base/head
+  # are the PR base and head; on push (e.g. release.yml on main) they are the
+  # commit before the push and the pushed commit, so seeded-upgrade becomes a
+  # final "upgrade the previously deployed commit to this one" check.
+  resolve:
+    name: Resolve base and head
+    runs-on: ubuntu-latest
+    outputs:
+      has_base: ${{ steps.resolve_refs.outputs.has_base }}
+      base_sha: ${{ steps.resolve_refs.outputs.base_sha }}
+      head_sha: ${{ steps.resolve_refs.outputs.head_sha }}
+    steps:
+      - id: resolve_refs
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT}" == "pull_request" ]]; then
+            base="${PR_BASE}"
+            head="${PR_HEAD}"
+          else
+            base="${PUSH_BEFORE}"
+            head="${PUSH_AFTER}"
+          fi
+          if [[ -z "${base}" || "${base}" =~ ^0+$ ]]; then
+            echo "No base commit to compare against; immutability lint and seeded-upgrade no-op."
+            echo "has_base=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_base=true" >> "${GITHUB_OUTPUT}"
+          fi
+          echo "base_sha=${base}" >> "${GITHUB_OUTPUT}"
+          echo "head_sha=${head}" >> "${GITHUB_OUTPUT}"
+
+  lint-migrations:
+    name: Lint migration files
+    needs: resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Merged revisions must be immutable
+        if: ${{ needs.resolve.outputs.has_base == 'true' }}
+        env:
+          BASE_SHA: ${{ needs.resolve.outputs.base_sha }}
+          HEAD_SHA: ${{ needs.resolve.outputs.head_sha }}
+          VERSIONS_DIR: ${{ inputs.versions_dir }}
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-status --diff-filter=MRD \
+            "${BASE_SHA}...${HEAD_SHA}" -- "${VERSIONS_DIR}")
+          if [[ -n "${changed}" ]]; then
+            echo "Alembic revisions already present on the base must not be modified, renamed, or deleted."
+            echo "Editing a merged revision (especially its down_revision) breaks the chain for"
+            echo "every database that already applied it. Add a NEW revision instead."
+            echo ""
+            echo "${changed}"
+            exit 1
+          fi
+          echo "No merged revisions were modified."
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      # Not a base comparison, so this runs on every event including a repo's
+      # first revision: the current tree must resolve to exactly one head.
+      - name: Revision graph must have a single head
+        run: |
+          set -euo pipefail
+          heads=$(poetry run alembic heads 2>/dev/null | grep -c '(head)' || true)
+          if [[ "${heads}" -ne 1 ]]; then
+            echo "Revision graph has ${heads} heads; expected exactly 1."
+            echo "A second revision merged since this branch was cut. Rebase and point your"
+            echo "revision's down_revision at the new head so the graph is linear again."
+            poetry run alembic heads || true
+            exit 1
+          fi
+          echo "Revision graph has a single head."
+
+  migrate-roundtrip:
+    name: Upgrade / downgrade / upgrade
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      - name: Start Postgres
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages
+        run: poetry install --no-interaction --no-ansi
+      - name: Upgrade to head
+        run: ${{ inputs.migrate_command }}
+      - name: Downgrade to base
+        run: ${{ inputs.rollback_command }}
+      - name: Upgrade to head again
+        run: ${{ inputs.migrate_command }}
+
+  seeded-upgrade:
+    name: Upgrade seeded base database
+    needs: resolve
+    if: ${{ needs.resolve.outputs.has_base == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      # Phase 1: reconstruct the production-like starting state from the base commit.
+      - name: Check out base
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.base_sha }}
+          fetch-depth: 0
+      - name: Install poetry
+        run: pipx install poetry
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ inputs.python_version }}
+          cache: poetry
+      # A repo introducing its first revision has nothing to upgrade from, so
+      # the rest of this job is skipped rather than failing on a missing setup.
+      - name: Detect base revisions
+        id: base
+        env:
+          VERSIONS_DIR: ${{ inputs.versions_dir }}
+        run: |
+          set -euo pipefail
+          if [[ -d "${VERSIONS_DIR}" ]]; then
+            count=$(find "${VERSIONS_DIR}" -maxdepth 1 -type f -name '*.py' | wc -l | tr -d ' ')
+          else
+            count=0
+          fi
+          if [[ "${count}" -gt 0 ]]; then
+            echo "has_revisions=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No revisions on the base commit; nothing to upgrade from. Skipping."
+            echo "has_revisions=false" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: Start Postgres
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        env:
+          IMAGE: ${{ inputs.postgres_image }}
+          COMPOSE_FILE: ${{ inputs.postgres_compose_file }}
+          SERVICE: ${{ inputs.postgres_service }}
+          DB_NAME: ${{ inputs.db_name }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${IMAGE}" ]]; then
+            echo "Starting Postgres from fallback image ${IMAGE}"
+            docker run -d --name mc-postgres \
+              -e POSTGRES_USER=postgres \
+              -e POSTGRES_PASSWORD=postgres \
+              -e POSTGRES_DB="${DB_NAME}" \
+              -p 5432:5432 "${IMAGE}"
+          else
+            echo "Starting '${SERVICE}' from ${COMPOSE_FILE}"
+            docker compose -f "${COMPOSE_FILE}" up -d --wait "${SERVICE}"
+          fi
+      - name: Wait for Postgres
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U postgres >/dev/null 2>&1; then
+              echo "Postgres is ready"
+              exit 0
+            fi
+            echo "waiting for postgres (${i})"
+            sleep 2
+          done
+          echo "Postgres did not become ready in time"
+          exit 1
+      - name: Install packages (base)
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        run: poetry install --no-interaction --no-ansi
+      - name: Upgrade to head at base
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        run: ${{ inputs.migrate_command }}
+      - name: Seed at base
+        if: ${{ steps.base.outputs.has_revisions == 'true' && inputs.seed_command != '' }}
+        run: ${{ inputs.seed_command }}
+      # Phase 2: apply only the new revisions on top of the seeded data.
+      - name: Check out head
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.head_sha }}
+          clean: true
+      - name: Install packages (head)
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        run: poetry install --no-interaction --no-ansi
+      - name: Apply new revisions against seeded data
+        if: ${{ steps.base.outputs.has_revisions == 'true' }}
+        run: ${{ inputs.migrate_command }}
