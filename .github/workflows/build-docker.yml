@@ -291,8 +291,16 @@ jobs:
 
   merge:
     name: Merge manifests & scan
-    needs: [prepare, build]
-    if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
+    # Depends on scan-image so a CRITICAL container CVE blocks the consumable
+    # tag from ever being published. scan-image is skipped when scan_container
+    # is false, so releases without scanning still tag as before.
+    needs: [prepare, build, scan-image]
+    if: >-
+      ${{ always()
+          && (inputs.push_ghcr == true || inputs.push_dockerhub == true)
+          && needs.prepare.result == 'success'
+          && needs.build.result == 'success'
+          && (needs.scan-image.result == 'success' || needs.scan-image.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download digests
