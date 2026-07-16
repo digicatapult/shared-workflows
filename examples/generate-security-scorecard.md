@@ -2,11 +2,11 @@
 
 ## Using [generate-security-scorecard.yml](../.github/workflows/generate-security-scorecard.yml) in callers
 
-`security-events: write` and `id-token: write` permissions are used. They are invoked at the workflow level for the `analysis` job.
+`security-events: write` and `id-token: write` permissions are used. They are invoked at the workflow level for the `analysis` job. Private callers also need `contents: read`, `actions: read` and `pull-requests: read` (see the [permissions note](../README.md#workflows)).
 
 ### Default scan (full check suite, results published)
 
-Runs the complete `ossf/scorecard-action` check suite and uploads results to GitHub Code Scanning. `publish_results: true` also submits results to the public [Scorecard REST API](https://api.scorecard.dev) and enables the Scorecard badge. These benefits are only available in this default mod, using `ossf/scorecard-action`, and cannot be achieved with the CLI.
+Runs the complete `ossf/scorecard-action` check suite and uploads results to GitHub Code Scanning. `publish_results: true` also submits results to the public [Scorecard REST API](https://api.scorecard.dev) and enables the Scorecard badge. These benefits are only available in this default mode, using `ossf/scorecard-action`, and cannot be achieved with the CLI.
 
 ```yaml
 jobs:
@@ -15,9 +15,12 @@ jobs:
     permissions:
       security-events: write
       id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
     with:
       publish_results: true
-      upload_type: artifact
+      upload_type: artefact
       results_format: sarif
       results_file: ${{ github.event.repository.name }}-scorecard.sarif
     secrets:
@@ -35,10 +38,13 @@ jobs:
     permissions:
       security-events: write
       id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
     with:
       custom_scan: true
       custom_checks: "Branch-Protection,Code-Review"
-      upload_type: artifact
+      upload_type: artefact
       results_format: sarif
       results_file: ${{ github.event.repository.name }}-scorecard.sarif
     secrets:

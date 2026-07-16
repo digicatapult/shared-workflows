@@ -8,17 +8,17 @@ on:
         required: false
     inputs:
       results_file:
-        required: true
+        required: false
         type: string
         default: "results.sarif"
       results_format:
-        required: true
+        required: false
         type: string
         default: "sarif"  # sarif or json only
       upload_type:
         required: false
         type: string
-        default: "artifact"  # art(i|e)fact or dashboard only
+        default: "artefact"  # art(i|e)fact or sarif only
       publish_results:
         required: false
         type: boolean
@@ -27,9 +27,6 @@ on:
         required: false
         type: string
         default: "archive"  # archive or git only
-      repo_token:
-        required: false
-        type: string
       custom_scan:
         required: false
         type: boolean
@@ -63,10 +60,13 @@ jobs:
     permissions:
       security-events: write
       id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
 
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -76,9 +76,15 @@ jobs:
           echo "::error::custom_checks must be a non-empty, comma-separated list of check names when custom_scan is true (e.g. 'Branch-Protection,Code-Review')."
           exit 1
 
+      - name: "Validate upload/format combination"
+        if: ${{ inputs.results_format == 'json' && inputs.upload_type == 'sarif' }}
+        run: |
+          echo "::error::upload_type 'sarif' uploads to GitHub Code Scanning via github/codeql-action/upload-sarif, which requires a SARIF file. Set results_format to 'sarif', or use upload_type 'artifact'/'artefact' with results_format 'json'."
+          exit 1
+
       - name: "Run analysis"
         if: ${{ inputs.custom_scan != true }}
-        uses: ossf/scorecard-action@v2.4.3
+        uses: ossf/scorecard-action@v2
         with:
           file_mode: ${{inputs.file_mode}}
           publish_results: ${{inputs.publish_results}}
@@ -93,7 +99,12 @@ jobs:
         if: ${{ inputs.custom_scan == true }}
         env:
           GITHUB_AUTH_TOKEN: ${{ secrets.repo_token }}
-          ENABLE_SARIF: ${{ inputs.results_format == 'sarif' && '1' || '' }}
+          CUSTOM_CHECKS: ${{ inputs.custom_checks }}
+          RESULTS_FILE: ${{ inputs.results_file }}
+          RESULTS_FORMAT: ${{ inputs.results_format }}
+          FILE_MODE: ${{ inputs.file_mode }}
+          SCORECARD_VERSION: ${{ inputs.scorecard_version }}
+          SCORECARD_TARGET_REPO: ${{ github.repository }}
         run: |
           # Generate a Scorecard policy file that enables all checks specified in `custom_checks`.
           ALL_CHECKS="Binary-Artifacts Branch-Protection CI-Tests CII-Best-Practices Code-Review \
@@ -101,7 +112,7 @@ jobs:
             Packaging Pinned-Dependencies SAST Security-Policy Signed-Releases Token-Permissions \
             Vulnerabilities Webhooks"
 
-          IFS=',' read -ra ENABLED <<< "${{ inputs.custom_checks }}"
+          IFS=',' read -ra ENABLED <<< "$CUSTOM_CHECKS"
 
           {
             echo "version: 1"
@@ -124,36 +135,43 @@ jobs:
             done
           } > scorecard-policy.yml
 
+          # Scorecard's SARIF output is feature-flagged behind ENABLE_SARIF; only pass it
+          # through to the container when results_format is sarif, so json runs don't have
+          # it registered (even empty) via LookupEnv.
+          DOCKER_ENV_ARGS=(-e GITHUB_AUTH_TOKEN)
+          if [ "$RESULTS_FORMAT" = "sarif" ]; then
+            export ENABLE_SARIF=1
+            DOCKER_ENV_ARGS+=(-e ENABLE_SARIF)
+          fi
+
           docker run --rm \
             --user "$(id -u):$(id -g)" \
-            -e GITHUB_AUTH_TOKEN \
-            -e ENABLE_SARIF \
+            "${DOCKER_ENV_ARGS[@]}" \
             -v "${{ github.workspace }}:/workspace" \
             -w /workspace \
-            "ghcr.io/ossf/scorecard:${{ inputs.scorecard_version }}" \
-            --repo="github.com/${{ github.repository }}" \
-            --checks="${{ inputs.custom_checks }}" \
+            "ghcr.io/ossf/scorecard:$SCORECARD_VERSION" \
+            --repo="github.com/$SCORECARD_TARGET_REPO" \
             --policy="scorecard-policy.yml" \
-            --format="${{ inputs.results_format }}" \
-            --file-mode="${{ inputs.file_mode }}" \
+            --format="$RESULTS_FORMAT" \
+            --file-mode="$FILE_MODE" \
             --show-details \
-            --output="${{ inputs.results_file }}"
+            --output="$RESULTS_FILE"
 
       # Upload the results as artifacts.
       # Commenting out will disable uploads of run results in SARIF format to the repository Actions tab.
       # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         if: ${{inputs.upload_type == 'artifact' || inputs.upload_type == 'artefact'}}
         with:
-          name: SARIF file
+          name: ${{ inputs.results_format == 'sarif' && 'SARIF file' || 'Scorecard results (JSON)' }}
           path: ${{inputs.results_file}}
           retention-days: 5
 
       # Upload the results to GitHub's code scanning dashboard.
       # Commenting out will disable upload of results to your repo's Code Scanning dashboard.
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@v4.35.3
-        if: ${{inputs.upload_type == 'dashboard'}}
+        uses: github/codeql-action/upload-sarif@v4
+        if: ${{inputs.upload_type == 'sarif'}}
         with:
           sarif_file: ${{inputs.results_file}}

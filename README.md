@@ -376,22 +376,30 @@ Runs an [OpenSSF Scorecard](https://github.com/ossf/scorecard) analysis against 
 
 | Input             | Type    | Description                                                                                                                                                                | Default         | Required |
 | ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
-| results_file      | string  | File path to store the Scorecard results                                                                                                                                   | `results.sarif` | true     |
-| results_format    | string  | Format of the results. Options: `sarif`, `json`                                                                                                                            | `sarif`         | true     |
-| upload_type       | string  | How results are published. Options: `artifact`/`artefact` uploads a workflow artifact, `dashboard` uploads to GitHub Code Scanning                                         | `artifact`      | false    |
+| results_file      | string  | File path to store the Scorecard results                                                                                                                                   | `results.sarif` | false    |
+| results_format    | string  | Format of the results. Options: `sarif`, `json`                                                                                                                            | `sarif`         | false    |
+| upload_type       | string  | How results are published. Options: `artifact`/`artefact` uploads a workflow artifact, `sarif` uploads to GitHub Code Scanning; unrecognised values are ignored            | `artefact`      | false    |
 | publish_results   | boolean | Publishes results to the public [Scorecard REST API](https://api.scorecard.dev) and enables the Scorecard badge. Only supported by the default path - see the note below   | `false`         | false    |
 | file_mode         | string  | Method used to fetch repository files. Options: `archive`, `git`                                                                                                           | `archive`       | false    |
-| repo_token        | string  | GitHub token with read access, used to authenticate Scorecard's GitHub API calls                                                                                           | `""`            | false    |
 | custom_scan       | boolean | Runs the Scorecard CLI directly (via Docker), restricted to `custom_checks`, instead of the full `ossf/scorecard-action` suite                                             | `false`         | false    |
 | custom_checks     | string  | Comma-separated list of Scorecard check names to run when `custom_scan` is `true`, e.g. `Branch-Protection,Code-Review`. Required (non-empty) when `custom_scan` is `true` | `""`            | false    |
 | scorecard_version | string  | Pinned tag of the `ghcr.io/ossf/scorecard` CLI image, used only when `custom_scan` is `true`                                                                               | `v5.5.0`        | false    |
 
+#### Secrets
+
+| Secret       | Description                                                                      | Required |
+| ------------ | -------------------------------------------------------------------------------- | -------- |
+| `repo_token` | GitHub token with read access, used to authenticate Scorecard's GitHub API calls | false    |
+
 #### Permissions
 
-| Access                   | Jobs used  | Level    | Reason                                                            | Conditions |
-| ------------------------ | ---------- | -------- | ----------------------------------------------------------------- | ---------- |
-| `security-events: write` | `analysis` | Workflow | To POST new code scanning alerts based on the SARIF report        | N/A        |
-| `id-token: write`        | `analysis` | Workflow | Required by `ossf/scorecard-action` to publish results/OIDC flows | N/A        |
+| Access                    | Jobs used  | Level    | Reason                                                                                                                | Conditions                   |
+| ------------------------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------| ---------------------------- |
+| `security-events: write`  | `analysis` | Workflow | To POST new code scanning alerts based on the SARIF report                                                            | N/A                          |
+| `id-token: write`         | `analysis` | Workflow | Required by `ossf/scorecard-action` to publish results/OIDC flows                                                     | N/A                          |
+| `contents: read`          | `analysis` | Workflow | To check out the callee repository, and required by checks such as Branch-Protection, Code-Review and Signed-Releases | Required for private callers |
+| `actions: read`           | `analysis` | Workflow | Required by Scorecard checks such as Token-Permissions to inspect workflow configuration                              | Required for private callers |
+| `pull-requests: read`     | `analysis` | Workflow | Required by Scorecard checks such as Code-Review to evaluate pull request review history                              | Required for private callers |
 
 #### Workflow Description
 
@@ -399,9 +407,10 @@ This GitHub Actions workflow runs an OpenSSF Scorecard analysis and publishes th
 
 1. **Checkout code**: Checks out the callee repository.
 2. **Validate custom scan inputs**: Fails fast with a clear error if `custom_scan` is `true` but `custom_checks` is empty, rather than letting the CLI silently run all checks.
-3. **Run analysis** _(default path, `custom_scan: false`)_: Runs `ossf/scorecard-action`, which always executes the complete set of Scorecard checks.
-4. **Run custom analysis** _(`custom_scan: true`)_: Runs the pinned `ghcr.io/ossf/scorecard` CLI image directly via `docker run`, passing `--checks` for the `custom_checks` list, `--format`/`--file-mode` matching the other inputs, and `--output` to the shared `results_file` path so the upload steps below work unchanged. `ENABLE_SARIF=1` is set automatically when `results_format` is `sarif`, since SARIF output is feature-flagged in the CLI.
-5. **Upload artifact** / **Upload to code-scanning**: Uploads `results_file` as a workflow artifact or to GitHub's Code Scanning dashboard, depending on `upload_type`.
+3. **Validate upload/format combination**: Fails fast with a clear error if `results_format` is `json` and `upload_type` is `sarif`, since `github/codeql-action/upload-sarif` requires a SARIF file.
+4. **Run analysis** _(default path, `custom_scan: false`)_: Runs `ossf/scorecard-action`, which always executes the complete set of Scorecard checks.
+5. **Run custom analysis** _(`custom_scan: true`)_: Runs the pinned `ghcr.io/ossf/scorecard` CLI image directly via `docker run`, using a generated policy file to restrict evaluation to the `custom_checks` list, `--format`/`--file-mode` matching the other inputs, and `--output` to the shared `results_file` path so the upload steps below work unchanged. `ENABLE_SARIF=1` is set automatically when `results_format` is `sarif`, since SARIF output is feature-flagged in the CLI.
+6. **Upload artifact** / **Upload to code-scanning**: Uploads `results_file` as a workflow artifact or to GitHub's Code Scanning dashboard, depending on `upload_type`.
 
 #### `custom_scan` limitations
 
