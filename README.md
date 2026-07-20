@@ -409,7 +409,7 @@ This GitHub Actions workflow runs an OpenSSF Scorecard analysis and publishes th
 2. **Validate custom scan inputs**: Fails fast with a clear error if `custom_scan` is `true` but `custom_checks` is empty, rather than letting the CLI silently run all checks.
 3. **Validate upload/format combination**: Fails fast with a clear error if `results_format` is `json` and `upload_type` is `sarif`, since `github/codeql-action/upload-sarif` requires a SARIF file.
 4. **Run analysis** _(default path, `custom_scan: false`)_: Runs `ossf/scorecard-action`, which always executes the complete set of Scorecard checks.
-5. **Run custom analysis** _(`custom_scan: true`)_: Runs the pinned `ghcr.io/ossf/scorecard` CLI image directly via `docker run`, using a generated policy file to restrict evaluation to the `custom_checks` list, `--format`/`--file-mode` matching the other inputs, and `--output` to the shared `results_file` path so the upload steps below work unchanged. `ENABLE_SARIF=1` is set automatically when `results_format` is `sarif`, since SARIF output is feature-flagged in the CLI.
+5. **Run custom analysis** _(`custom_scan: true`)_: Runs the pinned `ghcr.io/ossf/scorecard` CLI image directly via `docker run`, passing `--checks` for the `custom_checks` list, `--format`/`--file-mode` matching the other inputs, and `--output` to the shared `results_file` path so the upload steps below work unchanged. `ENABLE_SARIF=1` is set automatically when `results_format` is `sarif`, since SARIF output is feature-flagged in the CLI.
 6. **Upload artifact** / **Upload to code-scanning**: Uploads `results_file` as a workflow artifact or to GitHub's Code Scanning dashboard, depending on `upload_type`.
 
 #### `custom_scan` limitations

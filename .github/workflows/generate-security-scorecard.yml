@@ -84,7 +84,7 @@ jobs:
 
       - name: "Run analysis"
         if: ${{ inputs.custom_scan != true }}
-        uses: ossf/scorecard-action@v2
+        uses: ossf/scorecard-action@v2.4.3
         with:
           file_mode: ${{inputs.file_mode}}
           publish_results: ${{inputs.publish_results}}
@@ -106,52 +106,21 @@ jobs:
           SCORECARD_VERSION: ${{ inputs.scorecard_version }}
           SCORECARD_TARGET_REPO: ${{ github.repository }}
         run: |
-          # Generate a Scorecard policy file that enables all checks specified in `custom_checks`.
-          ALL_CHECKS="Binary-Artifacts Branch-Protection CI-Tests CII-Best-Practices Code-Review \
-            Contributors Dangerous-Workflow Dependency-Update-Tool Fuzzing License Maintained \
-            Packaging Pinned-Dependencies SAST Security-Policy Signed-Releases Token-Permissions \
-            Vulnerabilities Webhooks"
-
-          IFS=',' read -ra ENABLED <<< "$CUSTOM_CHECKS"
-
-          {
-            echo "version: 1"
-            echo "policies:"
-            for check in $ALL_CHECKS; do
-              trimmed_check="$check"
-              enabled=false
-              for e in "${ENABLED[@]}"; do
-                if [ "$(echo "$e" | xargs)" = "$trimmed_check" ]; then
-                  enabled=true
-                fi
-              done
-              echo "  $trimmed_check:"
-              if $enabled; then
-                echo "    mode: enforced"
-                echo "    score: 1"
-              else
-                echo "    mode: disabled"
-              fi
-            done
-          } > scorecard-policy.yml
-
           # Scorecard's SARIF output is feature-flagged behind ENABLE_SARIF; only pass it
-          # through to the container when results_format is sarif, so json runs don't have
-          # it registered (even empty) via LookupEnv.
+          # through to the container when results_format is sarif.
           DOCKER_ENV_ARGS=(-e GITHUB_AUTH_TOKEN)
           if [ "$RESULTS_FORMAT" = "sarif" ]; then
             export ENABLE_SARIF=1
             DOCKER_ENV_ARGS+=(-e ENABLE_SARIF)
           fi
-
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             "${DOCKER_ENV_ARGS[@]}" \
-            -v "${{ github.workspace }}:/workspace" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "ghcr.io/ossf/scorecard:$SCORECARD_VERSION" \
             --repo="github.com/$SCORECARD_TARGET_REPO" \
-            --policy="scorecard-policy.yml" \
+            --checks="$CUSTOM_CHECKS" \
             --format="$RESULTS_FORMAT" \
             --file-mode="$FILE_MODE" \
             --show-details \
@@ -171,7 +140,7 @@ jobs:
       # Upload the results to GitHub's code scanning dashboard.
       # Commenting out will disable upload of results to your repo's Code Scanning dashboard.
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.35.3
         if: ${{inputs.upload_type == 'sarif'}}
         with:
           sarif_file: ${{inputs.results_file}}
