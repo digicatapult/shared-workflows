@@ -78,6 +78,10 @@ jobs:
 
 The `automation-framework` type does not use `target`; instead it requires an `automation_plan` file path checked in to the repository. The wait-for-URL step is skipped for this scan type.
 
+Any `report` jobs defined in the plan are automatically located after the scan (by parsing the plan's `reportDir`/`reportFile`/`template` parameters) and uploaded as a workflow artifact (`zap_scan-automation-framework` by default), since ZAP writes them to the runner via the `/zap/wrk` -> `$GITHUB_WORKSPACE` mapping rather than exposing them directly.
+
+If your plan needs specific environment variables available inside the ZAP container (e.g. for authentication), set them via `env_vars` and list their names in `docker_env_vars`.
+
 ```yaml
 jobs:
   scan-zap:
@@ -89,6 +93,9 @@ jobs:
       matrix_scans: '["automation-framework"]'
       automation_plan: ".zap/plan.yml"
       docker_compose_file: docker-compose.yml
+      env_vars: '{"ZAP_AUTH_HEADER_VALUE": "Bearer some-token"}'
+      docker_env_vars: |
+        ZAP_AUTH_HEADER_VALUE
 ```
 
 ### Pulling images from GHCR
