@@ -106,12 +106,49 @@ jobs:
           SCORECARD_VERSION: ${{ inputs.scorecard_version }}
           SCORECARD_TARGET_REPO: ${{ github.repository }}
         run: |
-          # Scorecard's SARIF output is feature-flagged behind ENABLE_SARIF; only pass it
-          # through to the container when results_format is sarif.
+          # Scorecard's SARIF formatter requires a policy entry for every enabled check, so a
+          # policy file must be supplied whenever results_format is sarif. `--checks` is what
+          # actually restricts which checks run; the policy exists only to satisfy the
+          # formatter, and is rejected outright unless SARIF is feature-flagged on. Hence both
+          # are gated on results_format here.
           DOCKER_ENV_ARGS=(-e GITHUB_AUTH_TOKEN)
+          SCORECARD_ARGS=(
+            --repo="github.com/$SCORECARD_TARGET_REPO"
+            --checks="$CUSTOM_CHECKS"
+            --format="$RESULTS_FORMAT"
+            --file-mode="$FILE_MODE"
+            --show-details
+            --output="$RESULTS_FILE"
+          )
           if [ "$RESULTS_FORMAT" = "sarif" ]; then
             export ENABLE_SARIF=1
             DOCKER_ENV_ARGS+=(-e ENABLE_SARIF)
+            # Generate a Scorecard policy file covering all checks.
+            ALL_CHECKS="Binary-Artifacts Branch-Protection CI-Tests CII-Best-Practices Code-Review \
+              Contributors Dangerous-Workflow Dependency-Update-Tool Fuzzing License Maintained \
+              Packaging Pinned-Dependencies SAST Security-Policy Signed-Releases Token-Permissions \
+              Vulnerabilities Webhooks"
+            IFS=',' read -ra ENABLED <<< "$CUSTOM_CHECKS"
+            {
+              echo "version: 1"
+              echo "policies:"
+              for check in $ALL_CHECKS; do
+                enabled=false
+                for e in "${ENABLED[@]}"; do
+                  if [ "$(echo "$e" | xargs)" = "$check" ]; then
+                    enabled=true
+                  fi
+                done
+                echo "  $check:"
+                if $enabled; then
+                  echo "    mode: enforced"
+                  echo "    score: 1"
+                else
+                  echo "    mode: disabled"
+                fi
+              done
+            } > scorecard-policy.yml
+            SCORECARD_ARGS+=(--policy="scorecard-policy.yml")
           fi
           docker run --rm \
             --user "$(id -u):$(id -g)" \
@@ -119,12 +156,13 @@ jobs:
             -v "$GITHUB_WORKSPACE:/workspace" \
             -w /workspace \
             "ghcr.io/ossf/scorecard:$SCORECARD_VERSION" \
-            --repo="github.com/$SCORECARD_TARGET_REPO" \
-            --checks="$CUSTOM_CHECKS" \
-            --format="$RESULTS_FORMAT" \
-            --file-mode="$FILE_MODE" \
-            --show-details \
-            --output="$RESULTS_FILE"
+            "${SCORECARD_ARGS[@]}"
+          # Scorecard can fail to format results while still exiting 0, which is exactly how an
+          # empty SARIF passed CI. Fail loudly rather than uploading an empty artifact.
+          if [ ! -s "$RESULTS_FILE" ]; then
+            echo "::error::Scorecard produced no output at $RESULTS_FILE. Check the step log for formatter errors."
+            exit 1
+          fi
 
       # Upload the results as artifacts.
       # Commenting out will disable uploads of run results in SARIF format to the repository Actions tab.
