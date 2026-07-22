@@ -760,7 +760,7 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | fail_action         | boolean | Fail the job if ZAP identifies any alerts; applies to `baseline`, `full`, and `api` scan types only                          | `false`                            | false    |
 | artifact_name       | string  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`)                         | `zap_scan`                         | false    |
 | api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                                               | `openapi`                          | false    |
-| automation_plan     | string  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`                            | `""`                               | false    |
+| automation_plan     | string  | File path of the ZAP Automation Framework plan; required when using `automation-framework`                                   | `""`                               | false    |
 | docker_env_vars     | string  | Newline-separated names of environment variables, used only by the `automation-framework` scan type                          | `""`                               | false    |
 
 #### Permissions

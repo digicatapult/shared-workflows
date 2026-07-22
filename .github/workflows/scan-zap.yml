@@ -195,55 +195,74 @@ jobs:
       - name: Extract ZAP AF report paths
         if: matrix.scan_type == 'automation-framework'
         id: report_paths
-        continue-on-error: true
         env:
           PLAN_FILE: ${{ inputs.automation_plan }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
-          declare -A EXT_MAP=(
-            [risk-confidence-html]=html
-            [modern-html]=html
-            [traditional-html]=html
-            [traditional-html-plus]=html
-            [traditional-json]=json
-            [traditional-json-plus]=json
-            [traditional-json-min]=json
-            [traditional-md]=md
-            [traditional-xml]=xml
-            [traditional-xml-plus]=xml
-            [traditional-pdf]=pdf
-            [sarif-json]=json
-          )
+          paths=$(
+            set -euo pipefail
 
-          reports_json=$(yq -o=json '[(.jobs // []) | .[] | select(.type == "report")]' "$PLAN_FILE")
-          count=$(echo "$reports_json" | jq 'length')
+            declare -A EXT_MAP=(
+              [risk-confidence-html]=html
+              [modern-html]=html
+              [traditional-html]=html
+              [traditional-html-plus]=html
+              [traditional-json]=json
+              [traditional-json-plus]=json
+              [traditional-json-min]=json
+              [traditional-md]=md
+              [traditional-xml]=xml
+              [traditional-xml-plus]=xml
+              [traditional-pdf]=pdf
+              [sarif-json]=json
+            )
 
-          paths_file=$(mktemp)
-          for ((i = 0; i < count; i++)); do
-            report_dir=$(echo "$reports_json" | jq -r ".[$i].parameters.reportDir // \"\"")
-            report_file=$(echo "$reports_json" | jq -r ".[$i].parameters.reportFile // \"{{yyyy-MM-dd}}-ZAP-Report-[[site]]\"")
-            template=$(echo "$reports_json" | jq -r ".[$i].parameters.template // \"risk-confidence-html\"")
-            ext="${EXT_MAP[$template]:-html}"
+            reports_json=$(yq -o=json '[(.jobs // []) | .[] | select(.type == "report")]' "$PLAN_FILE")
+            count=$(echo "$reports_json" | jq 'length')
 
-            # action-af maps the container's /zap/wrk directory to $GITHUB_WORKSPACE
-            rel_dir="${report_dir#/zap/wrk}"
-            rel_dir="${rel_dir#/}"
-
-            # reportFile may contain {{...}} / [[...]] placeholders resolved at runtime; glob-match them
-            report_file_glob=$(echo "$report_file" | sed -E 's/\{\{[^}]*\}\}/*/g; s/\[\[[^]]*\]\]/*/g')
-
-            if [ -n "$rel_dir" ]; then
-              full_path="$GITHUB_WORKSPACE/$rel_dir/${report_file_glob}.${ext}"
-            else
-              full_path="$GITHUB_WORKSPACE/${report_file_glob}.${ext}"
+            if [ "$count" -eq 0 ]; then
+              # No report jobs in the plan - a legitimate, expected skip.
+              exit 0
             fi
-            echo "$full_path" >> "$paths_file"
-          done
+
+            paths_file=$(mktemp)
+            for ((i = 0; i < count; i++)); do
+              report_dir=$(echo "$reports_json" | jq -r ".[$i].parameters.reportDir // \"\"")
+              report_file=$(echo "$reports_json" | jq -r ".[$i].parameters.reportFile // \"{{yyyy-MM-dd}}-ZAP-Report-[[site]]\"")
+              template=$(echo "$reports_json" | jq -r ".[$i].parameters.template // \"risk-confidence-html\"")
+              ext="${EXT_MAP[$template]:-html}"
+
+              # action-af maps the container's /zap/wrk directory to $GITHUB_WORKSPACE
+              rel_dir="${report_dir#/zap/wrk}"
+              rel_dir="${rel_dir#/}"
+
+              # reportFile may contain {{...}} / [[...]] placeholders resolved at runtime; glob-match them
+              report_file_glob=$(echo "$report_file" | sed -E 's/\{\{[^}]*\}\}/*/g; s/\[\[[^]]*\]\]/*/g')
+
+              if [ -n "$rel_dir" ]; then
+                full_path="$GITHUB_WORKSPACE/$rel_dir/${report_file_glob}.${ext}"
+              else
+                full_path="$GITHUB_WORKSPACE/${report_file_glob}.${ext}"
+              fi
+              echo "$full_path" >> "$paths_file"
+            done
+
+            if [ ! -s "$paths_file" ]; then
+              echo "::warning::found $count report job(s) in the automation plan but resolved 0 report paths" >&2
+            fi
+
+            cat "$paths_file"
+          )
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "::warning::report extraction issue: failed to parse automation plan or resolve report paths (check yq/jq availability and plan structure)" >&2
+            paths=""
+          fi
 
           {
             echo "paths<<REPORT_PATHS_EOF"
-            cat "$paths_file"
+            echo "$paths"
             echo "REPORT_PATHS_EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Upload ZAP Automation Framework report
