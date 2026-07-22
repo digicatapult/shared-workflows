@@ -1,0 +1,184 @@
+name: Scorecard analysis workflow
+
+# Only use on public/private repositories where Code Scanning has been enabled.
+on:
+  workflow_call:
+    secrets:
+      repo_token:
+        required: false
+    inputs:
+      results_file:
+        required: false
+        type: string
+        default: "results.sarif"
+      results_format:
+        required: false
+        type: string
+        default: "sarif"  # sarif or json only
+      upload_type:
+        required: false
+        type: string
+        default: "artefact"  # art(i|e)fact or sarif only
+      publish_results:
+        required: false
+        type: boolean
+        default: false
+      file_mode:
+        required: false
+        type: string
+        default: "archive"  # archive or git only
+      custom_scan:
+        required: false
+        type: boolean
+        default: false
+        description: >-
+          When true, run the Scorecard CLI directly (via Docker) restricted to the checks in
+          `custom_checks`, instead of the full `ossf/scorecard-action` suite. Note that
+          `publish_results` has no effect in this mode - see the workflow's README section.
+      custom_checks:
+        required: false
+        type: string
+        default: ""
+        description: >-
+          Comma-separated list of Scorecard check names to run when `custom_scan` is true,
+          e.g. "Branch-Protection,Code-Review". Required (non-empty) when `custom_scan` is true.
+      scorecard_version:
+        required: false
+        type: string
+        default: "v5.5.0"
+        description: >-
+          Pinned tag of the `ghcr.io/ossf/scorecard` CLI image used only when `custom_scan` is
+          true. Does not affect the version of `ossf/scorecard-action` used for the default scan.
+
+# Use workflow-level read-all in caller workflows.
+# permissions: read-all
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+      pull-requests: read
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: "Validate custom scan inputs"
+        if: ${{ inputs.custom_scan == true && inputs.custom_checks == '' }}
+        run: |
+          echo "::error::custom_checks must be a non-empty, comma-separated list of check names when custom_scan is true (e.g. 'Branch-Protection,Code-Review')."
+          exit 1
+
+      - name: "Validate upload/format combination"
+        if: ${{ inputs.results_format == 'json' && inputs.upload_type == 'sarif' }}
+        run: |
+          echo "::error::upload_type 'sarif' uploads to GitHub Code Scanning via github/codeql-action/upload-sarif, which requires a SARIF file. Set results_format to 'sarif', or use upload_type 'artifact'/'artefact' with results_format 'json'."
+          exit 1
+
+      - name: "Run analysis"
+        if: ${{ inputs.custom_scan != true }}
+        uses: ossf/scorecard-action@v2.4.3
+        with:
+          file_mode: ${{inputs.file_mode}}
+          publish_results: ${{inputs.publish_results}}
+          results_file: ${{inputs.results_file}}
+          results_format: ${{inputs.results_format}}
+          repo_token: ${{secrets.repo_token}}
+
+      # Runs the Scorecard CLI directly so that `--checks` can restrict the run to
+      # `custom_checks`. `ossf/scorecard-action` has no equivalent input - see the
+      # workflow's README section for why `publish_results` is not supported here.
+      - name: "Run custom analysis"
+        if: ${{ inputs.custom_scan == true }}
+        env:
+          GITHUB_AUTH_TOKEN: ${{ secrets.repo_token }}
+          CUSTOM_CHECKS: ${{ inputs.custom_checks }}
+          RESULTS_FILE: ${{ inputs.results_file }}
+          RESULTS_FORMAT: ${{ inputs.results_format }}
+          FILE_MODE: ${{ inputs.file_mode }}
+          SCORECARD_VERSION: ${{ inputs.scorecard_version }}
+          SCORECARD_TARGET_REPO: ${{ github.repository }}
+        run: |
+          # Scorecard's SARIF formatter requires a policy entry for every enabled check, so a
+          # policy file must be supplied whenever results_format is sarif. `--checks` is what
+          # actually restricts which checks run; the policy exists only to satisfy the
+          # formatter, and is rejected outright unless SARIF is feature-flagged on. Hence both
+          # are gated on results_format here.
+          DOCKER_ENV_ARGS=(-e GITHUB_AUTH_TOKEN)
+          SCORECARD_ARGS=(
+            --repo="github.com/$SCORECARD_TARGET_REPO"
+            --checks="$CUSTOM_CHECKS"
+            --format="$RESULTS_FORMAT"
+            --file-mode="$FILE_MODE"
+            --show-details
+            --output="$RESULTS_FILE"
+          )
+          if [ "$RESULTS_FORMAT" = "sarif" ]; then
+            export ENABLE_SARIF=1
+            DOCKER_ENV_ARGS+=(-e ENABLE_SARIF)
+            # Generate a Scorecard policy file covering all checks.
+            ALL_CHECKS="Binary-Artifacts Branch-Protection CI-Tests CII-Best-Practices Code-Review \
+              Contributors Dangerous-Workflow Dependency-Update-Tool Fuzzing License Maintained \
+              Packaging Pinned-Dependencies SAST Security-Policy Signed-Releases Token-Permissions \
+              Vulnerabilities Webhooks"
+            IFS=',' read -ra ENABLED <<< "$CUSTOM_CHECKS"
+            {
+              echo "version: 1"
+              echo "policies:"
+              for check in $ALL_CHECKS; do
+                enabled=false
+                for e in "${ENABLED[@]}"; do
+                  if [ "$(echo "$e" | xargs)" = "$check" ]; then
+                    enabled=true
+                  fi
+                done
+                echo "  $check:"
+                if $enabled; then
+                  echo "    mode: enforced"
+                  echo "    score: 1"
+                else
+                  echo "    mode: disabled"
+                fi
+              done
+            } > scorecard-policy.yml
+            SCORECARD_ARGS+=(--policy="scorecard-policy.yml")
+          fi
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            "${DOCKER_ENV_ARGS[@]}" \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            "ghcr.io/ossf/scorecard:$SCORECARD_VERSION" \
+            "${SCORECARD_ARGS[@]}"
+          # Scorecard can fail to format results while still exiting 0, which is exactly how an
+          # empty SARIF passed CI. Fail loudly rather than uploading an empty artifact.
+          if [ ! -s "$RESULTS_FILE" ]; then
+            echo "::error::Scorecard produced no output at $RESULTS_FILE. Check the step log for formatter errors."
+            exit 1
+          fi
+
+      # Upload the results as artifacts.
+      # Commenting out will disable uploads of run results in SARIF format to the repository Actions tab.
+      # https://docs.github.com/en/actions/advanced-guides/storing-workflow-data-as-artifacts
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v7
+        if: ${{inputs.upload_type == 'artifact' || inputs.upload_type == 'artefact'}}
+        with:
+          name: ${{ inputs.results_format == 'sarif' && 'SARIF file' || 'Scorecard results (JSON)' }}
+          path: ${{inputs.results_file}}
+          retention-days: 5
+
+      # Upload the results to GitHub's code scanning dashboard.
+      # Commenting out will disable upload of results to your repo's Code Scanning dashboard.
+      - name: "Upload to code-scanning"
+        uses: github/codeql-action/upload-sarif@v4.35.3
+        if: ${{inputs.upload_type == 'sarif'}}
+        with:
+          sarif_file: ${{inputs.results_file}}
