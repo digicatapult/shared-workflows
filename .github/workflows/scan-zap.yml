@@ -272,7 +272,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Upload ZAP Automation Framework report
         if: matrix.scan_type == 'automation-framework' && steps.report_paths.outputs.paths != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ steps.report_paths.outputs.paths }}
