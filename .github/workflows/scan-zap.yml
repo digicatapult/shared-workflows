@@ -198,6 +198,7 @@ jobs:
         env:
           PLAN_FILE: ${{ inputs.automation_plan }}
         run: |
+          set +e
           set -uo pipefail
 
           paths=$(
@@ -249,13 +250,17 @@ jobs:
             done
 
             if [ ! -s "$paths_file" ]; then
-              echo "::warning::found $count report job(s) in the automation plan but resolved 0 report paths" >&2
+              echo "::error::found $count report job(s) in the automation plan but resolved 0 report paths" >&2
+              exit 2
             fi
 
             cat "$paths_file"
           )
           rc=$?
-          if [ "$rc" -ne 0 ]; then
+          if [ "$rc" -eq 2 ]; then
+            # report job(s) declared in the plan but path resolution produced nothing
+            exit 1
+          elif [ "$rc" -ne 0 ]; then
             echo "::warning::report extraction issue: failed to parse automation plan or resolve report paths (check yq/jq availability and plan structure)" >&2
             paths=""
           fi
@@ -271,4 +276,4 @@ jobs:
         with:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ steps.report_paths.outputs.paths }}
-          if-no-files-found: warn
+          if-no-files-found: error
