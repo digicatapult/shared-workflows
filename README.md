@@ -801,23 +801,24 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                          | Default                            | Required |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| matrix_scans        | string  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`               | `'["baseline"]'`                   | false    |
-| target              | string  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                | `http://localhost:3000`            | false    |
-| env_vars            | string  | JSON object of extra environment variables to inject                                                 | `{}`                               | false    |
-| docker_compose_file | string  | Docker Compose file used to bring up the application stack before scanning                           | `""`                               | false    |
-| pull_ghcr           | boolean | Log in to GitHub Container Registry before pulling images (e.g. if using private/custom proxy image) | `false`                            | false    |
-| pre_scan_command    | string  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                      | `""`                               | false    |
-| target_wait_timeout | number  | Seconds to poll `target` for a successful response before failing                                    | `60`                               | false    |
-| rules_file_name     | string  | Relative path to a ZAP rules TSV file for suppressing known alerts                                   | `""`                               | false    |
-| cmd_options         | string  | Additional ZAP CLI options passed to all scan types                                                  | `""`                               | false    |
-| docker_name         | string  | Custom ZAP Docker image name; defaults to the stable ZAP image                                       | `"ghcr.io/zaproxy/zaproxy:stable"` | false    |
-| allow_issue_writing | boolean | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`        | `false`                            | false    |
-| fail_action         | boolean | Fail the job if ZAP identifies any alerts                                                            | `false`                            | false    |
-| artifact_name       | string  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`) | `zap_scan`                         | false    |
-| api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                       | `openapi`                          | false    |
-| automation_plan     | string  | File path or URL of the ZAP Automation Framework plan; required when using `automation-framework`    | `""`                               | false    |
+| Input               | Type    | Description                                                                                                                  | Default                            | Required |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| matrix_scans        | string  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`                                       | `'["baseline"]'`                   | false    |
+| target              | string  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                                        | `http://localhost:3000`            | false    |
+| env_vars            | string  | JSON object of extra environment variables to inject                                                                         | `{}`                               | false    |
+| docker_compose_file | string  | Docker Compose file used to bring up the application stack before scanning                                                   | `""`                               | false    |
+| pull_ghcr           | boolean | Log in to GitHub Container Registry before pulling images (e.g. if using private/custom proxy image)                         | `false`                            | false    |
+| pre_scan_command    | string  | Arbitrary shell command to start the application (e.g. `npm ci && npm start &`)                                              | `""`                               | false    |
+| target_wait_timeout | number  | Seconds to poll `target` for a successful response before failing                                                            | `60`                               | false    |
+| rules_file_name     | string  | Relative path to a ZAP rules TSV file for suppressing known alerts; applies to `baseline`, `full`, and `api` scan types only | `""`                               | false    |
+| cmd_options         | string  | Additional ZAP CLI options passed to all scan types                                                                          | `""`                               | false    |
+| docker_name         | string  | Custom ZAP Docker image name; defaults to the stable ZAP image                                                               | `"ghcr.io/zaproxy/zaproxy:stable"` | false    |
+| allow_issue_writing | boolean | Create or update a GitHub issue in the repository with ZAP findings; requires `issues: write`                                | `false`                            | false    |
+| fail_action         | boolean | Fail the job if ZAP identifies any alerts; applies to `baseline`, `full`, and `api` scan types only                          | `false`                            | false    |
+| artifact_name       | string  | Base name for uploaded scan report artifacts; suffixed with the scan type (e.g. `zap_scan-baseline`)                         | `zap_scan`                         | false    |
+| api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                                               | `openapi`                          | false    |
+| automation_plan     | string  | File path of the ZAP Automation Framework plan; required when using `automation-framework`                                   | `""`                               | false    |
+| docker_env_vars     | string  | Newline-separated names of environment variables, used only by the `automation-framework` scan type                          | `""`                               | false    |
 
 #### Permissions
 
@@ -836,3 +837,4 @@ This GitHub Actions workflow runs OWASP ZAP DAST scans against a locally running
 3. **Run Pre-Scan Command** _(optional)_: Executes `pre_scan_command` on the runner for use cases where the application is started directly rather than via Docker Compose.
 4. **Wait for Target** _(skipped for `automation-framework`)_: Polls `target` with `curl` at two-second intervals until it responds successfully or `target_wait_timeout` is reached.
 5. **ZAP Scan**: Runs the selected ZAP action for each `matrix.scan_type`. Report artifacts are uploaded under `artifact_name-<scan_type>` to avoid collisions when multiple types run in parallel.
+6. **Upload Automation Framework Report** _(only for `automation-framework`)_: Parses `automation_plan` for any `report` jobs, locates the generated report file(s) on the runner (via the `/zap/wrk` → `$GITHUB_WORKSPACE` mapping), and uploads them as an artifact under `artifact_name-automation-framework`.
