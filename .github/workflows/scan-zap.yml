@@ -193,7 +193,7 @@ jobs:
           docker_env_vars: ${{ inputs.docker_env_vars }}
           cmd_options: ${{ inputs.cmd_options }}
       - name: Extract ZAP AF report paths
-        if: matrix.scan_type == 'automation-framework'
+        if: ${{ !cancelled() && matrix.scan_type == 'automation-framework' }}
         id: report_paths
         env:
           PLAN_FILE: ${{ inputs.automation_plan }}
@@ -271,7 +271,7 @@ jobs:
             echo "REPORT_PATHS_EOF"
           } >> "$GITHUB_OUTPUT"
       - name: Upload ZAP Automation Framework report
-        if: matrix.scan_type == 'automation-framework' && steps.report_paths.outputs.paths != ''
+        if: ${{ !cancelled() && matrix.scan_type == 'automation-framework' && steps.report_paths.outputs.paths != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.artifact.outputs.name }}
