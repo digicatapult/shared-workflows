@@ -84,7 +84,7 @@ jobs:
 
       - name: "Run analysis"
         if: ${{ inputs.custom_scan != true }}
-        uses: ossf/scorecard-action@v2.4.3
+        uses: ossf/scorecard-action@v2.4.4
         with:
           file_mode: ${{inputs.file_mode}}
           publish_results: ${{inputs.publish_results}}
@@ -178,7 +178,7 @@ jobs:
       # Upload the results to GitHub's code scanning dashboard.
       # Commenting out will disable upload of results to your repo's Code Scanning dashboard.
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@v4.35.3
+        uses: github/codeql-action/upload-sarif@v4.37.3
         if: ${{inputs.upload_type == 'sarif'}}
         with:
           sarif_file: ${{inputs.results_file}}
