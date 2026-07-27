@@ -147,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node_version }}
       - name: Start Postgres
@@ -203,7 +203,7 @@ jobs:
         with:
           ref: ${{ needs.resolve.outputs.base_sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node_version }}
       # A repo introducing its first migration has nothing to upgrade from, so

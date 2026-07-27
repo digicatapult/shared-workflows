@@ -103,10 +103,10 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_same_version: false
           package_manager: ${{ inputs.package_manager }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ inputs.node_version }}
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         if: inputs.install_python_deps
         with:
           python-version: ${{ inputs.python_version }}
