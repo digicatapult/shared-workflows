@@ -11,10 +11,7 @@ on:
         type: string
         default: "3.14"
       release-commit-prefix:
-        description: >-
-          Prefix used for the version commit. The caller uses the same value in
-          its loop guard so that the release workflow and this workflow cannot
-          trigger each other indefinitely.
+        description: Version commit prefix. Must match the caller's loop guard.
         required: false
         type: string
         default: "chore(release):"

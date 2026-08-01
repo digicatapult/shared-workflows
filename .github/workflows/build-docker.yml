@@ -59,12 +59,7 @@ on:
         required: false
         type: boolean
         default: true
-        description: >-
-          Fail when the package version already matches the latest published
-          release. This is the pull request version gate for repos that have no
-          separate check-version job. Repos using merge queue versioning must set
-          this to false: their branches deliberately carry no version bump, and
-          require-version-label enforces the intent instead.
+        description: Fail when the version already matches the latest release. Merge queue repos set false.
       scan_ignore_unfixed:
         required: false
         type: boolean

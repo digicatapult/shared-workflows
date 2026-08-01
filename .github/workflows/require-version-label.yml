@@ -3,9 +3,7 @@ on:
   workflow_call:
     inputs:
       version_labels:
-        description: >-
-          JSON array of accepted version labels. Exactly one of these must be
-          present on the pull request.
+        description: JSON array of accepted labels. Exactly one must be present.
         required: false
         type: string
         default: '["v:major", "v:minor", "v:patch"]'
