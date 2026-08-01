@@ -15,7 +15,11 @@ jobs:
     name: "Release"
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags are needed to work out which commits, and
+      # therefore which pull requests, this release actually contains.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"
@@ -26,38 +30,101 @@ jobs:
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Generate release notes from PR body
+      # Release notes are built from every pull request contained in this
+      # release, resolved from the commits since the previous release tag.
+      #
+      # This previously took `gh pr list --state merged --base main --limit 1`,
+      # which is wrong in two ways. `gh pr list` orders by *created* date, not
+      # merged date, so a long-lived pull request merged today loses to a newer
+      # one merged last week. And it only ever credits a single pull request, so
+      # any release containing more than one (which is every batched merge queue
+      # merge, and any release covering several pushes) silently attributes the
+      # whole release to one arbitrary change.
+      #
+      # Walking the commit range fixes both, and is also what makes this correct
+      # under merge queue versioning, where the released commit is a bot version
+      # commit with no pull request of its own.
+      - name: Generate release notes from merged pull requests
         id: release_notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES_PATH: ${{ runner.temp }}/release-notes.md
+          MAX_COMMITS: "200"
         run: |
-          echo "body<<EOF" >> $GITHUB_OUTPUT
+          set -euo pipefail
 
-          echo "## Changes" >> $GITHUB_OUTPUT
+          # Tags for releases are bare semver (see "Create GitHub release
+          # version" below). `latest` is force-moved by this workflow, so it must
+          # not be matched here or the range would always be empty.
+          prev_tag=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
 
-          PR_NUMBER=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number')
-          echo "Fetching body for PR #$PR_NUMBER"
+          if [[ -n "${prev_tag}" ]]; then
+            echo "Previous release tag: ${prev_tag}"
+            range="${prev_tag}..HEAD"
+          else
+            echo "No previous release tag found, describing the head commit only."
+            range="HEAD"
+            MAX_COMMITS="1"
+          fi
 
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json title,url,body --jq '{title, url, body}')
-          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title')
-          PR_URL=$(echo "$PR_JSON" | jq -r '.url')
-          BODY=$(echo "$PR_JSON" | jq -r '.body')
+          shas=$(git log --format='%H' -n "${MAX_COMMITS}" "${range}" || true)
+          total=$(printf '%s\n' "${shas}" | grep -c . || true)
+          echo "Commits in range: ${total}"
 
-          echo "**[$PR_TITLE]($PR_URL)**" >> $GITHUB_OUTPUT
+          pr_numbers=""
+          for sha in ${shas}; do
+            found=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls" \
+              --jq '.[].number' 2>/dev/null || true)
+            if [[ -n "${found}" ]]; then
+              pr_numbers+="${found}"$'\n'
+            fi
+          done
+          pr_numbers=$(printf '%s\n' "${pr_numbers}" | grep -E '^[0-9]+$' | sort -un || true)
 
-          echo "$BODY" | awk '
-            BEGIN { section = "" }
+          {
+            echo "## Changes"
+          } > "${NOTES_PATH}"
 
-            /^## Linked tickets/         { section = "### Linked Tickets"; print "\n" section; next }
-            /^## High level description/ { section = "### High Level Description"; print "\n" section; next }
-            /^## Detailed description/   { section = "### Detailed Description"; print "\n" section; next }
+          if [[ -z "${pr_numbers}" ]]; then
+            echo "No pull requests resolved for this range."
+            echo "" >> "${NOTES_PATH}"
+            echo "_No pull requests were associated with this release._" >> "${NOTES_PATH}"
+          else
+            echo "Pull requests in this release:" $(printf '#%s ' ${pr_numbers})
+            for pr in ${pr_numbers}; do
+              PR_JSON=$(gh pr view "${pr}" --json title,url,body --jq '{title, url, body}')
+              PR_TITLE=$(jq -r '.title' <<< "${PR_JSON}")
+              PR_URL=$(jq -r '.url' <<< "${PR_JSON}")
+              BODY=$(jq -r '.body' <<< "${PR_JSON}")
 
-            /^## / { section = ""; next }
+              {
+                echo ""
+                echo "**[${PR_TITLE}](${PR_URL})**"
+              } >> "${NOTES_PATH}"
 
-            { if (section != "") print $0 }
-          ' >> $GITHUB_OUTPUT
+              awk '
+                BEGIN { section = "" }
 
-          echo "EOF" >> $GITHUB_OUTPUT
+                /^## Linked tickets/         { section = "### Linked Tickets"; print "\n" section; next }
+                /^## High level description/ { section = "### High Level Description"; print "\n" section; next }
+                /^## Detailed description/   { section = "### Detailed Description"; print "\n" section; next }
+
+                /^## / { section = ""; next }
+
+                { if (section != "") print $0 }
+              ' <<< "${BODY}" >> "${NOTES_PATH}"
+            done
+          fi
+
+          if [[ "${total}" -ge "${MAX_COMMITS}" && -n "${prev_tag}" ]]; then
+            echo "::warning::Release notes considered only the most recent ${MAX_COMMITS} commits since ${prev_tag}. Some pull requests may be missing."
+          fi
+
+          echo "notes_path=${NOTES_PATH}" >> "${GITHUB_OUTPUT}"
+
+          echo "::group::Generated release notes"
+          cat "${NOTES_PATH}"
+          echo "::endgroup::"
       - name: Download SBOM artefacts
         uses: actions/download-artifact@v8
         if: inputs.get_sbom
@@ -71,7 +138,7 @@ jobs:
           draft: false
           prerelease: false
           make_latest: true
-          body: ${{ steps.release_notes.outputs.body }}
+          body_path: ${{ steps.release_notes.outputs.notes_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             **/*.cdx.json
@@ -90,5 +157,5 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          body: ${{ steps.release_notes.outputs.body }}
+          body_path: ${{ steps.release_notes.outputs.notes_path }}
           token: ${{ secrets.GITHUB_TOKEN }}
