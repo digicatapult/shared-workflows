@@ -226,7 +226,13 @@ jobs:
             echo "Vite config found"
           fi
 
+      # Only a pull_request has somewhere to post the summary comment. On a
+      # merge_group (or a push) there is no pull request attached to the run, so
+      # the action would fail the coverage job and, when coverage is a required
+      # check, stall the merge queue. The thresholds are still enforced by the
+      # "Fail if under thresholds" step below, which runs on every event.
       - name: Pretty coverage summary
+        if: ${{ github.event_name == 'pull_request' }}
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           file-coverage-mode: all

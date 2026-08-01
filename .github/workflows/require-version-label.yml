@@ -1,0 +1,59 @@
+name: Require version label
+on:
+  workflow_call:
+    inputs:
+      version_labels:
+        description: >-
+          JSON array of accepted version labels. Exactly one of these must be
+          present on the pull request.
+        required: false
+        type: string
+        default: '["v:major", "v:minor", "v:patch"]'
+jobs:
+  require-version-label:
+    name: "Require version label"
+    runs-on: ubuntu-latest
+    steps:
+      # This gate replaces "the version in package.json must be higher than the
+      # last release" for repos on a merge queue. That older gate is an absolute
+      # number written onto the branch, so two approved PRs necessarily collide
+      # and only one can merge. A label states the *intent* to bump instead, so
+      # it is order independent and every queued PR can satisfy it at once. The
+      # number itself is computed after merge by apply-version-npm.yml.
+      #
+      # There is deliberately no check on a merge_group event. The label was
+      # validated when the PR was queued and the queue is merging that same PR,
+      # so re-checking adds nothing. The job still runs (rather than being
+      # skipped by a job-level `if`) so that the required check reports a result
+      # against the queue's branch. A required check that never reports leaves
+      # the merge queue waiting indefinitely.
+      - name: Check for exactly one version label
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          VERSION_LABELS: ${{ inputs.version_labels }}
+        run: |
+          set -euo pipefail
+
+          labels="${PR_LABELS}"
+          if [[ -z "${labels}" || "${labels}" == "null" ]]; then
+            labels='[]'
+          fi
+
+          matched=$(jq -r --argjson want "${VERSION_LABELS}" \
+            '[ .[] | select(. as $l | $want | index($l)) ]' <<< "${labels}")
+          count=$(jq -r 'length' <<< "${matched}")
+          matched_list=$(jq -r 'join(", ")' <<< "${matched}")
+          want_list=$(jq -r 'join(", ")' <<< "${VERSION_LABELS}")
+
+          if [[ "${count}" -eq 1 ]]; then
+            echo "Version label: ${matched_list}"
+            exit 0
+          fi
+
+          if [[ "${count}" -eq 0 ]]; then
+            echo "::error::This pull request has no version label. Add exactly one of: ${want_list}."
+          else
+            echo "::error::This pull request has conflicting version labels (${matched_list}). Keep exactly one of: ${want_list}."
+          fi
+          exit 1

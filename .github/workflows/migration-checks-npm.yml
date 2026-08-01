@@ -50,10 +50,18 @@ on:
         type: string
         default: postgres
 jobs:
-  # Works on both pull_request and push callers. On pull_request the base/head
-  # are the PR base and head; on push (e.g. release.yml on main) they are the
-  # commit before the push and the pushed commit, so seeded-upgrade becomes a
-  # final "upgrade the previously deployed commit to this one" check.
+  # Works on pull_request, merge_group and push callers. On pull_request the
+  # base/head are the PR base and head; on merge_group they are the queue's base
+  # and the head of the temporary branch holding this PR stacked on top of the
+  # ones ahead of it; on push (e.g. release.yml on main) they are the commit
+  # before the push and the pushed commit, so seeded-upgrade becomes a final
+  # "upgrade the previously deployed commit to this one" check.
+  #
+  # merge_group must be handled explicitly. Its payload has neither
+  # github.event.pull_request nor github.event.before, so without this branch
+  # base resolves to an empty string, has_base becomes false, and the migration
+  # immutability lint, the ordering lint and seeded-upgrade would all silently
+  # no-op for every pull request merged through the queue.
   resolve:
     name: Resolve base and head
     runs-on: ubuntu-latest
@@ -67,6 +75,8 @@ jobs:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+          MG_HEAD: ${{ github.event.merge_group.head_sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_AFTER: ${{ github.sha }}
         run: |
@@ -74,6 +84,9 @@ jobs:
           if [[ "${EVENT}" == "pull_request" ]]; then
             base="${PR_BASE}"
             head="${PR_HEAD}"
+          elif [[ "${EVENT}" == "merge_group" ]]; then
+            base="${MG_BASE}"
+            head="${MG_HEAD}"
           else
             base="${PUSH_BEFORE}"
             head="${PUSH_AFTER}"
