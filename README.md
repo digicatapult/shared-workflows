@@ -66,6 +66,21 @@ The distinction matters because a version written onto a branch is an absolute n
 
 Adopting the merge queue model also means callers must add a `merge_group` trigger to whichever workflow provides their required checks. A required check that never reports on the queue's branch leaves the queue waiting indefinitely.
 
+### Merge queue compatibility
+
+The `merge_group` event is neither a pull request nor a push, and the queue's branch (`gh-readonly-queue/<base>/pr-<n>-<sha>`) is ephemeral and deleted the moment the entry merges. Several workflows here needed adjusting for that. The behaviour is listed once here rather than repeated in each file.
+
+| Workflow | Behaviour on `merge_group` | Why |
+| --- | --- | --- |
+| `migration-checks-npm` / `migration-checks-poetry` | Resolves base and head from `github.event.merge_group` | The payload has neither `pull_request` nor `before`. Without this the base sha resolves empty and the immutability lint, the ordering lint and seeded-upgrade all silently no-op for every queued pull request. |
+| `tests-npm` / `tests-poetry` | Job name uses `current` / `main`, never the branch | Interpolating the branch puts the ephemeral queue ref into the check name, making it unique per pull request and per merge attempt. Such a name can never be listed as a required status check, so the queue would wait forever. |
+| `tests-npm` | Coverage summary comment is skipped | There is no pull request to comment on. Thresholds are still enforced. |
+| `static-checks-npm` / `static-checks-poetry` | GHAS SARIF upload is skipped | The queue deletes its ref before code scanning can attach the analysis, so the upload fails with "ref not found in this repository". The scan itself still runs, and the same commit is uploaded from its pull request run and again on push to trunk. |
+| `require-version-label` | Performs no check, but still runs | The label was validated when the pull request was queued. The job runs rather than being skipped so the required check reports a result. |
+| `build-docker` | Builds without pushing, as on a pull request | No new tag is produced because `check-version` reports no new version. |
+
+`release-github` is unaffected by `merge_group` since it runs on push, but its release notes are resolved from the commits since the previous release tag rather than from the most recently merged pull request, so a batched queue merge credits every pull request it contained.
+
 ## Workflows
 
 > [!IMPORTANT]

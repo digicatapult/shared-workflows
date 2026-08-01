@@ -14,19 +14,10 @@ jobs:
     name: "Require version label"
     runs-on: ubuntu-latest
     steps:
-      # This gate replaces "the version in package.json must be higher than the
-      # last release" for repos on a merge queue. That older gate is an absolute
-      # number written onto the branch, so two approved PRs necessarily collide
-      # and only one can merge. A label states the *intent* to bump instead, so
-      # it is order independent and every queued PR can satisfy it at once. The
-      # number itself is computed after merge by apply-version-npm.yml.
-      #
-      # There is deliberately no check on a merge_group event. The label was
-      # validated when the PR was queued and the queue is merging that same PR,
-      # so re-checking adds nothing. The job still runs (rather than being
-      # skipped by a job-level `if`) so that the required check reports a result
-      # against the queue's branch. A required check that never reports leaves
-      # the merge queue waiting indefinitely.
+      # No check on merge_group: the label was validated when the PR was queued.
+      # The job still runs rather than being skipped by a job-level `if`, so the
+      # required check reports against the queue's branch. A required check that
+      # never reports stalls the queue. See examples/require-version-label.md.
       - name: Check for exactly one version label
         if: ${{ github.event_name == 'pull_request' }}
         env:

@@ -30,20 +30,9 @@ jobs:
         uses: digicatapult/check-version@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      # Release notes are built from every pull request contained in this
-      # release, resolved from the commits since the previous release tag.
-      #
-      # This previously took `gh pr list --state merged --base main --limit 1`,
-      # which is wrong in two ways. `gh pr list` orders by *created* date, not
-      # merged date, so a long-lived pull request merged today loses to a newer
-      # one merged last week. And it only ever credits a single pull request, so
-      # any release containing more than one (which is every batched merge queue
-      # merge, and any release covering several pushes) silently attributes the
-      # whole release to one arbitrary change.
-      #
-      # Walking the commit range fixes both, and is also what makes this correct
-      # under merge queue versioning, where the released commit is a bot version
-      # commit with no pull request of its own.
+      # Notes cover every pull request in the release, resolved from the commits
+      # since the previous release tag. Replaces `gh pr list --limit 1`, which
+      # ordered by created date and only ever credited one pull request.
       - name: Generate release notes from merged pull requests
         id: release_notes
         env:
@@ -53,9 +42,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Tags for releases are bare semver (see "Create GitHub release
-          # version" below). `latest` is force-moved by this workflow, so it must
-          # not be matched here or the range would always be empty.
+          # Bare semver only: `latest` is force-moved by this workflow, so
+          # matching it would always give an empty range.
           prev_tag=$(git describe --tags --abbrev=0 --match '[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)
 
           if [[ -n "${prev_tag}" ]]; then

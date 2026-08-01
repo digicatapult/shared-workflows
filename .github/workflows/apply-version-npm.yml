@@ -41,17 +41,10 @@ jobs:
       bumped: ${{ steps.apply.outputs.bumped }}
       version: ${{ steps.apply.outputs.version }}
     steps:
-      # A GitHub App token is used rather than GITHUB_TOKEN because pushes made
-      # with GITHUB_TOKEN deliberately do not trigger workflows. The version
-      # commit created here *must* trigger a run, because that commit is the one
-      # carrying the released version: build-docker, generate-sbom and
-      # release-github all read the version out of the checked out tree, so a
-      # release run on the pre-bump commit would build and tag the previous
-      # version and publish nothing new.
-      #
-      # This is the same App the synchronise-*-version workflows already use, so
-      # adopting repos need no new app and no new secrets. The App does need to
-      # be allowed to push to the protected trunk branch.
+      # An App token, not GITHUB_TOKEN: the version commit must trigger a run,
+      # because the release reads the version from the checked out tree. Same App
+      # the synchronise-*-version workflows already use, but it must be allowed
+      # to push to the protected trunk branch. See examples/apply-version.md.
       - name: Generate a token
         id: generate-token
         uses: actions/create-github-app-token@v3
@@ -83,11 +76,8 @@ jobs:
             echo "skip=false" >> "${GITHUB_OUTPUT}"
           fi
 
-      # A merge queue can land several pull requests in a single push, so the
-      # bump is resolved across every commit in the push rather than just the
-      # head commit. The strongest label present wins: major, then minor, then
-      # patch. A push containing no labelled pull request (for example a direct
-      # docs commit) produces no bump and therefore no release.
+      # A queue can land several pull requests in one push, so resolve across
+      # every commit and take the strongest label. No label means no bump.
       - name: Resolve version label for this push
         id: resolve
         if: ${{ steps.guard.outputs.skip == 'false' }}

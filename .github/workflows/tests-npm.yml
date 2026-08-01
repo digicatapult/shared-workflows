@@ -75,12 +75,8 @@ jobs:
         run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
-    # The branch is deliberately not interpolated into the job name. Doing so
-    # makes the resulting check name change per pull request, and under a merge
-    # queue it becomes the ephemeral gh-readonly-queue/... ref, which can never
-    # be listed as a required status check: the queue would wait forever for a
-    # check name that never appears again. "current" and "main" are enough to
-    # tell the two coverage matrix legs apart.
+    # Not matrix.branch: that would put the ephemeral gh-readonly-queue/... ref
+    # into the check name, which can never be a required status check.
     name: Run tests - ${{ matrix.command }} - ${{ matrix.branch == 'main' && 'main' || 'current' }}
     needs: setup
     strategy:
@@ -232,11 +228,8 @@ jobs:
             echo "Vite config found"
           fi
 
-      # Only a pull_request has somewhere to post the summary comment. On a
-      # merge_group (or a push) there is no pull request attached to the run, so
-      # the action would fail the coverage job and, when coverage is a required
-      # check, stall the merge queue. The thresholds are still enforced by the
-      # "Fail if under thresholds" step below, which runs on every event.
+      # Only a pull_request has somewhere to post this. Thresholds are still
+      # enforced by "Fail if under thresholds" below, which runs on every event.
       - name: Pretty coverage summary
         if: ${{ github.event_name == 'pull_request' }}
         uses: davelosert/vitest-coverage-report-action@v2

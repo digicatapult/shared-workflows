@@ -102,13 +102,8 @@ jobs:
       - name: Semgrep CE scan
         run: |
           semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
-      # Skipped on merge_group. The merge queue deletes its ephemeral
-      # gh-readonly-queue/... ref as soon as the entry is merged, so code
-      # scanning has no ref to attach the analysis to and the upload fails with
-      # "ref ... not found in this repository". That failure would block the
-      # queue for a reason unrelated to the code. The scan itself still runs
-      # above, and the same commit is uploaded from its pull request run and
-      # again on push to trunk, so no coverage is lost.
+      # Skipped on merge_group: the queue deletes its ephemeral ref before code
+      # scanning can attach the analysis ("ref not found"). The scan still runs.
       - name: Upload Semgrep CE's SARIF results directly to GHAS
         uses: github/codeql-action/upload-sarif@v4
         if: always() && inputs.semgrep_upload_type == 'sarif' && github.event_name != 'merge_group'

@@ -50,18 +50,14 @@ on:
         type: string
         default: postgres
 jobs:
-  # Works on pull_request, merge_group and push callers. On pull_request the
-  # base/head are the PR base and head; on merge_group they are the queue's base
-  # and the head of the temporary branch holding this PR stacked on top of the
-  # ones ahead of it; on push (e.g. release.yml on main) they are the commit
-  # before the push and the pushed commit, so seeded-upgrade becomes a final
-  # "upgrade the previously deployed commit to this one" check.
+  # Works on pull_request, merge_group and push callers. On push (e.g.
+  # release.yml on main) base/head are the commit before the push and the pushed
+  # commit, so seeded-upgrade becomes a final "upgrade the previously deployed
+  # commit to this one" check.
   #
-  # merge_group must be handled explicitly. Its payload has neither
-  # github.event.pull_request nor github.event.before, so without this branch
-  # base resolves to an empty string, has_base becomes false, and the migration
-  # immutability lint, the ordering lint and seeded-upgrade would all silently
-  # no-op for every pull request merged through the queue.
+  # merge_group needs its own branch below: its payload has neither
+  # pull_request nor before, so base would resolve empty and every check in this
+  # workflow would silently no-op for queued pull requests.
   resolve:
     name: Resolve base and head
     runs-on: ubuntu-latest

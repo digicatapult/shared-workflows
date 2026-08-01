@@ -83,12 +83,8 @@ jobs:
         run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
-    # The branch is deliberately not interpolated into the job name. Doing so
-    # makes the resulting check name change per pull request, and under a merge
-    # queue it becomes the ephemeral gh-readonly-queue/... ref, which can never
-    # be listed as a required status check: the queue would wait forever for a
-    # check name that never appears again. "current" and "main" are enough to
-    # tell the two coverage matrix legs apart.
+    # Not matrix.branch: that would put the ephemeral gh-readonly-queue/... ref
+    # into the check name, which can never be a required status check.
     name: Run tests - ${{ matrix.test_path }} - ${{ matrix.branch == 'main' && 'main' || 'current' }}
     needs: setup
     strategy:
