@@ -55,6 +55,16 @@ on:
         type: string
         default: "CRITICAL"
         description: "Comma-separated severities that fail the build (gate). The uploaded report always contains every severity."
+      fail_on_same_version:
+        required: false
+        type: boolean
+        default: true
+        description: >-
+          Fail when the package version already matches the latest published
+          release. This is the pull request version gate for repos that have no
+          separate check-version job. Repos using merge queue versioning must set
+          this to false: their branches deliberately carry no version bump, and
+          require-version-label enforces the intent instead.
       scan_ignore_unfixed:
         required: false
         type: boolean
@@ -102,6 +112,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           package_manager: ${{ inputs.package_manager }}
+          fail_on_same_version: ${{ inputs.fail_on_same_version }}
       - name: Compute image names to push
         id: image-names
         run: |

@@ -77,7 +77,7 @@ The `merge_group` event is neither a pull request nor a push, and the queue's br
 | `tests-npm` | Coverage summary comment is skipped | There is no pull request to comment on. Thresholds are still enforced. |
 | `static-checks-npm` / `static-checks-poetry` | GHAS SARIF upload is skipped | The queue deletes its ref before code scanning can attach the analysis, so the upload fails with "ref not found in this repository". The scan itself still runs, and the same commit is uploaded from its pull request run and again on push to trunk. |
 | `require-version-label` | Performs no check, but still runs | The label was validated when the pull request was queued. The job runs rather than being skipped so the required check reports a result. |
-| `build-docker` | Builds without pushing, as on a pull request | No new tag is produced because `check-version` reports no new version. |
+| `build-docker` | Builds without pushing, and callers must set `fail_on_same_version: false` | Its `check-version` call defaults to failing when the version already matches the latest release. That is the pull request version gate for repos with no separate `check-version` job, but under merge queue versioning the branch deliberately carries no bump, so it would fail every pull request. `require-version-label` enforces the intent instead. Leave it at the default on `release.yml`, where the version commit is bumped. |
 
 `release-github` is unaffected by `merge_group` since it runs on push, but its release notes are resolved from the commits since the previous release tag rather than from the most recently merged pull request, so a batched queue merge credits every pull request it contained.
 
