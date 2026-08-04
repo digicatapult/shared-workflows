@@ -102,9 +102,11 @@ jobs:
       - name: Semgrep CE scan
         run: |
           semgrep ${{ inputs.semgrep_extra_args }} --sarif --sarif-output=${{ inputs.semgrep_sarif_path }}
+      # Skipped on merge_group: the queue deletes its ephemeral ref before code
+      # scanning can attach the analysis ("ref not found"). The scan still runs.
       - name: Upload Semgrep CE's SARIF results directly to GHAS
         uses: github/codeql-action/upload-sarif@v4
-        if: always() && (inputs.semgrep_upload_type == 'sarif')
+        if: always() && inputs.semgrep_upload_type == 'sarif' && github.event_name != 'merge_group'
         with:
           sarif_file: ${{ inputs.semgrep_sarif_path }}
           category: semgrep

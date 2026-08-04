@@ -75,7 +75,9 @@ jobs:
         run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
-    name: Run tests - ${{ matrix.command }} - ${{ matrix.branch }}
+    # Not matrix.branch: that would put the ephemeral gh-readonly-queue/... ref
+    # into the check name, which can never be a required status check.
+    name: Run tests - ${{ matrix.command }} - ${{ matrix.branch == 'main' && 'main' || 'current' }}
     needs: setup
     strategy:
       fail-fast: false
@@ -226,7 +228,10 @@ jobs:
             echo "Vite config found"
           fi
 
+      # Only a pull_request has somewhere to post this. Thresholds are still
+      # enforced by "Fail if under thresholds" below, which runs on every event.
       - name: Pretty coverage summary
+        if: ${{ github.event_name == 'pull_request' }}
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           file-coverage-mode: all
