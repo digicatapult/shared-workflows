@@ -362,6 +362,8 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves
+          dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
           image: ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}:${{ needs.prepare.outputs.version }}
