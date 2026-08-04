@@ -2,6 +2,10 @@ name: Generate SBOM
 on:
   workflow_call:
     inputs:
+      dtrack_is_latest:
+        required: false
+        type: boolean
+        default: true
       dtrack_project_name:
         required: false
         type: string
@@ -212,3 +216,4 @@ jobs:
           bomfilename: ${{ steps.set-filename.outputs.filename }}
           autocreate: true
           parent: ${{ secrets.DTRACK_PARENT_GUID }}
+          isLatest: ${{ inputs.dtrack_is_latest }}

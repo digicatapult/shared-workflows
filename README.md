@@ -329,6 +329,7 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 
 | Input                  | Type    | Description                                                                                                                               | Default                               | Required |
 | ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| dtrack_is_latest       | boolean | An optional flag to mark the project as the latest version within Dependency Track                                                        | `true`                                | false    |
 | dtrack_project_name    | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
 | enable_check_version   | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
 | enable_dtrack_project  | boolean | An option to enable the use of Dependency Track                                                                                           | `false`                               | false    |
