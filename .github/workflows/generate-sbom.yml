@@ -5,6 +5,7 @@ on:
       dtrack_is_latest:
         required: false
         type: boolean
+        default: true
       dtrack_project_name:
         required: false
         type: string
