@@ -744,13 +744,13 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                            | Default                                                | Required |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
-| base                     | string  | An optional branch to base the scan on                                                 | `""`                                                   | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets          | `true`                                                 | false    |
-| env_vars                 | string  | Extra variables to be passed to the environment                                        | `{}`                                                   | false    |
-| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                                     | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
-| version                  | string  | TruffleHog version to install, pinned to avoid picking up unreviewed upstream releases | `"v3.96.0"`                                            | false    |
+| Input                    | Type    | Description                                                                                 | Default                                                | Required |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| base                     | string  | An optional branch to base the scan on                                                      | `""`                                                   | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets               | `true`                                                 | false    |
+| env_vars                 | string  | Extra variables to be passed to the environment                                             | `{}`                                                   | false    |
+| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                                          | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
+| image                    | string  | TruffleHog's GHCR image (registry/repo:tag) to run, pinned to avoid latest/breaking changes | `"ghcr.io/trufflesecurity/trufflehog:3.96.0"`          | false    |
 
 #### Permissions
 
