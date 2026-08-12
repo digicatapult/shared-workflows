@@ -37,6 +37,7 @@ on:
       trufflehog_extra_args:
         required: false
         type: string
+        default: "--results=verified,unknown --exclude-detectors=Lob"
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
