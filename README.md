@@ -160,21 +160,21 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Inputs
 
-| Input            | Type    | Description                                                                                                           | Default                     | Required |
-| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------- | -------- |
-| build_args       | string  | Build arguments to pass to Docker build                                                                               | `""`                        | false    |
-| env_vars         | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                        | false    |
-| pull_dhi         | boolean | Whether to login to Docker Hardened Images registry before building                                                   | `false`                     | false    |
-| push_dockerhub   | boolean | Whether to push the built image to DockerHub                                                                          | `false`                     | false    |
-| push_ghcr        | boolean | Whether to push the built image to GHCR                                                                               | `false`                     | false    |
-| docker_platforms | string  | Specifies architectures to build the container for                                                                    | `"linux/amd64,linux/arm64"` | false    |
-| docker_file      | string  | Dockerfile to be used for building the container                                                                      | `Dockerfile`                | false    |
-| package_manager  | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                            | `"npm"`                     | false    |
-| arm64_runner     | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo       | `"ubuntu-24.04-arm"`        | false    |
-| scan_container       | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release). | `false`                     | false    |
-| trivy_image          | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                            | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false |
-| scan_fail_severity   | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity         | `CRITICAL`                  | false    |
-| scan_ignore_unfixed  | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)   | `true`                      | false    |
+| Input               | Type    | Description                                                                                                                  | Default                               | Required |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| build_args          | string  | Build arguments to pass to Docker build                                                                                      | `""`                                  | false    |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run        | `{}`                                  | false    |
+| pull_dhi            | boolean | Whether to login to Docker Hardened Images registry before building                                                          | `false`                               | false    |
+| push_dockerhub      | boolean | Whether to push the built image to DockerHub                                                                                 | `false`                               | false    |
+| push_ghcr           | boolean | Whether to push the built image to GHCR                                                                                      | `false`                               | false    |
+| docker_platforms    | string  | Specifies architectures to build the container for                                                                           | `"linux/amd64,linux/arm64"`           | false    |
+| docker_file         | string  | Dockerfile to be used for building the container                                                                             | `Dockerfile`                          | false    |
+| package_manager     | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                                   | `"npm"`                               | false    |
+| arm64_runner        | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo              | `"ubuntu-24.04-arm"`                  | false    |
+| scan_container      | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release). | `false`                               | false    |
+| trivy_image         | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                                   | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false    |
+| scan_fail_severity  | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity                | `CRITICAL`                            | false    |
+| scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)          | `true`                                | false    |
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
@@ -182,13 +182,13 @@ When `scan_container` is enabled, the `build` job exports the built `linux/amd64
 
 #### Permissions
 
-| Access                   | Jobs used             | Level | Reason                                                                    | Conditions                                 |
-| ------------------------ | ---------------------- | ----- | -------------------------------------------------------------------------- | ------------------------------------------- |
-| `contents: read`         | `prepare`               | Job   | To GET repository contents                                                | N/A                                         |
-| `contents: read`         | `build`                 | Job   | To GET repository contents                                                | N/A                                         |
-| `packages: write`        | `build`, `merge`        | Job   | To POST built packages/manifests to one or more container registries      | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
-| `security-events: write` | `merge`                 | Job   | To POST new code scanning alerts based on the SARIF report                | `inputs.push_dockerhub`/`inputs.push_ghcr`  |
-| `contents: read`         | `scan-image`            | Job   | To download the exported image artifact and scan it (no secrets required) | `inputs.scan_container`                     |
+| Access                   | Jobs used        | Level | Reason                                                                    | Conditions                                 |
+| ------------------------ | ---------------- | ----- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| `contents: read`         | `prepare`        | Job   | To GET repository contents                                                | N/A                                        |
+| `contents: read`         | `build`          | Job   | To GET repository contents                                                | N/A                                        |
+| `packages: write`        | `build`, `merge` | Job   | To POST built packages/manifests to one or more container registries      | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `security-events: write` | `merge`          | Job   | To POST new code scanning alerts based on the SARIF report                | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `contents: read`         | `scan-image`     | Job   | To download the exported image artifact and scan it (no secrets required) | `inputs.scan_container`                    |
 
 #### Secrets
 
@@ -451,7 +451,7 @@ Runs static analysis for Poetry projects (default matrix includes `pylint`, `bla
 | semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`                                                          | false    |
 | semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                                                                   | false    |
 | semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                                                                           | false    |
-| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `--results=verified,unknown`                                                      | false    |
+| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown --exclude-detectors=Lob"`                            | false    |
 
 #### Permissions
 
@@ -468,7 +468,7 @@ Runs static analysis for Poetry projects (default matrix includes `pylint`, `bla
 This GitHub Actions workflow runs a configurable matrix of static checks on a Poetry project, optionally accompanied by secret and vulnerability scanning.
 
 1. **Static Checks**: For each command in `matrix_commands`, sets up Python, installs Poetry and the project dependencies, then runs the command via `poetry run` in a dedicated matrix job (`fail-fast: false`).
-2. **Secrets Scanning (Optional)**: When `enable_trufflehog_action` is `true`, runs TruffleHog against the branch for both verified and unverified secrets.
+2. **Secrets Scanning (Optional)**: When `enable_trufflehog_action` is `true`, calls the [Scan Secrets](#scan-secrets-examples) reusable workflow, running TruffleHog against the branch for both verified and unverified secrets.
 3. **Vulnerability Scanning (Optional)**: When `enable_semgrep_action` is `true` (and the actor is not `dependabot[bot]`), runs Semgrep CE and uploads the results either as a SARIF report to GitHub Advanced Security or as an artefact, depending on `semgrep_upload_type`.
 
 ### [Poetry Tests](.github/workflows/tests-poetry.yml) ([examples](examples/tests-poetry.md))
@@ -552,17 +552,17 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                                                                               | Default                         | Required |
-| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | -------- |
-| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                          | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | `false`                         | false    |
-| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                            | false    |
-| node_version             | string  | The node version to use                                                                                                                   | `24.x`                          | false    |
-| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint", "depcheck", "check"]` | false    |
-| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`        | false    |
-| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                 | false    |
-| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                         | false    |
-| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown"`  | false    |
+| Input                    | Type    | Description                                                                                                                               | Default                                                | Required |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                                                 | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | `false`                                                | false    |
+| env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                   | false    |
+| node_version             | string  | The node version to use                                                                                                                   | `24.x`                                                 | false    |
+| matrix_commands          | string  | A JSON array of commands to run in the static checks matrix, each representing an NPM script defined in the package                       | `["lint", "depcheck", "check"]`                        | false    |
+| semgrep_extra_args       | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'`                               | false    |
+| semgrep_sarif_path       | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`                                        | false    |
+| semgrep_upload_type      | string  | Upload format for Semgrep results; `sarif` uses the CodeQL SARIF upload action, `artefact` uses vanilla artefact upload, and `none` skips | `sarif`                                                | false    |
+| trufflehog_extra_args    | string  | Extra arguments to be passed to the TruffleHog CLI                                                                                        | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
 
 #### Permissions
 
@@ -583,7 +583,7 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 3. **Node Modules Caching**: Caches `node_modules` based on the `package-lock.json` hash to speed up dependency installation.
 4. **Install Packages**: Installs the necessary dependencies.
 5. **Run Static Checks**: Executes each specified command in the matrix (`lint`, `depcheck`, `check` or others as configured) as defined in the NPM scripts.
-6. **Secrets Scanning**: Run TruffleHog against the calling branch for both verified and unverified secrets.
+6. **Secrets Scanning**: Calls the [Scan Secrets](#scan-secrets-examples) reusable workflow, running TruffleHog against the calling branch for both verified and unverified secrets.
 7. **Vulnerability Scanning**: Run Semgrep CE to identify security vulnerabilities and upload the results in SARIF format to GitHub.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
@@ -694,17 +694,17 @@ Works on both `pull_request` and `push` callers. On `pull_request` the base and 
 
 #### Inputs
 
-| Input                 | Type   | Description                                                                                                | Default              | Required |
-| --------------------- | ------ | --------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
-| node_version          | string | The node version to use                                                                                   | `24.x`               | false    |
-| migrations_dir        | string | Path to the knex migrations directory, used by the file lint job                                          | `db/migrations`      | false    |
-| migrate_command       | string | Command that applies all outstanding migrations                                                           | `npm run db:migrate` | false    |
-| rollback_command      | string | Command that rolls back the most recent migration batch                                                   | `npm run db:rollback`| false    |
-| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                       | `""`                 | false    |
-| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                     | `docker-compose.yml` | false    |
-| postgres_service      | string | Name of the postgres service within the compose file                                                     | `postgres`           | false    |
-| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service     | `""`                 | false    |
-| db_name               | string | Database to create when using the `postgres_image` fallback                                               | `postgres`           | false    |
+| Input                 | Type   | Description                                                                                           | Default               | Required |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | --------------------- | -------- |
+| node_version          | string | The node version to use                                                                               | `24.x`                | false    |
+| migrations_dir        | string | Path to the knex migrations directory, used by the file lint job                                      | `db/migrations`       | false    |
+| migrate_command       | string | Command that applies all outstanding migrations                                                       | `npm run db:migrate`  | false    |
+| rollback_command      | string | Command that rolls back the most recent migration batch                                               | `npm run db:rollback` | false    |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                  | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`  | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                  | `postgres`            | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                  | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`            | false    |
 
 #### Permissions
 
@@ -720,17 +720,17 @@ Works on both `pull_request` and `push` callers, the same way as the NPM variant
 
 #### Inputs
 
-| Input                 | Type   | Description                                                                                            | Default                          | Required |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | -------------------------------- | -------- |
-| python_version        | string | The python version to use                                                                             | `3.14`                           | false    |
-| versions_dir          | string | Path to the alembic versions directory, used by the file lint job                                     | `alembic/versions`               | false    |
-| migrate_command       | string | Command that applies all outstanding revisions                                                        | `poetry run alembic upgrade head`| false    |
-| rollback_command      | string | Command that downgrades to the base (empty) revision                                                  | `poetry run alembic downgrade base`| false  |
-| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                             | false    |
-| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`             | false    |
-| postgres_service      | string | Name of the postgres service within the compose file                                                 | `postgres`                       | false    |
-| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                             | false    |
-| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`                       | false    |
+| Input                 | Type   | Description                                                                                           | Default                             | Required |
+| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| python_version        | string | The python version to use                                                                             | `3.14`                              | false    |
+| versions_dir          | string | Path to the alembic versions directory, used by the file lint job                                     | `alembic/versions`                  | false    |
+| migrate_command       | string | Command that applies all outstanding revisions                                                        | `poetry run alembic upgrade head`   | false    |
+| rollback_command      | string | Command that downgrades to the base (empty) revision                                                  | `poetry run alembic downgrade base` | false    |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                                | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`                | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                  | `postgres`                          | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                                | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`                          | false    |
 
 #### Permissions
 
@@ -744,12 +744,13 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                   | Default                        | Required |
-| ------------------------ | ------- | ----------------------------------------------------------------------------- | ------------------------------ | -------- |
-| base                     | string  | An optional branch to base the scan on                                        | `""`                           | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets | `true`                         | false    |
-| env_vars                 | string  | Extra variables to be passed to the environment                               | `{}`                           | false    |
-| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                            | `"--results=verified,unknown"` | false    |
+| Input                    | Type    | Description                                                                                 | Default                                                | Required |
+| ------------------------ | ------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| base                     | string  | An optional branch to base the scan on                                                      | `""`                                                   | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets               | `true`                                                 | false    |
+| env_vars                 | string  | Extra variables to be passed to the environment                                             | `{}`                                                   | false    |
+| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                                          | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
+| image                    | string  | TruffleHog's GHCR image (registry/repo:tag) to run, pinned to avoid latest/breaking changes | `"ghcr.io/trufflesecurity/trufflehog:3.96.0"`          | false    |
 
 #### Permissions
 

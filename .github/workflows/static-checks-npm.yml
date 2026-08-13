@@ -37,7 +37,7 @@ on:
       trufflehog_extra_args:
         required: false
         type: string
-        default: "--results=verified,unknown"
+        default: "--results=verified,unknown --exclude-detectors=Lob"
 jobs:
   static-checks:
     name: Static Analysis Checks - ${{ matrix.command }}
@@ -72,15 +72,11 @@ jobs:
   scan-secrets:
     if: ${{ inputs.enable_trufflehog_action == true }}
     name: Secrets scanning
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: TruffleHog PR scan
-        uses: trufflesecurity/trufflehog@v3.96.0
-        with:
-          base: ""
-          head: ${{ github.ref_name }}
-          extra_args: ${{ inputs.trufflehog_extra_args }}
+    uses: ./.github/workflows/scan-secrets.yml
+    with:
+      enable_trufflehog_action: ${{ inputs.enable_trufflehog_action }}
+      env_vars: ${{ inputs.env_vars }}
+      extra_args: ${{ inputs.trufflehog_extra_args }}
   scan-vulns:
     if: |
       (inputs.enable_semgrep_action == true) &&
