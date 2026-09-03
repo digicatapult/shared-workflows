@@ -60,6 +60,11 @@ on:
         type: boolean
         default: true
         description: "When gating, ignore vulnerabilities that have no fix available so the gate stays actionable. Does not affect the report, which always lists fixed and unfixed."
+      scan_ignore_cves:
+        required: false
+        type: string
+        default: ""
+        description: "Comma-separated CVE IDs (matched against VulnerabilityID) to exclude from the gate, e.g. for known vulnerabilities with no consumable upstream fix yet. Per-caller, so each repo accepts its own risk. Does not affect the report, which always lists every vulnerability regardless of this input."
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -429,16 +434,19 @@ jobs:
         env:
           FAIL_SEVERITY: ${{ inputs.scan_fail_severity }}
           IGNORE_UNFIXED: ${{ inputs.scan_ignore_unfixed }}
+          IGNORE_CVES: ${{ inputs.scan_ignore_cves }}
           REPORT: ${{ runner.temp }}/scan/trivy-report.json
         run: |
           set -euo pipefail
-          count=$(jq --arg sevs "${FAIL_SEVERITY}" --arg iu "${IGNORE_UNFIXED}" '
+          count=$(jq --arg sevs "${FAIL_SEVERITY}" --arg iu "${IGNORE_UNFIXED}" --arg ignore "${IGNORE_CVES}" '
             ($sevs | split(",")) as $s
+            | ( $ignore | split(",") | map(gsub("^\\s+|\\s+$";"")) | map(select(length > 0)) ) as $ignored
             | [ .Results[]?.Vulnerabilities // [] | .[]
                 | select( .Severity as $v | $s | index($v) )
-                | select( ($iu != "true") or ((.FixedVersion // "") != "") ) ]
+                | select( ($iu != "true") or ((.FixedVersion // "") != "") )
+                | select( .VulnerabilityID as $id | ($ignored | index($id)) == null ) ]
             | length' "${REPORT}")
-          echo "Gating vulnerabilities (${FAIL_SEVERITY}, ignore_unfixed=${IGNORE_UNFIXED}): ${count}"
+          echo "Gating vulnerabilities (${FAIL_SEVERITY}, ignore_unfixed=${IGNORE_UNFIXED}, ignore_cves=${IGNORE_CVES:-none}): ${count}"
           if [ "${count}" -gt 0 ]; then
             echo "::error::${count} vulnerabilit(y/ies) at ${FAIL_SEVERITY} with a fix available. See the trivy-container-report artifact."
             exit 1
