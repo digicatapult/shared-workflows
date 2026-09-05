@@ -4,12 +4,21 @@ Shared github workflows created by the `digicatapult` organisation.
 
 ## Contents
 
-**Version synchronisation**
+**Version synchronisation** (bump on the pull request branch)
 
 - [Synchronise PR Version](#synchronise-pr-version-examples)
 - [Synchronise PR Version (Poetry)](#synchronise-pr-version-poetry-examples)
 - [Synchronise all PR versions](#synchronise-all-pr-versions-examples)
 - [Synchronise all PR versions (Poetry)](#synchronise-all-pr-versions-poetry-examples)
+
+**Merge queue versioning** (bump on trunk after merge)
+
+- [Require Version Label](#require-version-label-examples)
+- [Apply Version](#apply-version-examples)
+- [Apply Version (Poetry)](#apply-version-poetry-examples)
+
+> These two groups are alternatives, not companions. A repository uses one or
+> the other. See [Choosing a versioning model](#choosing-a-versioning-model).
 
 **Build & release**
 
@@ -36,6 +45,41 @@ Shared github workflows created by the `digicatapult` organisation.
 - [Scan Secrets](#scan-secrets-examples)
 - [Scan Vulnerabilities](#scan-vulnerabilities-examples)
 - [ZAP Scan](#zap-scan-examples)
+
+## Choosing a versioning model
+
+Two versioning models are supported. Both are maintained; pick one per repository and use its workflows exclusively, because running both would apply two bumps for a single change and both would compete over the same `v:` labels.
+
+**Version synchronisation** is the default and is unchanged. Applying a `v:patch`, `v:minor` or `v:major` label makes the bot commit the resulting version onto the pull request branch, and `check-version` gates the release on that version being higher than the last release. It suits repositories that merge to trunk one pull request at a time.
+
+**Merge queue versioning** suits repositories using a GitHub merge queue. The pull request carries only the label, stating the intent to bump, and the number is computed and committed on trunk after merge. Nothing is written to the pull request branch.
+
+The distinction matters because a version written onto a branch is an absolute number. Two approved pull requests both compute the same next version, so the second one to reach the queue fails `check-version` and is evicted. Recovering it means bumping again, which dismisses its approval and removes it from the queue, which is the loop a merge queue is supposed to remove. Deferring the number to merge time makes the gate order independent, so any number of approved pull requests can flow through the queue together.
+
+| | Version synchronisation | Merge queue versioning |
+| --- | --- | --- |
+| PR gate | `check-version` (version is higher than last release) | [Require Version Label](#require-version-label-examples) (exactly one `v:` label) |
+| Where the number is written | The pull request branch, before merge | Trunk, after merge |
+| Bump workflows | [Synchronise PR Version](#synchronise-pr-version-examples), [Synchronise all PR versions](#synchronise-all-pr-versions-examples) | [Apply Version](#apply-version-examples) |
+| Concurrent approved PRs | Serialised, each re-bump dismisses approval | Flow through the queue together |
+| GitHub App | Pushes to the pull request branch | Pushes to trunk, so it needs a ruleset bypass there |
+
+Adopting the merge queue model also means callers must add a `merge_group` trigger to whichever workflow provides their required checks. A required check that never reports on the queue's branch leaves the queue waiting indefinitely.
+
+### Merge queue compatibility
+
+The `merge_group` event is neither a pull request nor a push, and the queue's branch (`gh-readonly-queue/<base>/pr-<n>-<sha>`) is ephemeral and deleted the moment the entry merges. Several workflows here needed adjusting for that. The behaviour is listed once here rather than repeated in each file.
+
+| Workflow | Behaviour on `merge_group` | Why |
+| --- | --- | --- |
+| `migration-checks-npm` / `migration-checks-poetry` | Resolves base and head from `github.event.merge_group` | The payload has neither `pull_request` nor `before`. Without this the base sha resolves empty and the immutability lint, the ordering lint and seeded-upgrade all silently no-op for every queued pull request. |
+| `tests-npm` / `tests-poetry` | Job name uses `current` / `main`, never the branch | Interpolating the branch puts the ephemeral queue ref into the check name, making it unique per pull request and per merge attempt. Such a name can never be listed as a required status check, so the queue would wait forever. |
+| `tests-npm` | Coverage summary comment is skipped | There is no pull request to comment on. Thresholds are still enforced. |
+| `static-checks-npm` / `static-checks-poetry` | GHAS SARIF upload is skipped | The queue deletes its ref before code scanning can attach the analysis, so the upload fails with "ref not found in this repository". The scan itself still runs, and the same commit is uploaded from its pull request run and again on push to trunk. |
+| `require-version-label` | Performs no check, but still runs | The label was validated when the pull request was queued. The job runs rather than being skipped so the required check reports a result. |
+| `build-docker` | Builds without pushing. Callers must set `fail_on_same_version: false` | Its `check-version` defaults to failing when the version matches the latest release, which a queue branch always does since it carries no bump. `require-version-label` is the gate instead. Leave the default on `release.yml`, which runs on the bumped commit. |
+
+`release-github` is unaffected by `merge_group` since it runs on push, but its release notes are resolved from the commits since the previous release tag rather than from the most recently merged pull request, so a batched queue merge credits every pull request it contained.
 
 ## Workflows
 
@@ -153,6 +197,103 @@ This workflow also requires two secrets in order to run:
 | --------- | ------------------------------------------------------------- |
 | `bot-id`  | Id of the `Github App` to use when committing version updates |
 | `bot-key` | Private Key for the `Github App`                              |
+
+### [Require Version Label](.github/workflows/require-version-label.yml) ([examples](examples/require-version-label.md))
+
+The pull request version gate for repositories on a merge queue. Asserts that the pull request carries exactly one of `v:major`, `v:minor` or `v:patch`, failing with an actionable message when there is none or more than one. It replaces `check-version` as the pull request gate under [Merge queue versioning](#choosing-a-versioning-model): the label declares the intent to bump, and the number itself is applied after merge by [Apply Version](#apply-version-examples).
+
+Labels are read from the event payload rather than the API, so no token and no permissions are needed.
+
+#### Inputs
+
+| Name             | Required | Type   | Default                               | Description                                                                     |
+| ---------------- | -------- | ------ | ------------------------------------- | ------------------------------------------------------------------------------- |
+| `version_labels` | No       | string | `'["v:major", "v:minor", "v:patch"]'` | JSON array of accepted labels. Exactly one must be present on the pull request. |
+
+#### Permissions
+
+None. Callers can pass `permissions: {}`.
+
+#### Workflow Description
+
+On a `pull_request` event the workflow compares the pull request's labels against `version_labels` and fails unless exactly one matches. On a `merge_group` event it performs no check and succeeds: the label was already validated when the pull request was queued, and the queue is merging that same pull request. The job still runs on `merge_group` rather than being skipped, so that the required check reports a result against the queue's branch. A required check that never reports leaves the merge queue waiting indefinitely.
+
+Callers should give this workflow its own file triggered on the `labeled` and `unlabeled` pull request types as well as `merge_group`, so that adding a label re-evaluates the gate without re-running the repository's whole test suite.
+
+### [Apply Version](.github/workflows/apply-version-npm.yml) ([examples](examples/apply-version.md))
+
+Computes and commits the release version on trunk after a pull request has merged, for repositories using [Merge queue versioning](#choosing-a-versioning-model). It reads the version labels of every pull request contained in the push, takes the strongest one, increments trunk's `package.json` by that amount, and pushes a version commit back to trunk.
+
+The increment arithmetic is identical to [Synchronise PR Version](#synchronise-pr-version-examples). The difference is where it runs: on trunk after merge rather than on the pull request branch before it, which is what stops two approved pull requests computing the same number.
+
+#### Inputs
+
+| Name                    | Required | Type   | Default           | Description                                                       |
+| ----------------------- | -------- | ------ | ----------------- | ----------------------------------------------------------------- |
+| `trunk-branch`          | No       | string | `main`            | Branch the version commit is pushed to.                           |
+| `release-commit-prefix` | No       | string | `chore(release):` | Prefix of the version commit. Must match the caller's loop guard. |
+
+#### Outputs
+
+| Output    | Type    | Description                                                       |
+| --------- | ------- | ----------------------------------------------------------------- |
+| `bumped`  | boolean | `true` when a version commit was pushed.                          |
+| `version` | string  | Version written to `package.json`, empty when nothing was bumped. |
+
+#### Permissions
+
+None. The workflow authenticates entirely with the GitHub App token, so callers can pass `permissions: {}`.
+
+#### Secrets
+
+| Name      | Required | Description             |
+| --------- | -------- | ----------------------- |
+| `bot-id`  | Yes      | GitHub App ID.          |
+| `bot-key` | Yes      | GitHub App private key. |
+
+#### Workflow Description
+
+A merge queue can land several pull requests in a single push, so the workflow inspects every commit in the push rather than only the head commit, collecting the version labels of all associated pull requests and applying the strongest (major, then minor, then patch). A push containing no labelled pull request produces no bump and therefore no release.
+
+The version commit is pushed with a GitHub App token rather than `GITHUB_TOKEN`. This is deliberate. `build-docker`, `generate-sbom` and `release-github` all read the version out of the checked out tree, so the commit that gets built and released must be the commit carrying the new version. Pushes made with `GITHUB_TOKEN` do not trigger workflows, so the version commit would never be built and `check-version` would report `is_new_version=false`. Using the App token means a merge produces two runs on trunk: the first applies the version, and the second, triggered by the version commit, releases it.
+
+The `release-commit-prefix` is what keeps those two runs from triggering each other indefinitely. The caller guards its own invocation with `if: ${{ !startsWith(github.event.head_commit.message, '<prefix>') }}` and guards its release jobs with the inverse. The workflow repeats the check internally as a safety net.
+
+This is the same GitHub App the `synchronise-*-version` workflows already use, so adopting repositories need no new app and no new secrets. The App does need to be added to the bypass list of the ruleset protecting trunk, because it now pushes there rather than to a feature branch.
+
+### [Apply Version (Poetry)](.github/workflows/apply-version-poetry.yml) ([examples](examples/apply-version-poetry.md))
+
+The Poetry counterpart of [Apply Version](#apply-version-examples). Behaviour is identical, reading and writing the version in `pyproject.toml` with `poetry version` instead of `package.json` with `npm version`. The version is read from `[tool.poetry]` and falls back to `[project]`, matching [Synchronise PR Version (Poetry)](#synchronise-pr-version-poetry-examples).
+
+#### Inputs
+
+| Name                    | Required | Type   | Default           | Description                                                       |
+| ----------------------- | -------- | ------ | ----------------- | ----------------------------------------------------------------- |
+| `trunk-branch`          | No       | string | `main`            | Branch the version commit is pushed to.                           |
+| `python-version`        | No       | string | `3.14`            | Python version used to read `pyproject.toml` and run Poetry.      |
+| `release-commit-prefix` | No       | string | `chore(release):` | Prefix of the version commit. Must match the caller's loop guard. |
+
+#### Outputs
+
+| Output    | Type    | Description                                                        |
+| --------- | ------- | ------------------------------------------------------------------ |
+| `bumped`  | boolean | `true` when a version commit was pushed.                           |
+| `version` | string  | Version written to `pyproject.toml`, empty when nothing was bumped. |
+
+#### Permissions
+
+None. Callers can pass `permissions: {}`.
+
+#### Secrets
+
+| Name      | Required | Description             |
+| --------- | -------- | ----------------------- |
+| `bot-id`  | Yes      | GitHub App ID.          |
+| `bot-key` | Yes      | GitHub App private key. |
+
+#### Workflow Description
+
+See [Apply Version](#apply-version-examples). The token model, the two-run release sequence and the commit prefix guard are the same.
 
 ### [Build Docker](.github/workflows/build-docker.yml) ([examples](examples/build-docker.md))
 

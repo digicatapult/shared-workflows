@@ -83,7 +83,9 @@ jobs:
         run: echo "prefix=$(uuidgen)" >> $GITHUB_OUTPUT
 
   tests:
-    name: Run tests - ${{ matrix.test_path }} - ${{ matrix.branch }}
+    # Not matrix.branch: that would put the ephemeral gh-readonly-queue/... ref
+    # into the check name, which can never be a required status check.
+    name: Run tests - ${{ matrix.test_path }} - ${{ matrix.branch == 'main' && 'main' || 'current' }}
     needs: setup
     strategy:
       fail-fast: false
