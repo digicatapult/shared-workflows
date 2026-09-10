@@ -62,7 +62,8 @@ jobs:
         uses: actions/download-artifact@v8
         if: inputs.get_sbom
         with:
-          name: ${{ github.event.repository.name }}.cdx.json
+          pattern: '*.cdx.json'
+          merge-multiple: true
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v3
         with:

@@ -30,6 +30,10 @@ on:
         required: false
         type: string
         default: Dockerfile
+      image_name:
+        required: false
+        type: string
+        default: ''
       package_manager:
         required: false
         type: string
@@ -77,6 +81,7 @@ jobs:
     outputs:
       repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
       org_name: ${{ steps.repo_ids.outputs.ORG_NAME }}
+      resolved_image_name: ${{ steps.resolve-image-name.outputs.resolved_image_name }}
       version: ${{ steps.get_version.outputs.VERSION }}
       build_date: ${{ steps.get_version.outputs.BUILD_DATE }}
       image_names: ${{ steps.image-names.outputs.names }}
@@ -102,6 +107,15 @@ jobs:
           ORG_NAME=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "REPO_NAME=$REPO_NAME" >> $GITHUB_OUTPUT
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
+      - name: Resolve and validate image name
+        id: resolve-image-name
+        run: |
+          IMAGE_NAME="${{ inputs.image_name || steps.repo_ids.outputs.REPO_NAME }}"
+          if [[ ! "$IMAGE_NAME" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+            echo "Invalid Docker image name: $IMAGE_NAME" >&2
+            exit 1
+          fi
+          echo "resolved_image_name=$IMAGE_NAME" >> "$GITHUB_OUTPUT"
       - id: get_version
         uses: digicatapult/check-version@v1
         with:
@@ -112,10 +126,10 @@ jobs:
         run: |
           NAMES=""
           if [ "${{ inputs.push_ghcr }}" = "true" ]; then
-            NAMES="ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}"
+            NAMES="ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}"
           fi
           if [ "${{ inputs.push_dockerhub }}" = "true" ]; then
-            NAMES="${NAMES:+$NAMES,}${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}"
+            NAMES="${NAMES:+$NAMES,}${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}"
           fi
           echo "names=$NAMES" >> $GITHUB_OUTPUT
       - name: Generate tags
@@ -132,15 +146,15 @@ jobs:
           echo "DOCKERHUB_LATEST_TAG=" >> $GITHUB_OUTPUT
           if [ "$IS_NEW_VERSION" == "true" ]; then
             if [ "${{ inputs.push_ghcr }}" == "true" ]; then
-              echo "GHCR_VERSION_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:$VERSION" >> $GITHUB_OUTPUT
+              echo "GHCR_VERSION_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}:$VERSION" >> $GITHUB_OUTPUT
               if [ "$IS_PRERELEASE" == "false" ]; then
-                echo "GHCR_LATEST_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:latest" >> $GITHUB_OUTPUT
+                echo "GHCR_LATEST_TAG=ghcr.io/${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}:latest" >> $GITHUB_OUTPUT
               fi
             fi
             if [ "${{ inputs.push_dockerhub }}" == "true" ]; then
-              echo "DOCKERHUB_VERSION_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:$VERSION" >> $GITHUB_OUTPUT
+              echo "DOCKERHUB_VERSION_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}:$VERSION" >> $GITHUB_OUTPUT
               if [ "$IS_PRERELEASE" == "false" ]; then
-                echo "DOCKERHUB_LATEST_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.repo_ids.outputs.REPO_NAME }}:latest" >> $GITHUB_OUTPUT
+                echo "DOCKERHUB_LATEST_TAG=${{ steps.repo_ids.outputs.ORG_NAME }}/${{ steps.resolve-image-name.outputs.resolved_image_name }}:latest" >> $GITHUB_OUTPUT
               fi
             fi
           fi
@@ -225,7 +239,7 @@ jobs:
           sbom: true
           outputs: type=image,"name=${{ needs.prepare.outputs.image_names }}",push-by-digest=true,name-canonical=true,push=true
           labels: |
-            org.opencontainers.image.title=${{ needs.prepare.outputs.repo_name }}
+            org.opencontainers.image.title=${{ needs.prepare.outputs.resolved_image_name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.source=${{ github.event.repository.html_url }}
             org.opencontainers.image.url=${{ github.event.repository.html_url }}
@@ -242,7 +256,7 @@ jobs:
         if: ${{ inputs.push_ghcr == true || inputs.push_dockerhub == true }}
         uses: actions/upload-artifact@v7
         with:
-          name: digests-${{ matrix.slug }}
+          name: ${{ needs.prepare.outputs.resolved_image_name }}-digests-${{ matrix.slug }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -289,7 +303,7 @@ jobs:
         if: ${{ inputs.scan_container && matrix.platform == 'linux/amd64' }}
         uses: actions/upload-artifact@v7
         with:
-          name: scan-image
+          name: ${{ needs.prepare.outputs.resolved_image_name }}-scan-image
           path: ${{ runner.temp }}/scan-image.tar
           retention-days: 1
           if-no-files-found: error
@@ -312,7 +326,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
-          pattern: digests-*
+          pattern: ${{ needs.prepare.outputs.resolved_image_name }}-digests-*
           merge-multiple: true
       - name: Login to GitHub Container Registry
         if: ${{ inputs.push_ghcr == true }}
@@ -334,7 +348,7 @@ jobs:
         if: ${{ inputs.push_ghcr == true }}
         working-directory: /tmp/digests
         run: |
-          IMAGE="ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}"
+          IMAGE="ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.resolved_image_name }}"
           TAGS="-t $IMAGE:${{ github.sha }}"
           [ -n "${{ needs.prepare.outputs.ghcr_version_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.ghcr_version_tag }}"
           [ -n "${{ needs.prepare.outputs.ghcr_latest_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.ghcr_latest_tag }}"
@@ -344,7 +358,7 @@ jobs:
         if: ${{ inputs.push_dockerhub == true }}
         working-directory: /tmp/digests
         run: |
-          IMAGE="${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}"
+          IMAGE="${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.resolved_image_name }}"
           TAGS="-t $IMAGE:${{ github.sha }}"
           [ -n "${{ needs.prepare.outputs.dockerhub_version_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.dockerhub_version_tag }}"
           [ -n "${{ needs.prepare.outputs.dockerhub_latest_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.dockerhub_latest_tag }}"
@@ -357,7 +371,7 @@ jobs:
           command: cves
           dockerhub-user: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
-          image: registry://${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}:${{ needs.prepare.outputs.version }}
+          image: registry://${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.resolved_image_name }}:${{ needs.prepare.outputs.version }}
           organization: ${{ needs.prepare.outputs.org_name }}
           exit-code: false
           sarif-file: scout.sarif
@@ -371,7 +385,7 @@ jobs:
           dockerhub-password: ${{ secrets.DOCKERHUB_TOKEN }}
           registry-user: ${{ github.repository_owner }}
           registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image: ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.repo_name }}:${{ needs.prepare.outputs.version }}
+          image: ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.resolved_image_name }}:${{ needs.prepare.outputs.version }}
           organization: ${{ needs.prepare.outputs.org_name }}
           exit-code: false
           sarif-file: scout.sarif
@@ -392,7 +406,7 @@ jobs:
   # and the job fails on scan_fail_severity.
   scan-image:
     name: Scan image for CVEs
-    needs: build
+    needs: [prepare, build]
     if: ${{ inputs.scan_container }}
     runs-on: ubuntu-latest
     permissions:
@@ -401,7 +415,7 @@ jobs:
       - name: Download amd64 image
         uses: actions/download-artifact@v8
         with:
-          name: scan-image
+          name: ${{ needs.prepare.outputs.resolved_image_name }}-scan-image
           path: ${{ runner.temp }}/scan
       # One comprehensive scan: every severity, fixed and unfixed. The JSON is
       # the report artifact and the full table is printed to the log; the gate
@@ -426,7 +440,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: trivy-container-report
+          name: ${{ needs.prepare.outputs.resolved_image_name }}-trivy-container-report
           path: ${{ runner.temp }}/scan/trivy-report.json
           if-no-files-found: warn
           retention-days: 30
