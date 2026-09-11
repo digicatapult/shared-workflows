@@ -109,9 +109,12 @@ jobs:
           echo "ORG_NAME=$ORG_NAME" >> $GITHUB_OUTPUT
       - name: Resolve and validate image name
         id: resolve-image-name
+        env:
+          IMAGE_NAME_INPUT: ${{ inputs.image_name }}
+          REPO_NAME: ${{ steps.repo_ids.outputs.REPO_NAME }}
         run: |
-          IMAGE_NAME="${{ inputs.image_name || steps.repo_ids.outputs.REPO_NAME }}"
-          if [[ ! "$IMAGE_NAME" =~ ^[a-z0-9][a-z0-9._-]*$ ]]; then
+          IMAGE_NAME="${IMAGE_NAME_INPUT:-$REPO_NAME}"
+          if [[ ! "$IMAGE_NAME" =~ ^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*$ ]]; then
             echo "Invalid Docker image name: $IMAGE_NAME" >&2
             exit 1
           fi
@@ -394,7 +397,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v4
         if: ${{ !github.event.repository.private && (inputs.push_dockerhub == true || inputs.push_ghcr == true) }}
         with:
-          category: scout
+          category: ${{ inputs.image_name == '' && 'scout' || format('scout-{0}', needs.prepare.outputs.resolved_image_name) }}
           sarif_file: scout.sarif
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -462,7 +465,7 @@ jobs:
             | length' "${REPORT}")
           echo "Gating vulnerabilities (${FAIL_SEVERITY}, ignore_unfixed=${IGNORE_UNFIXED}, ignore_cves=${IGNORE_CVES:-none}): ${count}"
           if [ "${count}" -gt 0 ]; then
-            echo "::error::${count} vulnerabilit(y/ies) at ${FAIL_SEVERITY} with a fix available. See the trivy-container-report artifact."
+            echo "::error::${count} vulnerabilit(y/ies) at ${FAIL_SEVERITY} with a fix available. See the ${{ needs.prepare.outputs.resolved_image_name }}-trivy-container-report artifact."
             exit 1
           fi
           echo "No gating vulnerabilities found."

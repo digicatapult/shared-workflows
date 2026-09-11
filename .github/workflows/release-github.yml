@@ -74,6 +74,7 @@ jobs:
           make_latest: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          fail_on_unmatched_files: ${{ inputs.get_sbom }}
           files: |
             **/*.cdx.json
       - name: Update latest tag

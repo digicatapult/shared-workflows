@@ -169,7 +169,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | push_ghcr           | boolean | Whether to push the built image to GHCR                                                                                      | `false`                               | false    |
 | docker_platforms    | string  | Specifies architectures to build the container for                                                                           | `"linux/amd64,linux/arm64"`           | false    |
 | docker_file         | string  | Dockerfile to be used for building the container                                                                             | `Dockerfile`                          | false    |
-| image_name          | string  | Image repository name without registry or organisation; empty uses the repository name                                      | `''`                                  | false    |
+| image_name          | string  | Image repository name without registry or organisation; empty uses the repository name                                       | `''`                                  | false    |
 | package_manager     | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                                   | `"npm"`                               | false    |
 | arm64_runner        | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo              | `"ubuntu-24.04-arm"`                  | false    |
 | scan_container      | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release). | `false`                               | false    |
@@ -180,9 +180,9 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
-For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build. See the [two-image example](examples/build-docker.md#two-images).
+For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build.
 
-When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only — there is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before.
+When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only — there is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before.
 
 #### Permissions
 
@@ -407,13 +407,13 @@ Runs an [OpenSSF Scorecard](https://github.com/ossf/scorecard) analysis against 
 
 #### Permissions
 
-| Access                    | Jobs used  | Level    | Reason                                                                                                                | Conditions                   |
-| ------------------------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------| ---------------------------- |
-| `security-events: write`  | `analysis` | Workflow | To POST new code scanning alerts based on the SARIF report                                                            | N/A                          |
-| `id-token: write`         | `analysis` | Workflow | Required by `ossf/scorecard-action` to publish results/OIDC flows                                                     | N/A                          |
-| `contents: read`          | `analysis` | Workflow | To check out the callee repository, and required by checks such as Branch-Protection, Code-Review and Signed-Releases | Required for private callers |
-| `actions: read`           | `analysis` | Workflow | Required by Scorecard checks such as Token-Permissions to inspect workflow configuration                              | Required for private callers |
-| `pull-requests: read`     | `analysis` | Workflow | Required by Scorecard checks such as Code-Review to evaluate pull request review history                              | Required for private callers |
+| Access                   | Jobs used  | Level    | Reason                                                                                                                | Conditions                   |
+| ------------------------ | ---------- | -------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `security-events: write` | `analysis` | Workflow | To POST new code scanning alerts based on the SARIF report                                                            | N/A                          |
+| `id-token: write`        | `analysis` | Workflow | Required by `ossf/scorecard-action` to publish results/OIDC flows                                                     | N/A                          |
+| `contents: read`         | `analysis` | Workflow | To check out the callee repository, and required by checks such as Branch-Protection, Code-Review and Signed-Releases | Required for private callers |
+| `actions: read`          | `analysis` | Workflow | Required by Scorecard checks such as Token-Permissions to inspect workflow configuration                              | Required for private callers |
+| `pull-requests: read`    | `analysis` | Workflow | Required by Scorecard checks such as Code-Review to evaluate pull request review history                              | Required for private callers |
 
 #### Workflow Description
 
@@ -712,8 +712,8 @@ Works on both `pull_request` and `push` callers. On `pull_request` the base and 
 
 #### Permissions
 
-| Access           | Jobs used                                             | Level    | Reason                                                             | Conditions |
-| ---------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------ | ---------- |
+| Access           | Jobs used                                                | Level    | Reason                                                            | Conditions |
+| ---------------- | -------------------------------------------------------- | -------- | ----------------------------------------------------------------- | ---------- |
 | `contents: read` | `lint-migrations`, `migrate-roundtrip`, `seeded-upgrade` | Workflow | To GET repository contents and check out the base ref and PR head | N/A        |
 
 ### [Poetry Migration Checks](.github/workflows/migration-checks-poetry.yml) ([examples](examples/migration-checks-poetry.md))
@@ -738,8 +738,8 @@ Works on both `pull_request` and `push` callers, the same way as the NPM variant
 
 #### Permissions
 
-| Access           | Jobs used                                             | Level    | Reason                                                             | Conditions |
-| ---------------- | ----------------------------------------------------- | -------- | ------------------------------------------------------------------ | ---------- |
+| Access           | Jobs used                                                | Level    | Reason                                                            | Conditions |
+| ---------------- | -------------------------------------------------------- | -------- | ----------------------------------------------------------------- | ---------- |
 | `contents: read` | `lint-migrations`, `migrate-roundtrip`, `seeded-upgrade` | Workflow | To GET repository contents and check out the base ref and PR head | N/A        |
 
 ### [Scan Secrets](.github/workflows/scan-secrets.yml) ([examples](examples/scan-secrets.md))
