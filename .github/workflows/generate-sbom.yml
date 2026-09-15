@@ -208,12 +208,12 @@ jobs:
           inputs.enable_dtrack_project &&
           steps.check_dtrack_project_status.outputs.dtrack_parent_guid_set == 'YES'
         with:
-          serverhostname: ${{ secrets.DTRACK_HOSTNAME }}
-          apikey: ${{ secrets.DTRACK_APIKEY }}
-          projectname: ${{ inputs.dtrack_project_name }}
-          projectversion: ${{ steps.get-version.outputs.version }}
-          projecttags: ${{ steps.get-version.outputs.version }}
-          bomfilename: ${{ steps.set-filename.outputs.filename }}
-          autocreate: true
+          server-hostname: ${{ secrets.DTRACK_HOSTNAME }}
+          api-key: ${{ secrets.DTRACK_APIKEY }}
+          project-name: ${{ inputs.dtrack_project_name }}
+          project-version: ${{ steps.get-version.outputs.version }}
+          project-tags: ${{ steps.get-version.outputs.version }}
+          bom-filename: ${{ steps.set-filename.outputs.filename }}
+          auto-create: true
           parent: ${{ secrets.DTRACK_PARENT_GUID }}
-          isLatest: ${{ inputs.dtrack_is_latest }}
+          is-latest: ${{ inputs.dtrack_is_latest }}
