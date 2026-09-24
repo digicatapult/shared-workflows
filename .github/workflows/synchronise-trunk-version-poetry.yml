@@ -2,6 +2,11 @@ name: Synchronise all PR versions (Poetry)
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       trunk-branch:
         required: true
         type: string
@@ -14,6 +19,7 @@ on:
 jobs:
   find-pull-requests:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}
     env:
@@ -37,6 +43,7 @@ jobs:
         pr_number: ${{ fromJSON(needs.find-pull-requests.outputs.pr_list) }}
     uses: ./.github/workflows/synchronise-pr-version-poetry.yml
     with:
+      timeout_minutes: ${{ inputs.timeout_minutes }}
       pr-number: ${{ matrix.pr_number }}
       trunk-branch: ${{ inputs.trunk-branch }}
     secrets:

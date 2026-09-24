@@ -2,6 +2,11 @@ name: Poetry Static checks
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       enable_semgrep_action:
         required: false
         type: boolean
@@ -50,6 +55,7 @@ jobs:
       matrix:
         command: ${{ fromJson(inputs.matrix_commands) }}
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}
@@ -75,6 +81,7 @@ jobs:
     name: Secrets scanning
     uses: ./.github/workflows/scan-secrets.yml
     with:
+      timeout_minutes: ${{ inputs.timeout_minutes }}
       enable_trufflehog_action: ${{ inputs.enable_trufflehog_action }}
       env_vars: ${{ inputs.env_vars }}
       extra_args: ${{ inputs.trufflehog_extra_args }}
@@ -85,6 +92,7 @@ jobs:
       (github.actor != 'dependabot[bot]')
     name: Vulnerability scanning
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:

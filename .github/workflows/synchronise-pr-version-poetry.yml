@@ -2,6 +2,11 @@ name: Synchronise PR Version (Poetry)
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       pr-number:
         required: true
         type: number
@@ -20,6 +25,7 @@ concurrency:
 jobs:
   synchronise-version:
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       PR_NUMBER: ${{ inputs.pr-number }}
