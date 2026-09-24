@@ -2,6 +2,11 @@ name: NPM Migration checks
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       node_version:
         required: false
         type: string
@@ -57,6 +62,7 @@ jobs:
   resolve:
     name: Resolve base and head
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       has_base: ${{ steps.resolve_refs.outputs.has_base }}
       base_sha: ${{ steps.resolve_refs.outputs.base_sha }}
@@ -91,6 +97,7 @@ jobs:
     name: Lint migration files
     needs: resolve
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -145,6 +152,7 @@ jobs:
   migrate-roundtrip:
     name: Migrate up / down / up
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -196,6 +204,7 @@ jobs:
     needs: resolve
     if: ${{ needs.resolve.outputs.has_base == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
     steps:
       # Phase 1: reconstruct the production-like starting state from the base commit.
       - name: Check out base

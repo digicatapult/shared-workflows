@@ -2,6 +2,11 @@ name: "[LEGACY ALIAS] Generate SBOM (generate-sbom-npm.yml)"
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       dtrack_project_name:
         required: false
         type: string
@@ -72,6 +77,7 @@ jobs:
   generate-sbom:
     uses: ./.github/workflows/generate-sbom.yml
     with:
+      timeout_minutes: ${{ inputs.timeout_minutes }}
       dtrack_project_name: ${{ inputs.dtrack_project_name }}
       enable_check_version: ${{ inputs.enable_check_version }}
       enable_dtrack_project: ${{ inputs.enable_dtrack_project }}

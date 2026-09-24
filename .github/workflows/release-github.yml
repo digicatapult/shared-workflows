@@ -2,6 +2,11 @@ name: Release Github
 on:
   workflow_call:
     inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
       env_vars:
         required: false
         type: string
@@ -18,6 +23,7 @@ jobs:
   release:
     name: "Release"
     runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7
       - name: Set environment variables from JSON

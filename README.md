@@ -50,10 +50,11 @@ Synchronises the version in a `package.json` on a pull-request branch in relatio
 
 #### Inputs
 
-| Input        | Type   | Description                             | Default | Required |
-| ------------ | ------ | --------------------------------------- | ------- | -------- |
-| pr-number    | number | The PR to run this workflow for         |         | true     |
-| trunk-branch | string | The trunk branch to synchronise against | `main`  | true     |
+| Input           | Type   | Description                                                                                                               | Default | Required |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `synchronise-version` 10 | `0`     | false    |
+| pr-number       | number | The PR to run this workflow for                                                                                           |         | true     |
+| trunk-branch    | string | The trunk branch to synchronise against                                                                                   | `main`  | true     |
 
 #### Permissions
 
@@ -77,10 +78,11 @@ Synchronises the version in a `pyproject.toml` on a pull-request branch in relat
 
 #### Inputs
 
-| Input        | Type   | Description                             | Default | Required |
-| ------------ | ------ | --------------------------------------- | ------- | -------- |
-| pr-number    | number | The PR to run this workflow for         |         | true     |
-| trunk-branch | string | The trunk branch to synchronise against | `main`  | true     |
+| Input           | Type   | Description                                                                                                               | Default | Required |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `synchronise-version` 10 | `0`     | false    |
+| pr-number       | number | The PR to run this workflow for                                                                                           |         | true     |
+| trunk-branch    | string | The trunk branch to synchronise against                                                                                   | `main`  | true     |
 
 #### Permissions
 
@@ -104,9 +106,10 @@ Synchronises the version in `package.json` for all open pull-requests that have 
 
 #### Inputs
 
-| Input        | Type   | Description                             | Default | Required |
-| ------------ | ------ | --------------------------------------- | ------- | -------- |
-| trunk-branch | string | The trunk branch to synchronise against | `main`  | true     |
+| Input           | Type   | Description                                                                                                              | Default | Required |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| timeout_minutes | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `find-pull-requests` 10 | `0`     | false    |
+| trunk-branch    | string | The trunk branch to synchronise against                                                                                  | `main`  | true     |
 
 #### Permissions
 
@@ -132,9 +135,10 @@ Synchronises the version in `pyproject.toml` for all open pull requests that hav
 
 #### Inputs
 
-| Input        | Type   | Description                             | Default | Required |
-| ------------ | ------ | --------------------------------------- | ------- | -------- |
-| trunk-branch | string | The trunk branch to synchronise against | `main`  | true     |
+| Input           | Type   | Description                                                                                                              | Default | Required |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| timeout_minutes | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `find-pull-requests` 10 | `0`     | false    |
+| trunk-branch    | string | The trunk branch to synchronise against                                                                                  | `main`  | true     |
 
 #### Permissions
 
@@ -160,23 +164,24 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                                  | Default                               | Required |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
-| build_args          | string  | Build arguments to pass to Docker build                                                                                      | `""`                                  | false    |
-| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run        | `{}`                                  | false    |
-| pull_dhi            | boolean | Whether to login to Docker Hardened Images registry before building                                                          | `false`                               | false    |
-| push_dockerhub      | boolean | Whether to push the built image to DockerHub                                                                                 | `false`                               | false    |
-| push_ghcr           | boolean | Whether to push the built image to GHCR                                                                                      | `false`                               | false    |
-| docker_platforms    | string  | Specifies architectures to build the container for                                                                           | `"linux/amd64,linux/arm64"`           | false    |
-| docker_file         | string  | Dockerfile to be used for building the container                                                                             | `Dockerfile`                          | false    |
-| image_name          | string  | Image repository name without registry or organisation; empty uses the repository name                                       | `''`                                  | false    |
-| package_manager     | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                                   | `"npm"`                               | false    |
-| arm64_runner        | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo              | `"ubuntu-24.04-arm"`                  | false    |
-| scan_container      | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release). | `false`                               | false    |
-| trivy_image         | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                                   | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false    |
-| scan_fail_severity  | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity                | `CRITICAL`                            | false    |
-| scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)          | `true`                                | false    |
-| scan_ignore_cves    | string  | Comma-separated CVE IDs to exclude from the gate (e.g. known issues with no consumable upstream fix yet)                     | `""`                                  | false    |
+| Input               | Type    | Description                                                                                                                                            | Default                               | Required |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `prepare` 10, `build` 30, `merge` 15, `scan-image` 20 | `0`                                   | false    |
+| build_args          | string  | Build arguments to pass to Docker build                                                                                                                | `""`                                  | false    |
+| env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run                                  | `{}`                                  | false    |
+| pull_dhi            | boolean | Whether to login to Docker Hardened Images registry before building                                                                                    | `false`                               | false    |
+| push_dockerhub      | boolean | Whether to push the built image to DockerHub                                                                                                           | `false`                               | false    |
+| push_ghcr           | boolean | Whether to push the built image to GHCR                                                                                                                | `false`                               | false    |
+| docker_platforms    | string  | Specifies architectures to build the container for                                                                                                     | `"linux/amd64,linux/arm64"`           | false    |
+| docker_file         | string  | Dockerfile to be used for building the container                                                                                                       | `Dockerfile`                          | false    |
+| image_name          | string  | Image repository name without registry or organisation; empty uses the repository name                                                                 | `''`                                  | false    |
+| package_manager     | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                                                             | `"npm"`                               | false    |
+| arm64_runner        | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo                                        | `"ubuntu-24.04-arm"`                  | false    |
+| scan_container      | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release).                           | `false`                               | false    |
+| trivy_image         | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                                                             | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false    |
+| scan_fail_severity  | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity                                          | `CRITICAL`                            | false    |
+| scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)                                    | `true`                                | false    |
+| scan_ignore_cves    | string  | Comma-separated CVE IDs to exclude from the gate (e.g. known issues with no consumable upstream fix yet)                                               | `""`                                  | false    |
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
@@ -232,6 +237,12 @@ This workflow is versatile, offering a full pipeline for Docker image creation a
 
 Determines the versioning information of the repository, setting output values related to version, release type, and build date. This workflow is typically used as a prerequisite step in other workflows that need version information for tagging, releasing, or publishing. It detects if the current commit represents a new version by comparing the `package.json` version against existing git tags, determines if the version follows pre-release naming conventions (e.g., contains alpha, beta, rc), and captures the build timestamp.
 
+#### Inputs
+
+| Input           | Type   | Description                                                                                                         | Default | Required |
+| --------------- | ------ | ------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `check-version` 10 | `0`     | false    |
+
 #### Outputs
 
 | Output         | Type    | Description                                        |
@@ -259,6 +270,7 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 | Input               | Type    | Description                                                                                                                               | Default | Required |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `release` 15                             | `0`     | false    |
 | env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    | false    |
 | get_sbom            | boolean | An option to enable retrieval of SBOM artefacts from other workflows; leave `false` if none are expected                                  | `false` | false    |
 | expected_sbom_count | number  | Number of `*.cdx.json` artefacts expected when `get_sbom` is enabled; set this to the number of images being released                     | `1`     | false    |
@@ -291,6 +303,7 @@ Publishes an NPM package to the specified registry, optionally building the pack
 
 | Input             | Type   | Description                                                                                                                               | Default                      | Required |
 | ----------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | -------- |
+| timeout_minutes   | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `publish-npm` 20                         | `0`                          | false    |
 | env_vars          | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                         | false    |
 | node_version      | string | The node version to use                                                                                                                   | `24.x`                       | false    |
 | registry_url      | string | The NPM registry URL to which the package will be published                                                                               | `https://registry.npmjs.org` | false    |
@@ -335,6 +348,7 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 
 | Input                  | Type    | Description                                                                                                                               | Default                               | Required |
 | ---------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| timeout_minutes        | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `generate-sbom` 20                       | `0`                                   | false    |
 | dtrack_is_latest       | boolean | An optional flag to mark the project as the latest version within Dependency Track                                                        | `true`                                | false    |
 | dtrack_project_name    | string  | A project name to use within Dependency Track                                                                                             | `${{ github.event.repository.name }}` | false    |
 | enable_check_version   | boolean | An option to enable the use of the digicatapult/check-version action                                                                      | `false`                               | false    |
@@ -392,6 +406,7 @@ Runs an [OpenSSF Scorecard](https://github.com/ossf/scorecard) analysis against 
 
 | Input             | Type    | Description                                                                                                                                                                | Default         | Required |
 | ----------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| timeout_minutes   | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `analysis` 30                                                             | `0`             | false    |
 | results_file      | string  | File path to store the Scorecard results                                                                                                                                   | `results.sarif` | false    |
 | results_format    | string  | Format of the results. Options: `sarif`, `json`                                                                                                                            | `sarif`         | false    |
 | upload_type       | string  | How results are published. Options: `artifact`/`artefact` uploads a workflow artifact, `sarif` uploads to GitHub Code Scanning; unrecognised values are ignored            | `artefact`      | false    |
@@ -448,6 +463,7 @@ Runs static analysis for Poetry projects (default matrix includes `pylint`, `bla
 
 | Input                    | Type    | Description                                                                                                                               | Default                                                                           | Required |
 | ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------- |
+| timeout_minutes          | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `static-checks` 20, `scan-vulns` 15      | `0`                                                                               | false    |
 | enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                                                                            | false    |
 | enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Action, scanning for exposed secrets                                                              | `false`                                                                           | false    |
 | env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                                              | false    |
@@ -485,6 +501,7 @@ Runs unit/integration tests for Poetry projects using pytest and compares covera
 
 | Input               | Type    | Description                                                                                                                               | Default                               | Required |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `setup` 10, `tests` 30, `coverage` 15    | `0`                                   | false    |
 | env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
 | pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                  | false    |
 | pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                               | false    |
@@ -525,6 +542,7 @@ Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `
 
 | Input               | Type    | Description                                                                                                                               | Default                             | Required |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `e2e-tests` 45                           | `0`                                 | false    |
 | env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                | false    |
 | pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                | false    |
 | pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                             | false    |
@@ -560,6 +578,7 @@ Performs configurable static analysis checks on an NPM project, such as linting,
 
 | Input                    | Type    | Description                                                                                                                               | Default                                                | Required |
 | ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| timeout_minutes          | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `static-checks` 20, `scan-vulns` 15      | `0`                                                    | false    |
 | enable_semgrep_action    | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                                                 | false    |
 | enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                                             | `false`                                                | false    |
 | env_vars                 | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                                   | false    |
@@ -602,6 +621,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 | Input               | Type    | Description                                                                                                               | Default              | Required |
 | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `e2e-tests` 45           | `0`                  | false    |
 | env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
 | npm_build_command   | string  | Optional command to build the application before running tests                                                            | `""`                 | false    |
 | pre_test_command    | string  | Optional command to execute before running the main test command                                                          | `""`                 | false    |
@@ -638,17 +658,18 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 
 #### Inputs
 
-| Input                | Type    | Description                                                                                                           | Default                            | Required |
-| -------------------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run | `{}`                               | false    |
-| npm_build_command    | string  | Optional command to build the application before running tests                                                        | `""`                               | false    |
-| pre_test_command     | string  | Optional command to execute before the main test command                                                              | `""`                               | false    |
-| pull_ghcr            | boolean | Whether to login to GitHub Container Registry before docker compose                                                   | `false`                            | false    |
-| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                            | `docker-compose.yml`               | false    |
-| node_version         | string  | The node version to use                                                                                               | `24.x`                             | false    |
-| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                        | `["test:unit","test:integration"]` | false    |
-| coverage             | boolean | Whether to collect and report code coverage                                                                           | `true`                             | false    |
-| coverage_config_json | string  | Path to a custom c8 configuration JSON file                                                                           | `""`                               | false    |
+| Input                | Type    | Description                                                                                                                            | Default                            | Required |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| timeout_minutes      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `setup` 10, `tests` 30, `coverage` 15 | `0`                                | false    |
+| env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run                  | `{}`                               | false    |
+| npm_build_command    | string  | Optional command to build the application before running tests                                                                         | `""`                               | false    |
+| pre_test_command     | string  | Optional command to execute before the main test command                                                                               | `""`                               | false    |
+| pull_ghcr            | boolean | Whether to login to GitHub Container Registry before docker compose                                                                    | `false`                            | false    |
+| docker_compose_file  | string  | The Docker Compose file to use for setting up dependencies                                                                             | `docker-compose.yml`               | false    |
+| node_version         | string  | The node version to use                                                                                                                | `24.x`                             | false    |
+| tests                | string  | JSON array of test commands defined in NPM scripts (e.g., `["test:unit", "test:integration"]`)                                         | `["test:unit","test:integration"]` | false    |
+| coverage             | boolean | Whether to collect and report code coverage                                                                                            | `true`                             | false    |
+| coverage_config_json | string  | Path to a custom c8 configuration JSON file                                                                                            | `""`                               | false    |
 
 #### Permissions
 
@@ -700,17 +721,18 @@ Works on both `pull_request` and `push` callers. On `pull_request` the base and 
 
 #### Inputs
 
-| Input                 | Type   | Description                                                                                           | Default               | Required |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | --------------------- | -------- |
-| node_version          | string | The node version to use                                                                               | `24.x`                | false    |
-| migrations_dir        | string | Path to the knex migrations directory, used by the file lint job                                      | `db/migrations`       | false    |
-| migrate_command       | string | Command that applies all outstanding migrations                                                       | `npm run db:migrate`  | false    |
-| rollback_command      | string | Command that rolls back the most recent migration batch                                               | `npm run db:rollback` | false    |
-| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                  | false    |
-| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`  | false    |
-| postgres_service      | string | Name of the postgres service within the compose file                                                  | `postgres`            | false    |
-| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                  | false    |
-| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`            | false    |
+| Input                 | Type   | Description                                                                                                                                                                      | Default               | Required |
+| --------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------- |
+| timeout_minutes       | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `resolve` 10, `lint-migrations` 15, `migrate-roundtrip` 20, `seeded-upgrade` 30 | `0`                   | false    |
+| node_version          | string | The node version to use                                                                                                                                                          | `24.x`                | false    |
+| migrations_dir        | string | Path to the knex migrations directory, used by the file lint job                                                                                                                 | `db/migrations`       | false    |
+| migrate_command       | string | Command that applies all outstanding migrations                                                                                                                                  | `npm run db:migrate`  | false    |
+| rollback_command      | string | Command that rolls back the most recent migration batch                                                                                                                          | `npm run db:rollback` | false    |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                                                                                              | `""`                  | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                                                                                            | `docker-compose.yml`  | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                                                                                             | `postgres`            | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service                                                                            | `""`                  | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                                                                                                      | `postgres`            | false    |
 
 #### Permissions
 
@@ -726,17 +748,18 @@ Works on both `pull_request` and `push` callers, the same way as the NPM variant
 
 #### Inputs
 
-| Input                 | Type   | Description                                                                                           | Default                             | Required |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
-| python_version        | string | The python version to use                                                                             | `3.14`                              | false    |
-| versions_dir          | string | Path to the alembic versions directory, used by the file lint job                                     | `alembic/versions`                  | false    |
-| migrate_command       | string | Command that applies all outstanding revisions                                                        | `poetry run alembic upgrade head`   | false    |
-| rollback_command      | string | Command that downgrades to the base (empty) revision                                                  | `poetry run alembic downgrade base` | false    |
-| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                   | `""`                                | false    |
-| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                 | `docker-compose.yml`                | false    |
-| postgres_service      | string | Name of the postgres service within the compose file                                                  | `postgres`                          | false    |
-| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service | `""`                                | false    |
-| db_name               | string | Database to create when using the `postgres_image` fallback                                           | `postgres`                          | false    |
+| Input                 | Type   | Description                                                                                                                                                                      | Default                             | Required |
+| --------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
+| timeout_minutes       | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `resolve` 10, `lint-migrations` 15, `migrate-roundtrip` 20, `seeded-upgrade` 30 | `0`                                 | false    |
+| python_version        | string | The python version to use                                                                                                                                                        | `3.14`                              | false    |
+| versions_dir          | string | Path to the alembic versions directory, used by the file lint job                                                                                                                | `alembic/versions`                  | false    |
+| migrate_command       | string | Command that applies all outstanding revisions                                                                                                                                   | `poetry run alembic upgrade head`   | false    |
+| rollback_command      | string | Command that downgrades to the base (empty) revision                                                                                                                             | `poetry run alembic downgrade base` | false    |
+| seed_command          | string | Seed command for the seeded-upgrade job. Empty string skips seeding                                                                                                              | `""`                                | false    |
+| postgres_compose_file | string | Compose file whose postgres service is started for the DB-backed jobs                                                                                                            | `docker-compose.yml`                | false    |
+| postgres_service      | string | Name of the postgres service within the compose file                                                                                                                             | `postgres`                          | false    |
+| postgres_image        | string | Fallback Postgres image; when set, a container from this image is used instead of the compose service                                                                            | `""`                                | false    |
+| db_name               | string | Database to create when using the `postgres_image` fallback                                                                                                                      | `postgres`                          | false    |
 
 #### Permissions
 
@@ -750,13 +773,14 @@ Runs scanners to detect the exposure of secrets, with the option to add in extra
 
 #### Inputs
 
-| Input                    | Type    | Description                                                                                 | Default                                                | Required |
-| ------------------------ | ------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
-| base                     | string  | An optional branch to base the scan on                                                      | `""`                                                   | false    |
-| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets               | `true`                                                 | false    |
-| env_vars                 | string  | Extra variables to be passed to the environment                                             | `{}`                                                   | false    |
-| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                                          | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
-| image                    | string  | TruffleHog's GHCR image (registry/repo:tag) to run, pinned to avoid latest/breaking changes | `"ghcr.io/trufflesecurity/trufflehog:3.96.0"`          | false    |
+| Input                    | Type    | Description                                                                                                      | Default                                                | Required |
+| ------------------------ | ------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | -------- |
+| timeout_minutes          | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `trufflehog` 15 | `0`                                                    | false    |
+| base                     | string  | An optional branch to base the scan on                                                                           | `""`                                                   | false    |
+| enable_trufflehog_action | boolean | An option to enable a TruffleHog GitHub Actions, scanning for exposed secrets                                    | `true`                                                 | false    |
+| env_vars                 | string  | Extra variables to be passed to the environment                                                                  | `{}`                                                   | false    |
+| extra_args               | string  | Extra arguments to be passed to the TruffleHog CLI                                                               | `"--results=verified,unknown --exclude-detectors=Lob"` | false    |
+| image                    | string  | TruffleHog's GHCR image (registry/repo:tag) to run, pinned to avoid latest/breaking changes                      | `"ghcr.io/trufflesecurity/trufflehog:3.96.0"`          | false    |
 
 #### Permissions
 
@@ -781,6 +805,7 @@ Runs scanners to detect bugs, security vulnerabilities, and compliance issues, w
 
 | Input                 | Type    | Description                                                                                                                               | Default                  | Required |
 | --------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | -------- |
+| timeout_minutes       | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `semgrep` 15                             | `0`                      | false    |
 | enable_semgrep_action | boolean | An option to enable a Semgrep CE scan for bugs, security vulnerabilities, and compliance issues                                           | `true`                   | false    |
 | extra_args            | string  | Extra arguments to be passed to the Semgrep CE CLI                                                                                        | `'--config="p/default"'` | false    |
 | sarif_path            | string  | A file path used to locate the SARIF result(s) from the Semgrep CLI                                                                       | `semgrep.sarif`          | false    |
@@ -811,6 +836,7 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 
 | Input               | Type    | Description                                                                                                                  | Default                            | Required |
 | ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `zap-scan` 60               | `0`                                | false    |
 | matrix_scans        | string  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`                                       | `'["baseline"]'`                   | false    |
 | target              | string  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                                        | `http://localhost:3000`            | false    |
 | env_vars            | string  | JSON object of extra environment variables to inject                                                                         | `{}`                               | false    |
