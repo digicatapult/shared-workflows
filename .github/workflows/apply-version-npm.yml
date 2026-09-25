@@ -1,0 +1,192 @@
+name: Apply version (NPM)
+on:
+  workflow_call:
+    inputs:
+      trunk-branch:
+        required: false
+        type: string
+        default: main
+      release-commit-prefix:
+        description: Version commit prefix. Must match the caller's loop guard.
+        required: false
+        type: string
+        default: "chore(release):"
+    secrets:
+      bot-id:
+        required: true
+      bot-key:
+        required: true
+    outputs:
+      bumped:
+        description: "true when a version commit was pushed"
+        value: ${{ jobs.apply-version.outputs.bumped }}
+      version:
+        description: "Version written to package.json, empty when nothing was bumped"
+        value: ${{ jobs.apply-version.outputs.version }}
+
+# Serialise against itself so two merges landing back to back cannot both read
+# the same trunk version and compute the same next version.
+concurrency:
+  group: ${{ github.workflow }}-apply-version-${{ inputs.trunk-branch }}
+  cancel-in-progress: false
+
+jobs:
+  apply-version:
+    name: "Apply version"
+    runs-on: ubuntu-latest
+    outputs:
+      bumped: ${{ steps.apply.outputs.bumped }}
+      version: ${{ steps.apply.outputs.version }}
+    steps:
+      # An App token, not GITHUB_TOKEN: the version commit must trigger a run,
+      # because the release reads the version from the checked out tree. Same App
+      # the synchronise-*-version workflows already use, but it must be allowed
+      # to push to the protected trunk branch. See examples/apply-version.md.
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.bot-id }}
+          private-key: ${{ secrets.bot-key }}
+
+      - name: Checkout ${{ inputs.trunk-branch }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.trunk-branch }}
+          fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
+
+      # Safety net for the caller's own loop guard. If a version commit somehow
+      # reaches this workflow, stop rather than bumping on top of a bump.
+      - name: Skip if this is already a version commit
+        id: guard
+        env:
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+          PREFIX: ${{ inputs.release-commit-prefix }}
+        run: |
+          set -euo pipefail
+          head_line="${HEAD_MESSAGE%%$'\n'*}"
+          if [[ "${head_line}" == "${PREFIX}"* ]]; then
+            echo "Head commit is already a version commit, nothing to do."
+            echo "skip=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+      # A queue can land several pull requests in one push, so resolve across
+      # every commit and take the strongest label. No label means no bump.
+      - name: Resolve version label for this push
+        id: resolve
+        if: ${{ steps.guard.outputs.skip == 'false' }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${BEFORE}" || "${BEFORE}" =~ ^0+$ ]]; then
+            shas="${SHA}"
+          else
+            shas=$(gh api "repos/${GITHUB_REPOSITORY}/compare/${BEFORE}...${SHA}" \
+              --jq '.commits[].sha' 2>/dev/null || echo "${SHA}")
+          fi
+          if [[ -z "${shas}" ]]; then
+            shas="${SHA}"
+          fi
+
+          labels=""
+          for sha in ${shas}; do
+            found=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/pulls" \
+              --jq '.[].labels[].name' 2>/dev/null || true)
+            if [[ -n "${found}" ]]; then
+              labels+="${found}"$'\n'
+            fi
+          done
+
+          echo "Labels found across this push:"
+          echo "${labels:-  (none)}"
+
+          bump=""
+          if grep -qx 'v:major' <<< "${labels}"; then
+            bump="major"
+          elif grep -qx 'v:minor' <<< "${labels}"; then
+            bump="minor"
+          elif grep -qx 'v:patch' <<< "${labels}"; then
+            bump="patch"
+          fi
+
+          if [[ -z "${bump}" ]]; then
+            echo "No version label on this push, no version will be applied."
+          else
+            echo "Resolved bump: ${bump}"
+          fi
+          echo "bump=${bump}" >> "${GITHUB_OUTPUT}"
+
+      - name: Apply and push version
+        id: apply
+        if: ${{ steps.guard.outputs.skip == 'false' && steps.resolve.outputs.bump != '' }}
+        env:
+          BUMP: ${{ steps.resolve.outputs.bump }}
+          PREFIX: ${{ inputs.release-commit-prefix }}
+          TRUNK_BRANCH: ${{ inputs.trunk-branch }}
+          APP_SLUG: ${{ steps.generate-token.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+
+          # Same arithmetic as synchronise-pr-version-npm.yml, applied on trunk
+          # after merge instead of on the pull request branch before it.
+          get_next_version() {
+            local base="$1"
+            local increment_type="$2"
+            local RE='[^0-9]*\([0-9]*\)[.]\([0-9]*\)[.]\([0-9]*\)\([0-9A-Za-z-]*\)'
+
+            local MAJOR
+            local MINOR
+            local PATCH
+            MAJOR=$(echo "$base" | sed -e "s#$RE#\1#")
+            MINOR=$(echo "$base" | sed -e "s#$RE#\2#")
+            PATCH=$(echo "$base" | sed -e "s#$RE#\3#")
+
+            case "$increment_type" in
+            major)
+              ((MAJOR += 1))
+              ((MINOR = 0))
+              ((PATCH = 0))
+              ;;
+            minor)
+              ((MINOR += 1))
+              ((PATCH = 0))
+              ;;
+            patch)
+              ((PATCH += 1))
+              ;;
+            esac
+
+            echo "$MAJOR.$MINOR.$PATCH"
+          }
+
+          current_version=$(jq -r .version package.json)
+          next_version=$(get_next_version "${current_version}" "${BUMP}")
+          echo "Applying ${BUMP}: ${current_version} -> ${next_version}"
+
+          npm version "${next_version}" --allow-same-version=true --git-tag-version=false
+
+          echo "version=${next_version}" >> "${GITHUB_OUTPUT}"
+
+          if git diff --quiet; then
+            echo "Working tree clean, version already at ${next_version}. Nothing to push."
+            echo "bumped=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
+          git add package.json
+          if [[ -f package-lock.json ]]; then
+            git add package-lock.json
+          fi
+          git commit -m "${PREFIX} v${next_version}"
+          git push origin "HEAD:${TRUNK_BRANCH}"
+
+          echo "bumped=true" >> "${GITHUB_OUTPUT}"
