@@ -182,22 +182,26 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | scan_fail_severity  | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity                                          | `CRITICAL`                            | false    |
 | scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)                                    | `true`                                | false    |
 | scan_ignore_cves    | string  | Comma-separated CVE IDs to exclude from the gate (e.g. known issues with no consumable upstream fix yet)                                               | `""`                                  | false    |
+| attest_provenance   | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the Trivy CVE report. Only applies when `scan_container` is `true`           | `false`                               | false    |
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
 For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build.
 
-When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only — there is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before.
+When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only. There is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before. When `attest_provenance` is also enabled, the `scan-image` job additionally generates a signed build provenance attestation (via `actions/attest`) for the Trivy report, so its authenticity survives independently of the 30-day artifact retention.
 
 #### Permissions
 
-| Access                   | Jobs used        | Level | Reason                                                                    | Conditions                                 |
-| ------------------------ | ---------------- | ----- | ------------------------------------------------------------------------- | ------------------------------------------ |
-| `contents: read`         | `prepare`        | Job   | To GET repository contents                                                | N/A                                        |
-| `contents: read`         | `build`          | Job   | To GET repository contents                                                | N/A                                        |
-| `packages: write`        | `build`, `merge` | Job   | To POST built packages/manifests to one or more container registries      | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `security-events: write` | `merge`          | Job   | To POST new code scanning alerts based on the SARIF report                | `inputs.push_dockerhub`/`inputs.push_ghcr` |
-| `contents: read`         | `scan-image`     | Job   | To download the exported image artifact and scan it (no secrets required) | `inputs.scan_container`                    |
+| Access                     | Jobs used        | Level | Reason                                                                     | Conditions                                 |
+| -------------------------- | ---------------- | ----- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| `contents: read`           | `prepare`        | Job   | To GET repository contents                                                 | N/A                                        |
+| `contents: read`           | `build`          | Job   | To GET repository contents                                                 | N/A                                        |
+| `packages: write`          | `build`, `merge` | Job   | To POST built packages/manifests to one or more container registries       | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `security-events: write`   | `merge`          | Job   | To POST new code scanning alerts based on the SARIF report                 | `inputs.push_dockerhub`/`inputs.push_ghcr` |
+| `contents: read`           | `scan-image`     | Job   | To download the exported image artifact and scan it (no secrets required)  | `inputs.scan_container`                    |
+| `id-token: write`          | `scan-image`     | Job   | To mint an OIDC token for Sigstore signing when attesting the Trivy report | `inputs.attest_provenance`                 |
+| `attestations: write`      | `scan-image`     | Job   | To persist the signed provenance attestation for the Trivy report          | `inputs.attest_provenance`                 |
+| `artifact-metadata: write` | `scan-image`     | Job   | Required by `actions/attest` to create the artifact storage record         | `inputs.attest_provenance`                 |
 
 #### Secrets
 
@@ -268,30 +272,35 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Inputs
 
-| Input               | Type    | Description                                                                                                                               | Default | Required |
-| ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `release` 15                             | `0`     | false    |
-| env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`    | false    |
-| get_sbom            | boolean | An option to enable retrieval of SBOM artefacts from other workflows; leave `false` if none are expected                                  | `false` | false    |
-| expected_sbom_count | number  | Number of `*.cdx.json` artefacts expected when `get_sbom` is enabled; set this to the number of images being released                     | `1`     | false    |
+| Input                                | Type    | Description                                                                                                                                                                                | Default | Required |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------- | -------- |
+| timeout_minutes                      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `release` 15                                                                              | `0`     | false    |
+| env_vars                             | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run                                                  | `{}`    | false    |
+| get_sbom                             | boolean | An option to enable retrieval of SBOM artefacts from other workflows; leave `false` if none are expected                                                                                   | `false` | false    |
+| expected_sbom_count                  | number  | Number of `*.cdx.json` artefacts expected when `get_sbom` is enabled; set this to the number of images being released                                                                      | `1`     | false    |
+| additional_release_artifact_patterns | string  | Allowlist glob passed directly to `actions/download-artifact`'s `pattern` input (supports extglob brace syntax). Callers are responsible for ensuring matched artefacts contain no secrets | `""`    | false    |
+| generate_checksums                   | boolean | Generate a `checksums.sha256` manifest of every attached release asset and attach it as a release asset itself, so hashes remain verifiable after source artefacts expire                  | `true`  | false    |
 
 #### Permissions
 
-| Access                | Jobs used | Level    | Reason                                                                                        | Conditions        |
-| --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | ----------------- |
-| `contents: write`     | `release` | Workflow | To POST release contents for both the versioned and `latest` tags                             | N/A               |
-| `pull-requests: read` | `release` | Workflow | To GET an SBOM artifact from a PR, and then include it subsequently as a GitHub release asset | `inputs.get_sbom` |
+| Access                | Jobs used | Level    | Reason                                                                                        | Conditions                                    |
+| --------------------- | --------- | -------- | --------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `contents: write`     | `release` | Workflow | To POST release contents for both the versioned and `latest` tags                             | N/A                                           |
+| `pull-requests: read` | `release` | Workflow | To GET an SBOM artifact from a PR, and then include it subsequently as a GitHub release asset | `inputs.get_sbom`                             |
+| `actions: read`       | `release` | Workflow | To GET workflow artefacts matching `additional_release_artifact_patterns` from the run        | `inputs.additional_release_artifact_patterns` |
 
 #### Workflow Description
 
-This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. When `get_sbom` is enabled, the workflow validates that `expected_sbom_count` `*.cdx.json` artefacts were downloaded before attaching them to the versioned release. The process involves:
+This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. When `get_sbom` is enabled, the workflow validates that `expected_sbom_count` `*.cdx.json` artefacts were downloaded before attaching them to the versioned release. When `additional_release_artifact_patterns` is set, matching workflow artefacts (e.g. Trivy or ZAP reports) are also downloaded and attached to both the versioned and `latest` releases, additive to the SBOM handling. When `generate_checksums` is enabled (the default) and at least one file is being attached, a `checksums.sha256` manifest of every attached asset is generated and attached as a release asset itself. This durable, tamper-evident hash record survives the 90-day workflow artifact retention window. The process involves:
 
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
 4. **Validate SBOMs**: Confirms that the expected number of SBOM artefacts were downloaded when requested.
-5. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and the validated SBOMs.
-6. **Build Latest Release**: Updates the `latest` tag to point to the newly created release.
+5. **Download Additional Artefacts**: Downloads any workflow artefacts matching `additional_release_artifact_patterns`, when set.
+6. **Generate Checksums Manifest**: Computes a `checksums.sha256` of every file about to be attached, when `generate_checksums` is enabled.
+7. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and all resolved release assets.
+8. **Build Latest Release**: Updates the `latest` tag to point to the newly created release, attaching the same release assets.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 
@@ -365,12 +374,16 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 | install_python_deps    | boolean | Install Python dependencies before SBOM generation                                                                                        | `false`                               | false    |
 | python_install_command | string  | Optional custom command to install Python dependencies                                                                                    | `""`                                  | false    |
 | upload_artifact        | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
+| attest_provenance      | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the SBOM file. Requires `upload_artifact` to also be true       | `false`                               | false    |
 
 #### Permissions
 
-| Access           | Jobs used       | Level    | Reason                     | Conditions |
-| ---------------- | --------------- | -------- | -------------------------- | ---------- |
-| `contents: read` | `generate-sbom` | Workflow | To GET repository contents | N/A        |
+| Access                     | Jobs used       | Level    | Reason                                                             | Conditions                 |
+| -------------------------- | --------------- | -------- | ------------------------------------------------------------------ | -------------------------- |
+| `contents: read`           | `generate-sbom` | Workflow | To GET repository contents                                         | N/A                        |
+| `id-token: write`          | `generate-sbom` | Workflow | To mint an OIDC token for Sigstore signing when attesting the SBOM | `inputs.attest_provenance` |
+| `attestations: write`      | `generate-sbom` | Workflow | To persist the signed provenance attestation for the SBOM          | `inputs.attest_provenance` |
+| `artifact-metadata: write` | `generate-sbom` | Workflow | Required by `actions/attest` to create the artifact storage record | `inputs.attest_provenance` |
 
 #### Secrets
 
@@ -396,7 +409,8 @@ This GitHub Actions workflow generates an SBOM for a project. It allows flexibil
 4. **Build (Optional)**: Runs a build command if specified, useful for projects that need compilation before SBOM generation.
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
-7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
+7. **Attest Provenance (Optional)**: When `attest_provenance` is enabled, generates a signed build provenance attestation for the SBOM file via `actions/attest`.
+8. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
 
 ### [Generate Security Scorecard](.github/workflows/generate-security-scorecard.yml) ([examples](examples/generate-security-scorecard.md))
 
@@ -853,14 +867,18 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                                               | `openapi`                          | false    |
 | automation_plan     | string  | File path of the ZAP Automation Framework plan; required when using `automation-framework`                                   | `""`                               | false    |
 | docker_env_vars     | string  | Newline-separated names of environment variables, used only by the `automation-framework` scan type                          | `""`                               | false    |
+| attest_provenance   | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the ZAP report(s)                                  | `false`                            | false    |
 
 #### Permissions
 
-| Access           | Jobs used  | Level    | Reason                                                                 | Conditions                   |
-| ---------------- | ---------- | -------- | ---------------------------------------------------------------------- | ---------------------------- |
-| `contents: read` | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | N/A                          |
-| `packages: read` | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `inputs.pull_ghcr`           |
-| `issues: write`  | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `inputs.allow_issue_writing` |
+| Access                     | Jobs used  | Level    | Reason                                                                 | Conditions                   |
+| -------------------------- | ---------- | -------- | ---------------------------------------------------------------------- | ---------------------------- |
+| `contents: read`           | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | N/A                          |
+| `packages: read`           | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `inputs.pull_ghcr`           |
+| `issues: write`            | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `inputs.allow_issue_writing` |
+| `id-token: write`          | `zap-scan` | Job      | To mint an OIDC token for Sigstore signing when attesting ZAP reports  | `inputs.attest_provenance`   |
+| `attestations: write`      | `zap-scan` | Job      | To persist the signed provenance attestation for ZAP reports           | `inputs.attest_provenance`   |
+| `artifact-metadata: write` | `zap-scan` | Job      | Required by `actions/attest` to create the artifact storage record     | `inputs.attest_provenance`   |
 
 #### Workflow Description
 
@@ -871,4 +889,5 @@ This GitHub Actions workflow runs OWASP ZAP DAST scans against a locally running
 3. **Run Pre-Scan Command** _(optional)_: Executes `pre_scan_command` on the runner for use cases where the application is started directly rather than via Docker Compose.
 4. **Wait for Target** _(skipped for `automation-framework`)_: Polls `target` with `curl` at two-second intervals until it responds successfully or `target_wait_timeout` is reached.
 5. **ZAP Scan**: Runs the selected ZAP action for each `matrix.scan_type`. Report artifacts are uploaded under `artifact_name-<scan_type>` to avoid collisions when multiple types run in parallel.
-6. **Upload Automation Framework Report** _(only for `automation-framework`)_: Parses `automation_plan` for any `report` jobs, locates the generated report file(s) on the runner (via the `/zap/wrk` → `$GITHUB_WORKSPACE` mapping), and uploads them as an artifact under `artifact_name-automation-framework`.
+6. **Attest Provenance (Optional)**: When `attest_provenance` is enabled, generates a signed build provenance attestation for the report file(s) of each scan type.
+7. **Upload Automation Framework Report** _(only for `automation-framework`)_: Parses `automation_plan` for any `report` jobs, locates the generated report file(s) on the runner (via the `/zap/wrk` → `$GITHUB_WORKSPACE` mapping), and uploads them as an artifact under `artifact_name-automation-framework`.

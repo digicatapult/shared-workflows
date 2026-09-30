@@ -70,6 +70,10 @@ on:
         required: false
         type: string
         default: ""
+      attest_provenance:
+        required: false
+        type: boolean
+        default: false
 jobs:
   zap-scan:
     name: ZAP ${{ matrix.scan_type }} scan
@@ -165,6 +169,14 @@ jobs:
           fail_action: ${{ inputs.fail_action }}
           artifact_name: ${{ steps.artifact.outputs.name }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest ZAP baseline report provenance
+        if: ${{ !cancelled() && matrix.scan_type == 'baseline' && inputs.attest_provenance }}
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            report_html.html
+            report_md.md
+            report_json.json
       - name: ZAP Full Scan
         if: matrix.scan_type == 'full'
         uses: zaproxy/action-full-scan@v0.13.0
@@ -177,6 +189,14 @@ jobs:
           fail_action: ${{ inputs.fail_action }}
           artifact_name: ${{ steps.artifact.outputs.name }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest ZAP full scan report provenance
+        if: ${{ !cancelled() && matrix.scan_type == 'full' && inputs.attest_provenance }}
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            report_html.html
+            report_md.md
+            report_json.json
       - name: ZAP API Scan
         if: matrix.scan_type == 'api'
         uses: zaproxy/action-api-scan@v0.10.0
@@ -190,6 +210,14 @@ jobs:
           fail_action: ${{ inputs.fail_action }}
           artifact_name: ${{ steps.artifact.outputs.name }}
           token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest ZAP API scan report provenance
+        if: ${{ !cancelled() && matrix.scan_type == 'api' && inputs.attest_provenance }}
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            report_html.html
+            report_md.md
+            report_json.json
       - name: ZAP Automation Framework Scan
         if: matrix.scan_type == 'automation-framework'
         uses: zaproxy/action-af@v0.3.0
@@ -283,3 +311,8 @@ jobs:
           name: ${{ steps.artifact.outputs.name }}
           path: ${{ steps.report_paths.outputs.paths }}
           if-no-files-found: error
+      - name: Attest ZAP Automation Framework report provenance
+        if: ${{ !cancelled() && matrix.scan_type == 'automation-framework' && steps.report_paths.outputs.paths != '' && inputs.attest_provenance }}
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.report_paths.outputs.paths }}

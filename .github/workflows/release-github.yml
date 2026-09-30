@@ -19,6 +19,16 @@ on:
         required: false
         type: number
         default: 1
+      additional_release_artifact_patterns:
+        required: false
+        type: string
+        default: ""
+        description: "Allowlist glob passed directly to actions/download-artifact's `pattern` input (supports extglob brace syntax for multiple artefacts to attach as additional release assets. Leave empty to skip."
+      generate_checksums:
+        required: false
+        type: boolean
+        default: true
+        description: "Generate a checksums.sha256 manifest of every attached release asset and attach it as a release asset itself, so hashes remain verifiable after source artefacts expire."
 jobs:
   release:
     name: "Release"
@@ -84,6 +94,48 @@ jobs:
             echo "Expected ${EXPECTED_SBOM_COUNT} SBOM artefact(s), found ${sbom_count}." >&2
             exit 1
           fi
+      - name: Download additional release artefacts
+        uses: actions/download-artifact@v8
+        if: inputs.additional_release_artifact_patterns != ''
+        with:
+          pattern: ${{ inputs.additional_release_artifact_patterns }}
+          path: additional-release-assets
+          merge-multiple: true
+      - name: Generate release asset checksums manifest
+        id: checksums
+        if: |
+          inputs.generate_checksums &&
+          (inputs.get_sbom || inputs.additional_release_artifact_patterns != '')
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          rm -f checksums.sha256
+          for f in **/*.cdx.json additional-release-assets/**/*; do
+            [ -f "$f" ] || continue
+            sha256sum "$f" >> checksums.sha256
+          done
+          if [ -s checksums.sha256 ]; then
+            echo "generated=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f checksums.sha256
+            echo "generated=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build release files list
+        id: release_files
+        run: |
+          {
+            echo "files<<RELEASE_FILES_EOF"
+            if [ "${{ inputs.get_sbom }}" = "true" ]; then
+              echo "**/*.cdx.json"
+            fi
+            if [ "${{ inputs.additional_release_artifact_patterns }}" != "" ]; then
+              echo "additional-release-assets/**"
+            fi
+            if [ "${{ steps.checksums.outputs.generated }}" = "true" ]; then
+              echo "checksums.sha256"
+            fi
+            echo "RELEASE_FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v3
         with:
@@ -94,8 +146,7 @@ jobs:
           make_latest: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            **/*.cdx.json
+          files: ${{ steps.release_files.outputs.files }}
       - name: Update latest tag
         run: |
           git config user.name github-actions
@@ -113,3 +164,4 @@ jobs:
           generate_release_notes: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          files: ${{ steps.release_files.outputs.files }}

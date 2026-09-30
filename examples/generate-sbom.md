@@ -76,3 +76,20 @@ jobs:
       DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
       DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
 ```
+
+### With a provenance attestation
+
+To generate a signed build provenance attestation for the SBOM file (via `actions/attest`), set `attest_provenance: true` and grant the additional permissions it requires. This is useful when the SBOM is also being attached to a GitHub release via `release-github.yml`'s `additional_release_artifact_patterns`, so its authenticity can be independently verified. It's worth noting that this is attesting the SBOM file itself as an output of the workflow, rather than attesting the image the SBOM paired with; the SBOM itself is an attestation of that.
+
+```yaml
+jobs:
+  generate-sbom:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    with:
+      attest_provenance: true
+```
