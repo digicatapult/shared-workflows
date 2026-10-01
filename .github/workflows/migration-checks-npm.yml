@@ -61,7 +61,7 @@ jobs:
   # final "upgrade the previously deployed commit to this one" check.
   resolve:
     name: Resolve base and head
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       has_base: ${{ steps.resolve_refs.outputs.has_base }}
@@ -96,7 +96,7 @@ jobs:
   lint-migrations:
     name: Lint migration files
     needs: resolve
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7
@@ -173,7 +173,7 @@ jobs:
 
   migrate-roundtrip:
     name: Migrate up / down / up
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     steps:
       - uses: actions/checkout@v7
@@ -225,7 +225,7 @@ jobs:
     name: Upgrade seeded base database
     needs: resolve
     if: ${{ needs.resolve.outputs.has_base == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
     steps:
       # Phase 1: reconstruct the production-like starting state from the base commit.

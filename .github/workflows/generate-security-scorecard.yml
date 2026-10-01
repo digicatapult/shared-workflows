@@ -61,7 +61,7 @@ on:
 jobs:
   analysis:
     name: Scorecard analysis
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
     permissions:
       security-events: write

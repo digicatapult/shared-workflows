@@ -54,7 +54,7 @@ on:
 jobs:
   setup:
     name: Setup branch matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       branches: ${{ steps.set-branches.outputs.branches }}
@@ -96,7 +96,7 @@ jobs:
       matrix:
         test_path: ${{ fromJson(inputs.tests) }}
         branch: ${{ fromJson(needs.setup.outputs.branches) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
     defaults:
       run:
@@ -176,7 +176,7 @@ jobs:
 
   coverage:
     name: Coverage
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     needs: [tests, setup]
     if: inputs.coverage

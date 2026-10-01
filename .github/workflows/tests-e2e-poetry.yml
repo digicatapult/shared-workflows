@@ -47,7 +47,7 @@ jobs:
   e2e-tests:
     name: Run e2e tests
     timeout-minutes: ${{ inputs.timeout_minutes || 45 }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     defaults:
       run:
         working-directory: ${{ inputs.working_directory }}

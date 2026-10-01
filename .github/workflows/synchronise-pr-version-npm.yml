@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   synchronise-version:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -38,7 +38,7 @@ on:
 jobs:
   publish-npm:
     name: "Publish package to ${{ inputs.registry_url }}"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     steps:
       - uses: actions/checkout@v7

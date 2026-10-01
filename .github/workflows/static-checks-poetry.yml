@@ -54,7 +54,7 @@ jobs:
       fail-fast: false
       matrix:
         command: ${{ fromJson(inputs.matrix_commands) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     defaults:
       run:
@@ -91,7 +91,7 @@ jobs:
       (inputs.enable_semgrep_action == true) &&
       (github.actor != 'dependabot[bot]')
     name: Vulnerability scanning
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7

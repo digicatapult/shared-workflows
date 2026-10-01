@@ -10,7 +10,7 @@ on:
 jobs:
   check-version:
     name: "Check version"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       is_new_version: ${{ steps.get_version.outputs.IS_NEW_VERSION }}
