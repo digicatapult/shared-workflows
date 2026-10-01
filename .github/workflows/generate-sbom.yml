@@ -102,7 +102,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     permissions:
-      contents: read
       id-token: write
       attestations: write
       artifact-metadata: write
