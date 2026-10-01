@@ -427,6 +427,9 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     permissions:
       contents: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Download amd64 image
         uses: actions/download-artifact@v8
