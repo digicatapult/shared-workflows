@@ -112,8 +112,9 @@ jobs:
           rm -f checksums.sha256
           for f in **/*.cdx.json additional-release-assets/**/*; do
             [ -f "$f" ] || continue
-            sha256sum "$f" >> checksums.sha256
+            printf '%s %s\n' "$(sha256sum "$f" | cut -d ' ' -f 1)" "$(basename "$f")" >> checksums.sha256
           done
+          awk '{print $2}' checksums.sha256 | sort | uniq -d
           if [ -s checksums.sha256 ]; then
             echo "generated=true" >> "$GITHUB_OUTPUT"
           else
