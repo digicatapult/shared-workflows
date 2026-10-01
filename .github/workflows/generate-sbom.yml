@@ -80,6 +80,11 @@ on:
         type: boolean
         default: true
         description: "Whether to upload the SBOM as a workflow artifact"
+      attest_provenance:
+        required: false
+        type: boolean
+        default: false
+        description: "Generate a signed build provenance attestation for the SBOM file using actions/attest. Requires the caller to grant id-token: write, attestations: write and artifact-metadata: write. Requires upload_artifact to also be true."
     outputs:
       sbom_file:
         description: "The name of the generated SBOM file"
@@ -96,6 +101,10 @@ jobs:
     name: "Generate SBOM"
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     outputs:
       sbom_file: ${{ steps.set-filename.outputs.filename }}
     steps:
@@ -194,6 +203,11 @@ jobs:
           name: ${{ steps.set-filename.outputs.filename }}
           path: ${{ steps.set-filename.outputs.filename }}
           retention-days: 90
+      - name: Attest SBOM provenance
+        if: inputs.attest_provenance && inputs.upload_artifact
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.set-filename.outputs.filename }}
       - name: Check Dependency-Track project status
         id: check_dtrack_project_status
         shell: bash

@@ -45,3 +45,28 @@ jobs:
       DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
       DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
 ```
+
+### With container CVE scanning and a provenance attestation
+
+Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). Adding `attest_provenance: true` additionally generates a signed build provenance attestation (via `actions/attest`) for the Trivy report, so it can be attached to a GitHub release (see [release-github.yml](release-github.md)) and verified independently of the workflow's 30-day artifact retention. This requires the extra permissions below on top of the standard `build-docker` set.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    with:
+      push_dockerhub: true
+      push_ghcr: true
+      scan_container: true
+      attest_provenance: true
+    secrets:
+      DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
+      DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
+```

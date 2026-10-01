@@ -104,3 +104,49 @@ jobs:
       get_sbom: true
       expected_sbom_count: 2
 ```
+
+### Attestable artefacts
+
+`get_sbom` handles SBOMs specifically, but other workflow artefacts (e.g. Trivy container CVE reports, ZAP scan reports) can also be attached as release assets via `additional_release_artifact_patterns`. This is an allowlist glob passed directly to `actions/download-artifact`'s `pattern` input. Use the extglob brace syntax (e.g. `{a,b}`) to match more than one artefact name. `actions: read` is required to download artefacts produced by other jobs in the same run.
+
+By default (`generate_checksums: true`), a `checksums.sha256` manifest of every attached asset is generated and attached as a release asset itself.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    with:
+      push_ghcr: true
+      scan_container: true
+
+  sbom:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    needs: [build-docker]
+    permissions:
+      contents: read
+
+  scan-zap:
+    uses: digicatapult/shared-workflows/.github/workflows/scan-zap.yml@main
+    needs: [build-docker]
+    permissions:
+      contents: read
+    with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
+      docker_compose_file: docker-compose.yml
+      target: "http://localhost:3000"
+
+  release-github:
+    uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
+    needs: [build-docker, sbom, scan-zap]
+    permissions:
+      pull-requests: read
+      contents: write
+      actions: read
+    with:
+      get_sbom: true
+      additional_release_artifact_patterns: "{*-trivy-container-report,zap_scan-*}"
+```
