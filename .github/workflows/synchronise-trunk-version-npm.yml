@@ -18,7 +18,7 @@ on:
         required: true
 jobs:
   find-pull-requests:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       pr_list: ${{ steps.find.outputs.pr_list }}

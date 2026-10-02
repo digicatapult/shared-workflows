@@ -94,7 +94,7 @@ on:
 jobs:
   generate-sbom:
     name: "Generate SBOM"
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     outputs:
       sbom_file: ${{ steps.set-filename.outputs.filename }}

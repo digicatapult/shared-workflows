@@ -39,7 +39,7 @@ jobs:
   e2e-tests:
     name: Run e2e tests
     timeout-minutes: ${{ inputs.timeout_minutes || 45 }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - name: Set environment variables from JSON

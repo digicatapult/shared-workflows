@@ -33,7 +33,7 @@ jobs:
       (inputs.enable_semgrep_action == true) &&
       (github.actor != 'dependabot[bot]')
     name: Semgrep CE
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - uses: actions/checkout@v7

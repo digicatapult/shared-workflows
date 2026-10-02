@@ -82,7 +82,7 @@ on:
 jobs:
   prepare:
     name: Prepare build
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     outputs:
       repo_name: ${{ steps.repo_ids.outputs.REPO_NAME }}
@@ -178,9 +178,9 @@ jobs:
           for raw in "${PLATS[@]}"; do
             p=$(echo "$raw" | xargs)
             case "$p" in
-              linux/amd64) runner="ubuntu-26.04"; native=true ;;
+              linux/amd64) runner="ubuntu-latest"; native=true ;;
               linux/arm64) runner="$ARM64_RUNNER"; native=true ;;
-              *) runner="ubuntu-26.04"; native=false ;;
+              *) runner="ubuntu-latest"; native=false ;;
             esac
             slug=$(echo "$p" | tr '/' '-')
             ENTRIES+=("{\"platform\":\"$p\",\"runner\":\"$runner\",\"native\":$native,\"slug\":\"$slug\"}")
@@ -329,7 +329,7 @@ jobs:
           && needs.prepare.result == 'success'
           && needs.build.result == 'success'
           && (needs.scan-image.result == 'success' || needs.scan-image.result == 'skipped') }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     steps:
       - name: Download digests
@@ -418,7 +418,7 @@ jobs:
     name: Scan image for CVEs
     needs: [prepare, build]
     if: ${{ inputs.scan_container }}
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     permissions:
       contents: read
