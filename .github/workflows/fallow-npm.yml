@@ -32,6 +32,11 @@ on:
         required: false
         type: string
         default: ""
+      scope:
+        description: "'changed' reports only findings on lines added by the pull request; 'all' reports findings across the whole codebase."
+        required: false
+        type: string
+        default: changed
       fail_on_issues:
         description: Fail the job when Fallow reports issues. Off by default so the audit is advisory.
         required: false
@@ -43,7 +48,7 @@ on:
         type: boolean
         default: true
       review_comments:
-        description: Post findings as inline PR review comments.
+        description: Post findings as inline PR review comments. Only applies when scope is 'changed'; with 'all', findings are emitted as annotations instead.
         required: false
         type: boolean
         default: true
@@ -62,6 +67,13 @@ jobs:
       pull-requests: write
       checks: write
     steps:
+      - name: Validate scope
+        if: ${{ inputs.scope != 'changed' && inputs.scope != 'all' }}
+        env:
+          SCOPE: ${{ inputs.scope }}
+        run: |
+          echo "::error::scope must be 'changed' or 'all', got: ${SCOPE}"
+          exit 1
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -79,8 +91,11 @@ jobs:
           version: ${{ inputs.fallow_version }}
           root: ${{ inputs.root }}
           config: ${{ inputs.config }}
+          auto-changed-since: ${{ inputs.scope == 'changed' }}
+          diff-filter: ${{ inputs.scope == 'changed' && 'added' || 'nofilter' }}
           fail-on-issues: ${{ inputs.fail_on_issues }}
           comment: ${{ inputs.comment }}
-          review-comments: ${{ inputs.review_comments }}
+          # Inline review comments can only target lines in the PR diff.
+          review-comments: ${{ inputs.review_comments && inputs.scope == 'changed' }}
           args: ${{ inputs.args }}
           branded-token: false

@@ -18,6 +18,21 @@ jobs:
       checks: write
 ```
 
+### Whole codebase, advisory
+
+```yaml
+jobs:
+  fallow:
+    uses: digicatapult/shared-workflows/.github/workflows/fallow-npm.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    with:
+      scope: all
+      fail_on_issues: false
+```
+
 ### Blocking, without installing dependencies
 
 ```yaml
