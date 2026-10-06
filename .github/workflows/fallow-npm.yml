@@ -82,8 +82,10 @@ jobs:
         with:
           node-version: ${{ inputs.node_version }}
           cache: npm
+          cache-dependency-path: ${{ inputs.root }}/package-lock.json
       - name: Install Packages
         if: ${{ inputs.install_dependencies }}
+        working-directory: ${{ inputs.root }}
         run: npm ci
       - name: Audit code
         uses: fallow-rs/fallow@71369f80d099e25726ad04382f15aef14a251abc # v3
@@ -93,6 +95,7 @@ jobs:
           config: ${{ inputs.config }}
           auto-changed-since: ${{ inputs.scope == 'changed' }}
           diff-filter: ${{ inputs.scope == 'changed' && 'added' || 'nofilter' }}
+          summary-scope: ${{ inputs.scope == 'changed' && 'diff' || 'all' }}
           fail-on-issues: ${{ inputs.fail_on_issues }}
           comment: ${{ inputs.comment }}
           # Inline review comments can only target lines in the PR diff.

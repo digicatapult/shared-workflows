@@ -626,7 +626,7 @@ Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to rep
 | node_version         | string  | The node version to use                                                                                           | `24.x`    | false    |
 | install_dependencies | boolean | Run `npm ci` before the audit so module resolution and type-aware analysis can use `node_modules`                 | `true`    | false    |
 | fallow_version       | string  | Fallow CLI version to install                                                                                     | `3.31.0`  | false    |
-| root                 | string  | Project root directory to analyse                                                                                 | `.`       | false    |
+| root                 | string  | Project root directory to analyse and install dependencies in                                                     | `.`       | false    |
 | config               | string  | Path to the Fallow config file; empty uses Fallow's auto-discovery (e.g. `.fallowrc.json`)                        | `""`      | false    |
 | scope                | string  | `changed` reports only findings on lines added by the pull request; `all` reports across the whole codebase       | `changed` | false    |
 | fail_on_issues       | boolean | Fail the job when Fallow reports issues; off by default so the audit is advisory and does not block pull requests | `false`   | false    |
