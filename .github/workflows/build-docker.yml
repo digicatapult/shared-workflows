@@ -74,11 +74,6 @@ on:
         type: string
         default: ""
         description: "Comma-separated CVE IDs (matched against VulnerabilityID) to exclude from the gate, e.g. for known vulnerabilities with no consumable upstream fix yet. Per-caller, so each repo accepts its own risk. Does not affect the report, which always lists every vulnerability regardless of this input."
-      attest_provenance:
-        required: false
-        type: boolean
-        default: false
-        description: "Generate a signed build provenance attestation for the Trivy CVE report using actions/attest. Only applies when scan_container is true."
     secrets:
       DOCKERHUB_USERNAME:
         required: false
@@ -427,9 +422,6 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
     permissions:
       contents: read
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     steps:
       - name: Download amd64 image
         uses: actions/download-artifact@v8
@@ -463,11 +455,6 @@ jobs:
           path: ${{ runner.temp }}/scan/trivy-report.json
           if-no-files-found: warn
           retention-days: 30
-      - name: Attest Trivy report provenance
-        if: ${{ inputs.attest_provenance }}
-        uses: actions/attest@v4
-        with:
-          subject-path: ${{ runner.temp }}/scan/trivy-report.json
       - name: Fail on gating vulnerabilities
         env:
           FAIL_SEVERITY: ${{ inputs.scan_fail_severity }}

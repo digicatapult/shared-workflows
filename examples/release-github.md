@@ -105,9 +105,9 @@ jobs:
       expected_sbom_count: 2
 ```
 
-### Attestable artefacts
+### Additional release artefacts
 
-`get_sbom` handles SBOMs specifically, but other workflow artefacts (e.g. Trivy container CVE reports, ZAP scan reports) can also be attached as release assets via `additional_release_artifact_patterns`. This is an allowlist glob passed directly to `actions/download-artifact`'s `pattern` input. Use the extglob brace syntax (e.g. `{a,b}`) to match more than one artefact name. `actions: read` is required to download artefacts produced by other jobs in the same run.
+`get_sbom` handles SBOMs specifically, but other workflow artefacts (e.g. Trivy container CVE reports, ZAP scan reports) can also be attached as release assets via `additional_release_artifact_patterns`. This is an allowlist glob passed directly to `actions/download-artifact`'s `pattern` input. Use the extglob brace syntax (e.g. `{a,b}`) to match more than one artefact name. `actions: read` is required to download artefacts produced by other jobs in the same run. Matched artefacts are downloaded into per-artefact directories and then flattened into uniquely-named files (`<artefact-name>-<filename>`) before being attached, so artefacts with the same internal filename (e.g. multiple images' Trivy reports, or multiple ZAP scan types) don't collide into a single release asset.
 
 By default (`generate_checksums: true`), a `checksums.sha256` manifest of every attached asset is generated and attached as a release asset itself.
 
@@ -150,3 +150,40 @@ jobs:
       get_sbom: true
       additional_release_artifact_patterns: "{*-trivy-container-report,zap_scan-*}"
 ```
+
+### Attesting the checksums manifest
+
+`checksums.sha256` (from `generate_checksums`) is a plain hash record, not a signed attestation. The release job that knows exactly which files shipped is the one place that can attest it meaningfully. Do this in a new job after `release-github`. Also note that `checksums.sha256` isn't exposed as a workflow output, so download it from the release itself rather than a workflow/PR artifact.
+
+```yaml
+jobs:
+  release-github:
+    uses: digicatapult/shared-workflows/.github/workflows/release-github.yml@main
+    needs: [build-docker]
+    permissions:
+      pull-requests: read
+      contents: write
+
+  attest-checksums:
+    needs: release-github
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      contents: read
+    steps:
+      - id: get_version
+        uses: digicatapult/check-version@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download checksums.sha256 from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "${{ steps.get_version.outputs.version }}" --pattern checksums.sha256
+      - uses: actions/attest@v4
+        with:
+          subject-checksums: checksums.sha256
+```
+
+Verify with `gh attestation verify checksums.sha256 --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --source-ref refs/heads/main` (see [Attest](../README.md#attest-examples) for the full explanation of `--signer-repo`).

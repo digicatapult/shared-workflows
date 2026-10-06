@@ -1,0 +1,129 @@
+name: Attest
+
+on:
+  workflow_call:
+    inputs:
+      timeout_minutes:
+        required: false
+        type: number
+        default: 0
+      subject-path:
+        required: false
+        type: string
+        description: "Path (or newline/comma-delimited list, or glob) to the file(s) to attest for build provenance. Mutually exclusive with subject-checksums and subject-digest."
+      subject-checksums:
+        required: false
+        type: string
+        description: "Path to a sha256sum-format checksums manifest. Every file it lists becomes a subject of a single attestation. Mutually exclusive with subject-path and subject-digest."
+      subject-digest:
+        required: false
+        type: string
+        description: "SHA256 digest of an image to attest, in the form sha256:<hex>. Requires subject-name. Mutually exclusive with subject-path and subject-checksums."
+      subject-name:
+        required: false
+        type: string
+        description: "Fully-qualified image name (no tag) for subject-digest, e.g. ghcr.io/org/image."
+      predicate-type:
+        required: false
+        type: string
+        description: "URI identifying the predicate type for a custom attestation. Leave empty for a plain SLSA build provenance attestation."
+      predicate-path:
+        required: false
+        type: string
+        description: "Path to the file providing the predicate content (e.g. the Trivy report or SBOM to associate with subject-digest). Requires predicate-type."
+      push-to-registry:
+        required: false
+        type: boolean
+        default: false
+        description: "Attach the attestation to the image in the registry as well as GH attestations. Only valid with subject-digest."
+      subject-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run) to download before attesting, whose content becomes subject-path. Mutually exclusive with providing subject-path directly."
+      predicate-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run) to download before attesting, whose content becomes predicate-path."
+jobs:
+  attest:
+    name: "Attest"
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
+    steps:
+      - name: Validate subject inputs
+        shell: bash
+        env:
+          SUBJECT_PATH: ${{ inputs.subject-path }}
+          SUBJECT_CHECKSUMS: ${{ inputs.subject-checksums }}
+          SUBJECT_DIGEST: ${{ inputs.subject-digest }}
+          SUBJECT_NAME: ${{ inputs.subject-name }}
+          SUBJECT_ARTIFACT_NAME: ${{ inputs.subject-artifact-name }}
+          PREDICATE_TYPE: ${{ inputs.predicate-type }}
+          PREDICATE_PATH: ${{ inputs.predicate-path }}
+          PREDICATE_ARTIFACT_NAME: ${{ inputs.predicate-artifact-name }}
+          PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
+        run: |
+          set -euo pipefail
+          count=0
+          [ -n "$SUBJECT_PATH" ] && count=$((count + 1))
+          [ -n "$SUBJECT_CHECKSUMS" ] && count=$((count + 1))
+          [ -n "$SUBJECT_DIGEST" ] && count=$((count + 1))
+          [ -n "$SUBJECT_ARTIFACT_NAME" ] && count=$((count + 1))
+          if [ "$count" -ne 1 ]; then
+            echo "::error::Exactly one of subject-path, subject-checksums, subject-digest or subject-artifact-name must be set (got ${count})." >&2
+            exit 1
+          fi
+          if [ -n "$SUBJECT_DIGEST" ] && [ -z "$SUBJECT_NAME" ]; then
+            echo "::error::subject-name is required when subject-digest is set." >&2
+            exit 1
+          fi
+          if [ -z "$SUBJECT_DIGEST" ] && [ "$PUSH_TO_REGISTRY" = "true" ]; then
+            echo "::error::push-to-registry is only valid with subject-digest." >&2
+            exit 1
+          fi
+          if [ -n "$PREDICATE_TYPE" ] && [ -z "$PREDICATE_PATH" ] && [ -z "$PREDICATE_ARTIFACT_NAME" ]; then
+            echo "::error::predicate-path or predicate-artifact-name is required when predicate-type is set." >&2
+            exit 1
+          fi
+          if [ -z "$PREDICATE_TYPE" ] && { [ -n "$PREDICATE_PATH" ] || [ -n "$PREDICATE_ARTIFACT_NAME" ]; }; then
+            echo "::error::predicate-type is required when predicate-path or predicate-artifact-name is set." >&2
+            exit 1
+          fi
+          if [ -n "$PREDICATE_PATH" ] && [ -n "$PREDICATE_ARTIFACT_NAME" ]; then
+            echo "::error::predicate-path and predicate-artifact-name are mutually exclusive." >&2
+            exit 1
+          fi
+      - name: Download subject artifact
+        if: inputs.subject-artifact-name != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.subject-artifact-name }}
+          path: attest-subject
+      - name: Download predicate artifact
+        if: inputs.predicate-artifact-name != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.predicate-artifact-name }}
+          path: attest-predicate
+      - name: Resolve downloaded artifact paths
+        if: inputs.subject-artifact-name != '' || inputs.predicate-artifact-name != ''
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.subject-artifact-name }}" ]; then
+            echo "subject-path=attest-subject/*" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "${{ inputs.predicate-artifact-name }}" ]; then
+            echo "predicate-path=$(find attest-predicate -type f | head -n1)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Attest
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ inputs.subject-artifact-name != '' && steps.resolve.outputs.subject-path || inputs.subject-path }}
+          subject-checksums: ${{ inputs.subject-checksums }}
+          subject-digest: ${{ inputs.subject-digest }}
+          subject-name: ${{ inputs.subject-name }}
+          predicate-type: ${{ inputs.predicate-type }}
+          predicate-path: ${{ inputs.predicate-artifact-name != '' && steps.resolve.outputs.predicate-path || inputs.predicate-path }}
+          push-to-registry: ${{ inputs.push-to-registry }}

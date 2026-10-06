@@ -46,9 +46,9 @@ jobs:
       DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
 ```
 
-### With container CVE scanning and a provenance attestation
+### With container CVE scanning
 
-Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). Adding `attest_provenance: true` additionally generates a signed build provenance attestation (via `actions/attest`) for the Trivy report, so it can be attached to a GitHub release (see [release-github.yml](release-github.md)) and verified independently of the workflow's 30-day artifact retention. This requires the extra permissions below on top of the standard `build-docker` set.
+Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). The report is uploaded as the `<image-name>-trivy-container-report` artifact. This requires no extra permissions on top of the standard `build-docker` set.
 
 ```yaml
 jobs:
@@ -58,15 +58,65 @@ jobs:
       contents: read
       packages: write
       security-events: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
     with:
       push_dockerhub: true
       push_ghcr: true
       scan_container: true
-      attest_provenance: true
     secrets:
       DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
       DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
 ```
+
+### Attesting the published image and its Trivy report
+
+To get a signed, verifiable claim that *this* released image was scanned with *this* result, attest the image digest as the subject with the Trivy report as the predicate. This is done with a new job set after `build-docker` has pushed the image.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    with:
+      push_dockerhub: false
+      push_ghcr: true
+      scan_container: true
+    secrets:
+      DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
+      DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
+
+  resolve-image-digest:
+    needs: build-docker
+    runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.inspect.outputs.digest }}
+    steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: inspect
+        run: |
+          DIGEST=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ github.sha }}" --format '{{json .Manifest}}' | jq -r '.digest')
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+  attest-image:
+    needs: [build-docker, resolve-image-digest]
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      actions: read
+    uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
+    with:
+      subject-name: ghcr.io/${{ github.repository }}
+      subject-digest: ${{ needs.resolve-image-digest.outputs.digest }}
+      predicate-type: https://trivy.dev/report/v1
+      predicate-artifact-name: ${{ github.event.repository.name }}-trivy-container-report
+```
+
+Verify with `gh attestation verify <image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --source-ref refs/heads/<branch>`.

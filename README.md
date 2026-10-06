@@ -17,6 +17,7 @@ Shared github workflows created by the `digicatapult` organisation.
 - [Check Version](#check-version-examples)
 - [Release Github](#release-github-examples)
 - [Release Module NPM](#release-module-npm-examples)
+- [Attest](#attest-examples)
 
 **Testing & quality**
 
@@ -182,13 +183,12 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | scan_fail_severity  | string  | Comma-separated severities that fail the build (the gate). The report artifact always contains every severity                                          | `CRITICAL`                            | false    |
 | scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)                                    | `true`                                | false    |
 | scan_ignore_cves    | string  | Comma-separated CVE IDs to exclude from the gate (e.g. known issues with no consumable upstream fix yet)                                               | `""`                                  | false    |
-| attest_provenance   | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the Trivy CVE report. Only applies when `scan_container` is `true`           | `false`                               | false    |
 
 Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
 For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build.
 
-When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only. There is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before. When `attest_provenance` is also enabled, the `scan-image` job additionally generates a signed build provenance attestation (via `actions/attest`) for the Trivy report, so its authenticity survives independently of the 30-day artifact retention.
+When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only. There is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before. To attest the published image (and/or the Trivy report) once it exists, see [Attest](#attest-examples).
 
 #### Permissions
 
@@ -199,9 +199,6 @@ When `scan_container` is enabled, the `build` job exports the built `linux/amd64
 | `packages: write`          | `build`, `merge` | Job   | To POST built packages/manifests to one or more container registries       | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `security-events: write`   | `merge`          | Job   | To POST new code scanning alerts based on the SARIF report                 | `inputs.push_dockerhub`/`inputs.push_ghcr` |
 | `contents: read`           | `scan-image`     | Job   | To download the exported image artifact and scan it (no secrets required)  | `inputs.scan_container`                    |
-| `id-token: write`          | `scan-image`     | Job   | To mint an OIDC token for Sigstore signing when attesting the Trivy report | `inputs.attest_provenance`                 |
-| `attestations: write`      | `scan-image`     | Job   | To persist the signed provenance attestation for the Trivy report          | `inputs.attest_provenance`                 |
-| `artifact-metadata: write` | `scan-image`     | Job   | Required by `actions/attest` to create the artifact storage record         | `inputs.attest_provenance`                 |
 
 #### Secrets
 
@@ -291,16 +288,17 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Workflow Description
 
-This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. When `get_sbom` is enabled, the workflow validates that `expected_sbom_count` `*.cdx.json` artefacts were downloaded before attaching them to the versioned release. When `additional_release_artifact_patterns` is set, matching workflow artefacts (e.g. Trivy or ZAP reports) are also downloaded and attached to both the versioned and `latest` releases, additive to the SBOM handling. When `generate_checksums` is enabled (the default) and at least one file is being attached, a `checksums.sha256` manifest of every attached asset is generated and attached as a release asset itself. This durable, tamper-evident hash record survives the 90-day workflow artifact retention window. The process involves:
+This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. When `get_sbom` is enabled, the workflow validates that `expected_sbom_count` `*.cdx.json` artefacts were downloaded before attaching them to the versioned release. When `additional_release_artifact_patterns` is set, matching workflow artefacts (e.g. Trivy or ZAP reports) are downloaded into per-artefact directories and then flattened into uniquely-named files (`<artefact-name>-<filename>`), so same-named files produced by different artefacts (e.g. multiple images, or multiple ZAP scan types) don't silently collide; a collision that survives flattening (e.g. two files with the same name nested inside one artefact) fails the step. When `generate_checksums` is enabled (the default) and at least one file is being attached, a `checksums.sha256` manifest of every attached asset is generated and attached as a release asset itself, so hashes remain verifiable after the 90-day workflow artifact retention window expires. This manifest is a plain hash record, not a signed attestation - it lives in the same mutable release as the files it describes, so it does not independently prove the files haven't been replaced. To get a verifiable, tamper-evident guarantee over exactly what shipped, attest `checksums.sha256` with [Attest](#attest-examples) in a job of your own that runs after this workflow. The process involves:
 
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
 4. **Validate SBOMs**: Confirms that the expected number of SBOM artefacts were downloaded when requested.
-5. **Download Additional Artefacts**: Downloads any workflow artefacts matching `additional_release_artifact_patterns`, when set.
-6. **Generate Checksums Manifest**: Computes a `checksums.sha256` of every file about to be attached, when `generate_checksums` is enabled.
+5. **Download and Flatten Additional Artefacts**: Downloads any workflow artefacts matching `additional_release_artifact_patterns` into per-artefact directories, then copies them into a single directory with artefact-prefixed filenames to avoid name collisions, when set.
+6. **Generate Checksums Manifest**: Computes a `checksums.sha256` of every file about to be attached, when `generate_checksums` is enabled, failing if any two assets would share a release asset name.
 7. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and all resolved release assets.
-8. **Build Latest Release**: Updates the `latest` tag to point to the newly created release, attaching the same release assets.
+8. **Clear Existing Latest Release**: Deletes the previous `latest` release and tag outright (rather than only overwriting same-named assets), so a file that stops being produced between releases (e.g. a narrowed pattern, a dropped scan, a renamed SBOM) can't linger on `latest` alongside a `checksums.sha256` that no longer lists it.
+9. **Build Latest Release**: Re-creates the `latest` tag and release pointing at the current commit, attaching the same, fresh set of release assets.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 
@@ -347,6 +345,57 @@ This GitHub Actions workflow publishes an NPM package, optionally building it be
 
 This workflow simplifies the process of publishing NPM packages by handling environment setup, versioning, and publication in a single automated sequence.
 
+### [Attest](.github/workflows/attest.yml) ([examples](examples/attest.md))
+
+Generates a signed [SLSA build provenance, SBOM, or custom attestation](https://github.com/actions/attest) (via `actions/attest`) for a file, a checksums manifest, or an image digest. This is a thin, generic wrapper, deliberately **not** called from inside `build-docker.yml`, `generate-sbom.yml`, `scan-zap.yml`, or `release-github.yml`.
+
+> [!IMPORTANT]
+> Reusable workflow permission checks apply to every job defined in a called workflow file, regardless of whether an `if:` condition would skip that job at runtime. A job requesting `id-token: write` (or any other elevated permission) fails every caller that hasn't granted it, even if the step is conditional on an input the caller never sets. Embedding this attestation logic inside the existing build/scan/release workflows would therefore break every caller that doesn't already grant these permissions, whether or not they use attestation. Instead, add a job for this workflow directly in **your own** top-level workflow, after the job that produced the artefact or image, and grant the permissions on that job yourself. This makes the permissions grant an explicit, visible opt-in action you take, not a surprise static failure.
+
+#### Inputs
+
+| Input             | Type    | Description                                                                                                                                                     | Default | Required |
+| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes   | number  | Overrides the job's default timeout of 10 minutes                                                                                                                | `0`     | false    |
+| subject-path      | string  | Path (or newline/comma-delimited list, or glob) to the file(s) to attest as build provenance. Mutually exclusive with `subject-checksums` and `subject-digest`   | `""`    | false    |
+| subject-checksums | string  | Path to a `sha256sum`-format checksums manifest; every file it lists becomes a subject of one attestation. Mutually exclusive with `subject-path`/`subject-digest` | `""`  | false    |
+| subject-digest    | string  | SHA256 digest of an image to attest, as `sha256:<hex>`. Requires `subject-name`. Mutually exclusive with `subject-path`/`subject-checksums`                      | `""`    | false    |
+| subject-name      | string  | Fully-qualified image name (no tag) for `subject-digest`, e.g. `ghcr.io/org/image`. Required when `subject-digest` is set                                       | `""`    | false    |
+| predicate-type    | string  | URI identifying the predicate type for a custom attestation (e.g. associating a Trivy report or SBOM with `subject-digest`). Requires `predicate-path`          | `""`    | false    |
+| predicate-path    | string  | Path to the file providing the predicate content. Requires `predicate-type`                                                                                      | `""`    | false    |
+| push-to-registry  | boolean | Attach the attestation to the image in the registry as well as GH attestations. Only valid with `subject-digest`; also requires the caller to log in to the registry and grant `packages: write` | `false` | false    |
+
+Exactly one of `subject-path`, `subject-checksums`, or `subject-digest` must be set; the job fails fast with a clear error otherwise.
+
+#### Permissions
+
+The workflow's own job declares no permissions itself - the caller's job (which invokes this workflow with `uses:`) must grant them, since that is the only point at which granting is an explicit, visible action:
+
+| Access                     | Reason                                                              | Conditions                                                        |
+| -------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `id-token: write`          | To mint an OIDC token for Sigstore signing                          | Always                                                             |
+| `attestations: write`      | To persist the signed attestation                                   | Always                                                             |
+| `artifact-metadata: write` | Required by `actions/attest` to create the artifact storage record  | Always                                                             |
+| `packages: write`          | To push the attestation to the image registry                       | `push-to-registry`                                                 |
+
+#### Workflow Description
+
+1. **Validate Subject Inputs**: Fails fast if the subject/predicate/push-to-registry inputs are combined incorrectly, rather than letting `actions/attest` fail with a less direct error.
+2. **Attest**: Calls `actions/attest@v4` with whichever subject/predicate inputs were provided.
+
+#### Verifying an attestation
+
+The signing identity is this repository (`digicatapult/shared-workflows`), not the calling repository, because `actions/attest` always signs as the workflow file that invokes it. Verify with:
+
+```bash
+gh attestation verify <asset> \
+  --repo digicatapult/<repo> \
+  --signer-repo digicatapult/shared-workflows \
+  --source-ref refs/heads/main
+```
+
+`--signer-repo` is required - the default `gh attestation verify --repo digicatapult/<repo>` check looks for a signer identity matching the calling repository and will reject a valid attestation produced by this workflow. `--source-ref refs/heads/main` is recommended so that attestations produced by PR runs (where inputs such as a scanner image can be caller-controlled) aren't accepted as equivalent to a release-time attestation from `main`.
+
 ### [Generate SBOM](.github/workflows/generate-sbom.yml) ([examples](examples/generate-sbom.md))
 
 Generates a Software Bill of Materials (SBOM) using CycloneDX tools. This workflow supports both Node/NPM projects and Python/Poetry projects when `sbom_tool` is set to `@cyclonedx/cdxgen` (which supports `poetry.lock` / `pyproject.toml`) and `package_manager` is set to `poetry` for version detection. In mixed repositories, prefer passing `--type python` via `additional_args` when generating a Poetry-focused SBOM so the output is constrained to Python dependencies.
@@ -374,16 +423,12 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 | install_python_deps    | boolean | Install Python dependencies before SBOM generation                                                                                        | `false`                               | false    |
 | python_install_command | string  | Optional custom command to install Python dependencies                                                                                    | `""`                                  | false    |
 | upload_artifact        | boolean | Whether to upload the SBOM as a workflow artifact                                                                                         | `true`                                | false    |
-| attest_provenance      | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the SBOM file. Requires `upload_artifact` to also be true       | `false`                               | false    |
 
 #### Permissions
 
 | Access                     | Jobs used       | Level    | Reason                                                             | Conditions                 |
 | -------------------------- | --------------- | -------- | ------------------------------------------------------------------ | -------------------------- |
 | `contents: read`           | `generate-sbom` | Workflow | To GET repository contents                                         | N/A                        |
-| `id-token: write`          | `generate-sbom` | Workflow | To mint an OIDC token for Sigstore signing when attesting the SBOM | `inputs.attest_provenance` |
-| `attestations: write`      | `generate-sbom` | Workflow | To persist the signed provenance attestation for the SBOM          | `inputs.attest_provenance` |
-| `artifact-metadata: write` | `generate-sbom` | Workflow | Required by `actions/attest` to create the artifact storage record | `inputs.attest_provenance` |
 
 #### Secrets
 
@@ -409,8 +454,9 @@ This GitHub Actions workflow generates an SBOM for a project. It allows flexibil
 4. **Build (Optional)**: Runs a build command if specified, useful for projects that need compilation before SBOM generation.
 5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
-7. **Attest Provenance (Optional)**: When `attest_provenance` is enabled, generates a signed build provenance attestation for the SBOM file via `actions/attest`.
-8. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
+7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
+
+To attest the SBOM file once uploaded, see [Attest](#attest-examples).
 
 ### [Generate Security Scorecard](.github/workflows/generate-security-scorecard.yml) ([examples](examples/generate-security-scorecard.md))
 
@@ -867,7 +913,6 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | api_scan_format     | string  | API definition format for the `api` scan type: `openapi`, `soap`, or `graphql`                                               | `openapi`                          | false    |
 | automation_plan     | string  | File path of the ZAP Automation Framework plan; required when using `automation-framework`                                   | `""`                               | false    |
 | docker_env_vars     | string  | Newline-separated names of environment variables, used only by the `automation-framework` scan type                          | `""`                               | false    |
-| attest_provenance   | boolean | Generate a signed build provenance attestation (via `actions/attest`) for the ZAP report(s)                                  | `false`                            | false    |
 
 #### Permissions
 
@@ -876,9 +921,6 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | `contents: read`           | `zap-scan` | Workflow | To GET repository contents and pass rules files into the ZAP container | N/A                          |
 | `packages: read`           | `zap-scan` | Job      | To authenticate with GHCR and pull Docker images                       | `inputs.pull_ghcr`           |
 | `issues: write`            | `zap-scan` | Job      | To allow ZAP to create or update a GitHub issue with scan findings     | `inputs.allow_issue_writing` |
-| `id-token: write`          | `zap-scan` | Job      | To mint an OIDC token for Sigstore signing when attesting ZAP reports  | `inputs.attest_provenance`   |
-| `attestations: write`      | `zap-scan` | Job      | To persist the signed provenance attestation for ZAP reports           | `inputs.attest_provenance`   |
-| `artifact-metadata: write` | `zap-scan` | Job      | Required by `actions/attest` to create the artifact storage record     | `inputs.attest_provenance`   |
 
 #### Workflow Description
 
@@ -889,5 +931,6 @@ This GitHub Actions workflow runs OWASP ZAP DAST scans against a locally running
 3. **Run Pre-Scan Command** _(optional)_: Executes `pre_scan_command` on the runner for use cases where the application is started directly rather than via Docker Compose.
 4. **Wait for Target** _(skipped for `automation-framework`)_: Polls `target` with `curl` at two-second intervals until it responds successfully or `target_wait_timeout` is reached.
 5. **ZAP Scan**: Runs the selected ZAP action for each `matrix.scan_type`. Report artifacts are uploaded under `artifact_name-<scan_type>` to avoid collisions when multiple types run in parallel.
-6. **Attest Provenance (Optional)**: When `attest_provenance` is enabled, generates a signed build provenance attestation for the report file(s) of each scan type.
-7. **Upload Automation Framework Report** _(only for `automation-framework`)_: Parses `automation_plan` for any `report` jobs, locates the generated report file(s) on the runner (via the `/zap/wrk` → `$GITHUB_WORKSPACE` mapping), and uploads them as an artifact under `artifact_name-automation-framework`.
+6. **Upload Automation Framework Report** _(only for `automation-framework`)_: Parses `automation_plan` for any `report` jobs, locates the generated report file(s) on the runner (via the `/zap/wrk` → `$GITHUB_WORKSPACE` mapping), and uploads them as an artifact under `artifact_name-automation-framework`.
+
+To attest a report once uploaded, see [Attest](#attest-examples).
