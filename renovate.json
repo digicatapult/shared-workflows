@@ -13,6 +13,30 @@
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+default: \"[^:\"]+:(?<currentValue>[^\"]+)\""
       ],
       "datasourceTemplate": "{{{datasource}}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "^\\.github/workflows/fallow-npm\\.yml$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+default: \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "{{{datasource}}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "^README\\.md$",
+        "^examples/fallow-npm\\.md$"
+      ],
+      "matchStrings": [
+        "\\| fallow_version\\s+\\|[^|]+\\|[^|]+\\| `(?<currentValue>[^`]+)`",
+        "npx fallow@(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "fallow_version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
+      ],
+      "depNameTemplate": "fallow",
+      "datasourceTemplate": "npm"
     }
   ]
 }

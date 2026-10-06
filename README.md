@@ -28,6 +28,7 @@ Shared github workflows created by the `digicatapult` organisation.
 - [NPM E2E Tests](#npm-e2e-tests-examples)
 - [NPM Tests](#npm-tests-examples)
 - [NPM Migration Checks](#npm-migration-checks-examples)
+- [NPM Fallow Audit](#npm-fallow-audit-examples)
 
 **Security & analysis**
 
@@ -612,6 +613,67 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 7. **Vulnerability Scanning**: Run Semgrep CE to identify security vulnerabilities and upload the results in SARIF format to GitHub.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
+
+### [NPM Fallow Audit](.github/workflows/fallow-npm.yml) ([examples](examples/fallow-npm.md))
+
+Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to report unused code, duplication and complexity, either for the changes in a pull request or across the whole codebase. Fallow is installed by the workflow at a pinned version, so it does not need to be an application or dev dependency of the caller. The workflow is advisory by default.
+
+#### Inputs
+
+| Input                | Type    | Description                                                                                                                                                                            | Default   | Required |
+| -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- | -------- |
+| timeout_minutes      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `fallow` 15                                                                           | `0`       | false    |
+| node_version         | string  | The node version to use                                                                                                                                                                | `24.x`    | false    |
+| install_dependencies | boolean | Run `npm ci --ignore-scripts` before the audit so module resolution and type-aware analysis can use `node_modules`. Only disable it when the Fallow config does not enable `typeAware` | `true`    | false    |
+| fallow_version       | string  | Fallow CLI version to install; callers that block on findings should pin it                                                                                                            | `3.31.0`  | false    |
+| root                 | string  | Project root to analyse and install dependencies in; must contain a `package-lock.json`                                                                                                | `.`       | false    |
+| workspace            | string  | Scope findings to npm workspaces (comma-separated names, globs or paths); use this rather than `root` for a workspace member                                                           | `""`      | false    |
+| config               | string  | Path to the Fallow config file; empty uses Fallow's auto-discovery (e.g. `.fallowrc.json`)                                                                                             | `""`      | false    |
+| scope                | string  | `changed` or `all`; see [Scope and blocking](#scope-and-blocking)                                                                                                                       | `changed` | false    |
+| fail_on              | string  | `none`, `new` or `any`; see [Scope and blocking](#scope-and-blocking)                                                                                                                  | `none`    | false    |
+| analyses             | string  | Comma-separated analyses to run (`dead-code`, `dupes`, `health`); empty runs all. Not supported with `fail_on: new`                                                                    | `""`      | false    |
+| baseline             | string  | Path to a committed Fallow baseline; findings already in it are not reported. Not supported with `fail_on: new`                                                                        | `""`      | false    |
+| comment              | boolean | Post a sticky PR comment and Fallow check run                                                                                                                                          | `true`    | false    |
+| review_comments      | boolean | Post findings as inline PR review comments; only applies when `scope` is `changed`                                                                                                     | `true`    | false    |
+| annotations          | boolean | Emit findings as workflow annotations when inline review comments are not posted                                                                                                       | `true`    | false    |
+| args                 | string  | Additional space-separated arguments passed to the Fallow CLI; gate flags passed here only warn and never fail the job                                                                 | `""`      | false    |
+
+#### Scope and blocking
+
+`scope` selects which findings are reported:
+
+- `changed`: findings on lines the pull request adds, plus findings that Fallow anchors to a whole file (such as circular dependencies) in files the pull request touches.
+- `all`: the whole codebase.
+
+`changed` cannot see dead code that a pull request creates in a file it does not touch, for example removing the last caller of an export defined elsewhere. Only `scope: all` reports that. `changed` only applies to `pull_request` events: on any other event Fallow has no base to compare against, so the run reports the whole codebase and the workflow does not fail it.
+
+`fail_on` selects what fails the job:
+
+- `none` (default): never fails. Findings are reported in the PR comment and annotations only. Annotation levels follow the rule severities in the caller's Fallow config; set `annotations: false` to drop them.
+- `new`: runs `fallow audit` with `gate: new-only`. The job fails only on findings the pull request introduces and that have `error` severity in the Fallow config; findings with `warn` severity are reported without failing. Findings that already existed are excluded. Requires `scope: changed`.
+- `any`: fails on every finding in scope, whatever its severity, including file-level findings that the pull request did not introduce.
+
+To gate dead code across the whole codebase, including files a pull request orphans, use `scope: all`, `analyses: dead-code`, `fail_on: any` and a committed `baseline`, so that only findings missing from the baseline fail. In a combined run the baseline only covers dead code, which is why `analyses` should be limited to `dead-code`.
+
+Blocking callers should pin `fallow_version`: the default is bumped centrally by Renovate, and a new Fallow release can add or tighten rules. Callers should refer to the workflow's `fallow_version` in their own documentation rather than repeating the number.
+
+#### Permissions
+
+The caller must always grant all three permissions. Job permissions in a reusable workflow are fixed, so the run is rejected at startup if any is missing, even when `comment` and `review_comments` are off.
+
+| Access                 | Jobs used | Level | Reason                                              | Conditions      |
+| ---------------------- | --------- | ----- | --------------------------------------------------- | --------------- |
+| `contents: read`       | `fallow`  | Job   | To GET repository contents and history for analysis | N/A             |
+| `pull-requests: write` | `fallow`  | Job   | To POST the sticky PR comment and inline review     | Always required |
+| `checks: write`        | `fallow`  | Job   | To POST the Fallow check run                        | Always required |
+
+#### Workflow Description
+
+1. **Resolve Settings**: Validates `scope` and `fail_on`, and turns off blocking when a PR-scoped run is triggered by a non-pull-request event.
+2. **Checkout**: Checks out the full history so Fallow can compute PR diffs and history-based metrics. Git credentials are not persisted.
+3. **Node Setup (Optional)**: Configures Node.js with npm caching when `install_dependencies` is enabled.
+4. **Install Packages (Optional)**: Runs `npm ci --ignore-scripts` in `root` when `install_dependencies` is enabled.
+5. **Audit Code**: Runs the `fallow-rs/fallow` action with the pinned `fallow_version`, using `fallow audit` when `fail_on` is `new`. Results are posted as a PR comment and either inline review comments (`scope: changed`) or annotations.
 
 ### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml) ([examples](examples/tests-e2e.md))
 
