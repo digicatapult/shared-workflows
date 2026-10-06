@@ -23,37 +23,57 @@ on:
         # renovate: datasource=npm depName=fallow
         default: "3.31.0"
       root:
-        description: Project root directory to analyse.
+        description: Project root directory to analyse and install dependencies in. Must contain the package-lock.json; use `workspace` to narrow to an npm workspace member.
         required: false
         type: string
         default: "."
+      workspace:
+        description: Scope findings to one or more npm workspaces (package names, globs or paths, comma-separated). Empty analyses every workspace.
+        required: false
+        type: string
+        default: ""
       config:
         description: Path to the Fallow config file. Empty uses Fallow's auto-discovery.
         required: false
         type: string
         default: ""
       scope:
-        description: "'changed' reports only findings on lines added by the pull request; 'all' reports findings across the whole codebase."
+        description: "'changed' reports findings on lines added by the pull request plus file-level findings in changed files; 'files' reports any finding in a file the pull request touches; 'all' reports the whole codebase. 'changed' and 'files' only apply to pull_request events."
         required: false
         type: string
         default: changed
-      fail_on_issues:
-        description: Fail the job when Fallow reports issues. Off by default so the audit is advisory.
+      fail_on:
+        description: "'none' never fails (advisory); 'new' runs `fallow audit` and fails only on error-severity findings the pull request introduces; 'any' fails on every finding in scope, regardless of severity."
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: none
+      analyses:
+        description: Comma-separated analyses to run (dead-code, dupes, health). Empty runs all. Not supported with fail_on 'new'.
+        required: false
+        type: string
+        default: ""
+      baseline:
+        description: Path to a committed Fallow baseline; findings already in it are not reported. Covers dead code only in a combined run, so pair with analyses 'dead-code'. Not supported with fail_on 'new'.
+        required: false
+        type: string
+        default: ""
       comment:
         description: Post a sticky PR comment and Fallow check run.
         required: false
         type: boolean
         default: true
       review_comments:
-        description: Post findings as inline PR review comments. Only applies when scope is 'changed'; with 'all', findings are emitted as annotations instead.
+        description: Post findings as inline PR review comments. Only applies when scope is 'changed'; otherwise findings are emitted as annotations.
+        required: false
+        type: boolean
+        default: true
+      annotations:
+        description: Emit findings as workflow annotations when inline review comments are not posted.
         required: false
         type: boolean
         default: true
       args:
-        description: Additional space-separated arguments passed to the Fallow CLI.
+        description: Additional space-separated arguments passed to the Fallow CLI. Gate flags passed here only warn and never fail the job.
         required: false
         type: string
         default: ""
@@ -67,16 +87,49 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - name: Validate scope
-        if: ${{ inputs.scope != 'changed' && inputs.scope != 'all' }}
+      - name: Resolve settings
+        id: settings
         env:
           SCOPE: ${{ inputs.scope }}
+          FAIL_ON: ${{ inputs.fail_on }}
+          ANALYSES: ${{ inputs.analyses }}
+          BASELINE: ${{ inputs.baseline }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          echo "::error::scope must be 'changed' or 'all', got: ${SCOPE}"
-          exit 1
+          case "$SCOPE" in changed|files|all) ;; *) echo "::error::scope must be 'changed', 'files' or 'all', got: ${SCOPE}"; exit 1 ;; esac
+          case "$FAIL_ON" in none|new|any) ;; *) echo "::error::fail_on must be 'none', 'new' or 'any', got: ${FAIL_ON}"; exit 1 ;; esac
+          if [[ "$FAIL_ON" == "new" && "$SCOPE" == "all" ]]; then
+            echo "::error::fail_on 'new' compares against the pull request base and needs scope 'changed' or 'files'. To gate the whole codebase use fail_on 'any' with a baseline."
+            exit 1
+          fi
+          if [[ "$FAIL_ON" == "new" && ( -n "$ANALYSES" || -n "$BASELINE" ) ]]; then
+            echo "::error::analyses and baseline are not supported with fail_on 'new'."
+            exit 1
+          fi
+
+          if [[ "$SCOPE" != "all" && "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "pull_request_target" ]]; then
+            # Without a PR base Fallow analyses the whole codebase, so do not gate on it.
+            echo "::notice::scope '${SCOPE}' only applies to pull requests; this ${EVENT_NAME} run reports the whole codebase without failing."
+            FAIL_ON=none
+          fi
+
+          command=""
+          gate=""
+          fail_on_issues=false
+          case "$FAIL_ON" in
+            new) command=audit; gate=new-only; fail_on_issues=true ;;
+            any) fail_on_issues=true ;;
+          esac
+          {
+            echo "command=${command}"
+            echo "gate=${gate}"
+            echo "fail_on_issues=${fail_on_issues}"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          # History is only needed to diff against the pull request base.
+          fetch-depth: ${{ inputs.scope == 'all' && 1 || 0 }}
+          persist-credentials: false
       - uses: actions/setup-node@v7
         if: ${{ inputs.install_dependencies }}
         with:
@@ -86,19 +139,25 @@ jobs:
       - name: Install Packages
         if: ${{ inputs.install_dependencies }}
         working-directory: ${{ inputs.root }}
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Audit code
         uses: fallow-rs/fallow@71369f80d099e25726ad04382f15aef14a251abc # v3
         with:
           version: ${{ inputs.fallow_version }}
+          command: ${{ steps.settings.outputs.command }}
+          gate: ${{ steps.settings.outputs.gate }}
           root: ${{ inputs.root }}
+          workspace: ${{ inputs.workspace }}
           config: ${{ inputs.config }}
-          auto-changed-since: ${{ inputs.scope == 'changed' }}
-          diff-filter: ${{ inputs.scope == 'changed' && 'added' || 'nofilter' }}
-          summary-scope: ${{ inputs.scope == 'changed' && 'diff' || 'all' }}
-          fail-on-issues: ${{ inputs.fail_on_issues }}
+          only: ${{ inputs.analyses }}
+          baseline: ${{ inputs.baseline }}
+          auto-changed-since: ${{ inputs.scope != 'all' }}
+          diff-filter: ${{ inputs.scope == 'changed' && 'added' || inputs.scope == 'files' && 'file' || 'nofilter' }}
+          summary-scope: ${{ inputs.scope == 'all' && 'all' || 'diff' }}
+          fail-on-issues: ${{ steps.settings.outputs.fail_on_issues }}
           comment: ${{ inputs.comment }}
           # Inline review comments can only target lines in the PR diff.
           review-comments: ${{ inputs.review_comments && inputs.scope == 'changed' }}
+          annotations: ${{ inputs.annotations }}
           args: ${{ inputs.args }}
           branded-token: false

@@ -32,7 +32,8 @@
       ],
       "matchStrings": [
         "\\| fallow_version\\s+\\|[^|]+\\|[^|]+\\| `(?<currentValue>[^`]+)`",
-        "npx fallow@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+        "npx fallow@(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "fallow_version: \"(?<currentValue>\\d+\\.\\d+\\.\\d+)\""
       ],
       "depNameTemplate": "fallow",
       "datasourceTemplate": "npm"
