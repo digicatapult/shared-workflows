@@ -629,7 +629,7 @@ Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to rep
 | root                 | string  | Project root to analyse and install dependencies in; must contain a `package-lock.json`                                                                                                | `.`       | false    |
 | workspace            | string  | Scope findings to npm workspaces (comma-separated names, globs or paths); use this rather than `root` for a workspace member                                                           | `""`      | false    |
 | config               | string  | Path to the Fallow config file; empty uses Fallow's auto-discovery (e.g. `.fallowrc.json`)                                                                                             | `""`      | false    |
-| scope                | string  | `changed`, `files` or `all`; see [Scope and blocking](#scope-and-blocking)                                                                                                             | `changed` | false    |
+| scope                | string  | `changed` or `all`; see [Scope and blocking](#scope-and-blocking)                                                                                                                       | `changed` | false    |
 | fail_on              | string  | `none`, `new` or `any`; see [Scope and blocking](#scope-and-blocking)                                                                                                                  | `none`    | false    |
 | analyses             | string  | Comma-separated analyses to run (`dead-code`, `dupes`, `health`); empty runs all. Not supported with `fail_on: new`                                                                    | `""`      | false    |
 | baseline             | string  | Path to a committed Fallow baseline; findings already in it are not reported. Not supported with `fail_on: new`                                                                        | `""`      | false    |
@@ -643,15 +643,14 @@ Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to rep
 `scope` selects which findings are reported:
 
 - `changed`: findings on lines the pull request adds, plus findings that Fallow anchors to a whole file (such as circular dependencies) in files the pull request touches.
-- `files`: any finding in a file the pull request touches.
 - `all`: the whole codebase.
 
-`changed` and `files` cannot see dead code that a pull request creates in a file it does not touch, for example removing the last caller of an export defined elsewhere. Only `scope: all` reports that. `changed` and `files` also only apply to `pull_request` events: on any other event Fallow has no base to compare against, so the run reports the whole codebase and the workflow does not fail it.
+`changed` cannot see dead code that a pull request creates in a file it does not touch, for example removing the last caller of an export defined elsewhere. Only `scope: all` reports that. `changed` only applies to `pull_request` events: on any other event Fallow has no base to compare against, so the run reports the whole codebase and the workflow does not fail it.
 
 `fail_on` selects what fails the job:
 
 - `none` (default): never fails. Findings are reported in the PR comment and annotations only. Annotation levels follow the rule severities in the caller's Fallow config; set `annotations: false` to drop them.
-- `new`: runs `fallow audit` with `gate: new-only`. The job fails only on findings the pull request introduces and that have `error` severity in the Fallow config; findings with `warn` severity are reported without failing. Findings that already existed are excluded. Requires `scope: changed` or `files`.
+- `new`: runs `fallow audit` with `gate: new-only`. The job fails only on findings the pull request introduces and that have `error` severity in the Fallow config; findings with `warn` severity are reported without failing. Findings that already existed are excluded. Requires `scope: changed`.
 - `any`: fails on every finding in scope, whatever its severity, including file-level findings that the pull request did not introduce.
 
 To gate dead code across the whole codebase, including files a pull request orphans, use `scope: all`, `analyses: dead-code`, `fail_on: any` and a committed `baseline`, so that only findings missing from the baseline fail. In a combined run the baseline only covers dead code, which is why `analyses` should be limited to `dead-code`.
@@ -671,7 +670,7 @@ The caller must always grant all three permissions. Job permissions in a reusabl
 #### Workflow Description
 
 1. **Resolve Settings**: Validates `scope` and `fail_on`, and turns off blocking when a PR-scoped run is triggered by a non-pull-request event.
-2. **Checkout**: Checks out the full history when `scope` is `changed` or `files`, and a shallow clone for `all`. Git credentials are not persisted.
+2. **Checkout**: Checks out the full history so Fallow can compute PR diffs and history-based metrics. Git credentials are not persisted.
 3. **Node Setup (Optional)**: Configures Node.js with npm caching when `install_dependencies` is enabled.
 4. **Install Packages (Optional)**: Runs `npm ci --ignore-scripts` in `root` when `install_dependencies` is enabled.
 5. **Audit Code**: Runs the `fallow-rs/fallow` action with the pinned `fallow_version`, using `fallow audit` when `fail_on` is `new`. Results are posted as a PR comment and either inline review comments (`scope: changed`) or annotations.

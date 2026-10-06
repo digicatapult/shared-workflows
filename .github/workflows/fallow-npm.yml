@@ -38,7 +38,7 @@ on:
         type: string
         default: ""
       scope:
-        description: "'changed' reports findings on lines added by the pull request plus file-level findings in changed files; 'files' reports any finding in a file the pull request touches; 'all' reports the whole codebase. 'changed' and 'files' only apply to pull_request events."
+        description: "'changed' reports findings on lines added by the pull request plus file-level findings; 'all' reports the whole codebase. 'changed' only applies to pull_request events."
         required: false
         type: string
         default: changed
@@ -96,10 +96,10 @@ jobs:
           BASELINE: ${{ inputs.baseline }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
-          case "$SCOPE" in changed|files|all) ;; *) echo "::error::scope must be 'changed', 'files' or 'all', got: ${SCOPE}"; exit 1 ;; esac
+          case "$SCOPE" in changed|all) ;; *) echo "::error::scope must be 'changed' or 'all', got: ${SCOPE}"; exit 1 ;; esac
           case "$FAIL_ON" in none|new|any) ;; *) echo "::error::fail_on must be 'none', 'new' or 'any', got: ${FAIL_ON}"; exit 1 ;; esac
-          if [[ "$FAIL_ON" == "new" && "$SCOPE" == "all" ]]; then
-            echo "::error::fail_on 'new' compares against the pull request base and needs scope 'changed' or 'files'. To gate the whole codebase use fail_on 'any' with a baseline."
+          if [[ "$FAIL_ON" == "new" && "$SCOPE" != "changed" ]]; then
+            echo "::error::fail_on 'new' compares against the pull request base and requires scope 'changed'. To gate the whole codebase use fail_on 'any' with a baseline."
             exit 1
           fi
           if [[ "$FAIL_ON" == "new" && ( -n "$ANALYSES" || -n "$BASELINE" ) ]]; then
@@ -107,7 +107,7 @@ jobs:
             exit 1
           fi
 
-          if [[ "$SCOPE" != "all" && "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "pull_request_target" ]]; then
+          if [[ "$SCOPE" == "changed" && "$EVENT_NAME" != "pull_request" && "$EVENT_NAME" != "pull_request_target" ]]; then
             # Without a PR base Fallow analyses the whole codebase, so do not gate on it.
             echo "::notice::scope '${SCOPE}' only applies to pull requests; this ${EVENT_NAME} run reports the whole codebase without failing."
             FAIL_ON=none
@@ -127,8 +127,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
-          # History is only needed to diff against the pull request base.
-          fetch-depth: ${{ inputs.scope == 'all' && 1 || 0 }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@v7
         if: ${{ inputs.install_dependencies }}
@@ -151,8 +150,8 @@ jobs:
           config: ${{ inputs.config }}
           only: ${{ inputs.analyses }}
           baseline: ${{ inputs.baseline }}
-          auto-changed-since: ${{ inputs.scope != 'all' }}
-          diff-filter: ${{ inputs.scope == 'changed' && 'added' || inputs.scope == 'files' && 'file' || 'nofilter' }}
+          auto-changed-since: ${{ inputs.scope == 'changed' }}
+          diff-filter: ${{ inputs.scope == 'changed' && 'added' || 'nofilter' }}
           summary-scope: ${{ inputs.scope == 'all' && 'all' || 'diff' }}
           fail-on-issues: ${{ steps.settings.outputs.fail_on_issues }}
           comment: ${{ inputs.comment }}
