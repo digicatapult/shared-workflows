@@ -1,0 +1,86 @@
+name: NPM Fallow audit
+on:
+  workflow_call:
+    inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
+      node_version:
+        required: false
+        type: string
+        default: 24.x
+      install_dependencies:
+        description: Run `npm ci` before the audit so module resolution and type-aware analysis can use node_modules.
+        required: false
+        type: boolean
+        default: true
+      fallow_version:
+        description: Fallow CLI version to install; it is not taken from the caller's package.json.
+        required: false
+        type: string
+        # renovate: datasource=npm depName=fallow
+        default: "3.31.0"
+      root:
+        description: Project root directory to analyse.
+        required: false
+        type: string
+        default: "."
+      config:
+        description: Path to the Fallow config file. Empty uses Fallow's auto-discovery.
+        required: false
+        type: string
+        default: ""
+      fail_on_issues:
+        description: Fail the job when Fallow reports issues. Off by default so the audit is advisory.
+        required: false
+        type: boolean
+        default: false
+      comment:
+        description: Post a sticky PR comment and Fallow check run.
+        required: false
+        type: boolean
+        default: true
+      review_comments:
+        description: Post findings as inline PR review comments.
+        required: false
+        type: boolean
+        default: true
+      args:
+        description: Additional space-separated arguments passed to the Fallow CLI.
+        required: false
+        type: string
+        default: ""
+jobs:
+  fallow:
+    name: Fallow audit
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        if: ${{ inputs.install_dependencies }}
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: npm
+      - name: Install Packages
+        if: ${{ inputs.install_dependencies }}
+        run: npm ci
+      - name: Audit code
+        uses: fallow-rs/fallow@71369f80d099e25726ad04382f15aef14a251abc # v3
+        with:
+          version: ${{ inputs.fallow_version }}
+          root: ${{ inputs.root }}
+          config: ${{ inputs.config }}
+          fail-on-issues: ${{ inputs.fail_on_issues }}
+          comment: ${{ inputs.comment }}
+          review-comments: ${{ inputs.review_comments }}
+          args: ${{ inputs.args }}
+          branded-token: false

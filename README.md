@@ -28,6 +28,7 @@ Shared github workflows created by the `digicatapult` organisation.
 - [NPM E2E Tests](#npm-e2e-tests-examples)
 - [NPM Tests](#npm-tests-examples)
 - [NPM Migration Checks](#npm-migration-checks-examples)
+- [NPM Fallow Audit](#npm-fallow-audit-examples)
 
 **Security & analysis**
 
@@ -612,6 +613,40 @@ This GitHub Actions workflow runs a series of static checks on an NPM project ba
 7. **Vulnerability Scanning**: Run Semgrep CE to identify security vulnerabilities and upload the results in SARIF format to GitHub.
 
 This flexible workflow enables dynamic static analysis checks to maintain code quality, making it adaptable to different project requirements.
+
+### [NPM Fallow Audit](.github/workflows/fallow-npm.yml) ([examples](examples/fallow-npm.md))
+
+Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to report unused code, duplication and complexity on the lines changed by a pull request. Fallow is installed by the workflow at a pinned version, so it does not need to be an application or dev dependency of the caller.
+
+#### Inputs
+
+| Input                | Type    | Description                                                                                                       | Default  | Required |
+| -------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- | -------- | -------- |
+| timeout_minutes      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `fallow` 15      | `0`      | false    |
+| node_version         | string  | The node version to use                                                                                           | `24.x`   | false    |
+| install_dependencies | boolean | Run `npm ci` before the audit so module resolution and type-aware analysis can use `node_modules`                 | `true`   | false    |
+| fallow_version       | string  | Fallow CLI version to install                                                                                     | `3.31.0` | false    |
+| root                 | string  | Project root directory to analyse                                                                                 | `.`      | false    |
+| config               | string  | Path to the Fallow config file; empty uses Fallow's auto-discovery (e.g. `.fallowrc.json`)                        | `""`     | false    |
+| fail_on_issues       | boolean | Fail the job when Fallow reports issues; off by default so the audit is advisory and does not block pull requests | `false`  | false    |
+| comment              | boolean | Post a sticky PR comment and Fallow check run                                                                     | `true`   | false    |
+| review_comments      | boolean | Post findings as inline PR review comments                                                                        | `true`   | false    |
+| args                 | string  | Additional space-separated arguments passed to the Fallow CLI                                                     | `""`     | false    |
+
+#### Permissions
+
+| Access                 | Jobs used | Level | Reason                                              | Conditions                                   |
+| ---------------------- | --------- | ----- | --------------------------------------------------- | -------------------------------------------- |
+| `contents: read`       | `fallow`  | Job   | To GET repository contents and history for analysis | N/A                                          |
+| `pull-requests: write` | `fallow`  | Job   | To POST the sticky PR comment and inline review     | `inputs.comment` or `inputs.review_comments` |
+| `checks: write`        | `fallow`  | Job   | To POST the Fallow check run                        | `inputs.comment`                             |
+
+#### Workflow Description
+
+1. **Checkout**: Checks out the full history so Fallow can scope findings to the pull request diff.
+2. **Node Setup (Optional)**: Configures Node.js with npm caching when `install_dependencies` is enabled.
+3. **Install Packages (Optional)**: Runs `npm ci` when `install_dependencies` is enabled.
+4. **Audit Code**: Runs the `fallow-rs/fallow` action with the pinned `fallow_version`, posting results as a PR comment and inline review comments. Findings are reported without failing the job unless `fail_on_issues` is set.
 
 ### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml) ([examples](examples/tests-e2e.md))
 
