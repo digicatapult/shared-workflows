@@ -24,7 +24,11 @@ on:
       subject-checksums:
         required: false
         type: string
-        description: "Path to a sha256sum-format checksums manifest. Every file it lists becomes a subject of a single attestation. Mutually exclusive with subject-path and subject-digest."
+        description: "Path to a sha256sum-format checksums manifest. Every file it lists becomes a subject of a single attestation. Mutually exclusive with subject-path, subject-digest and subject-checksums-artifact-name."
+      subject-checksums-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run, e.g. the stage-release-assets.yml bundle) containing a checksums.sha256 manifest at its root, to download and attest as subject-checksums. Mutually exclusive with the other subject inputs."
       subject-digest:
         required: false
         type: string
@@ -73,6 +77,7 @@ jobs:
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           SUBJECT_PATH: ${{ inputs.subject-path }}
           SUBJECT_CHECKSUMS: ${{ inputs.subject-checksums }}
+          SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ inputs.subject-checksums-artifact-name }}
           SUBJECT_DIGEST: ${{ inputs.subject-digest }}
           SUBJECT_NAME: ${{ inputs.subject-name }}
           SUBJECT_ARTIFACT_NAME: ${{ inputs.subject-artifact-name }}
@@ -90,7 +95,7 @@ jobs:
             printf '::error::%s\n' "$@" >&2
             exit 1
           }
-          scalars="${SUBJECT_PATH}${SUBJECT_CHECKSUMS}${SUBJECT_DIGEST}${SUBJECT_NAME}${SUBJECT_ARTIFACT_NAME}${PREDICATE_TYPE}${PREDICATE_PATH}${PREDICATE_ARTIFACT_NAME}"
+          scalars="${SUBJECT_PATH}${SUBJECT_CHECKSUMS}${SUBJECT_CHECKSUMS_ARTIFACT_NAME}${SUBJECT_DIGEST}${SUBJECT_NAME}${SUBJECT_ARTIFACT_NAME}${PREDICATE_TYPE}${PREDICATE_PATH}${PREDICATE_ARTIFACT_NAME}"
           mapfile -t images < <(read_list "${IMAGE_MATRIX}")
           mapfile -t predicates < <(read_list "${PREDICATE_MATRIX}")
 
@@ -136,10 +141,10 @@ jobs:
           else
             # Single-attestation mode: one matrix entry built from the scalar inputs.
             count=0
-            for value in "${SUBJECT_PATH}" "${SUBJECT_CHECKSUMS}" "${SUBJECT_DIGEST}" "${SUBJECT_ARTIFACT_NAME}"; do
+            for value in "${SUBJECT_PATH}" "${SUBJECT_CHECKSUMS}" "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" "${SUBJECT_DIGEST}" "${SUBJECT_ARTIFACT_NAME}"; do
               [[ -n "${value}" ]] && count=$((count + 1))
             done
-            (( count == 1 )) || fail "Exactly one of image-matrix, subject-path, subject-checksums, subject-digest or subject-artifact-name must be set (got ${count} single-attestation subjects)."
+            (( count == 1 )) || fail "Exactly one of image-matrix, subject-path, subject-checksums, subject-checksums-artifact-name, subject-digest or subject-artifact-name must be set (got ${count} single-attestation subjects)."
             [[ -z "${SUBJECT_DIGEST}" || -n "${SUBJECT_NAME}" ]] || fail "subject-name is required when subject-digest is set."
             [[ -n "${SUBJECT_DIGEST}" || "${PUSH_TO_REGISTRY}" != "true" ]] || fail "push-to-registry is only valid with subject-digest or image-matrix."
             if [[ -n "${PREDICATE_TYPE}" && -z "${PREDICATE_PATH}" && -z "${PREDICATE_ARTIFACT_NAME}" ]]; then
@@ -152,6 +157,7 @@ jobs:
             manifest=$(jq -cn \
               --arg subject_path "${SUBJECT_PATH}" \
               --arg subject_checksums "${SUBJECT_CHECKSUMS}" \
+              --arg subject_checksums_artifact_name "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" \
               --arg subject_digest "${SUBJECT_DIGEST}" \
               --arg subject_name "${SUBJECT_NAME}" \
               --arg subject_artifact_name "${SUBJECT_ARTIFACT_NAME}" \
@@ -162,6 +168,7 @@ jobs:
               '[{
                 "subject-path": $subject_path,
                 "subject-checksums": $subject_checksums,
+                "subject-checksums-artifact-name": $subject_checksums_artifact_name,
                 "subject-digest": $subject_digest,
                 "subject-name": $subject_name,
                 "subject-artifact-name": $subject_artifact_name,
@@ -196,6 +203,12 @@ jobs:
         with:
           name: ${{ matrix['subject-artifact-name'] }}
           path: attest-subject
+      - name: Download checksums manifest artifact
+        if: matrix['subject-checksums-artifact-name']
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix['subject-checksums-artifact-name'] }}
+          path: attest-checksums
       - name: Download predicate artifact
         if: matrix['predicate-artifact-name']
         uses: actions/download-artifact@v8
@@ -210,6 +223,8 @@ jobs:
           SUBJECT_DIGEST: ${{ matrix['subject-digest'] }}
           SUBJECT_ARTIFACT_NAME: ${{ matrix['subject-artifact-name'] }}
           SUBJECT_PATH: ${{ matrix['subject-path'] }}
+          SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ matrix['subject-checksums-artifact-name'] }}
+          SUBJECT_CHECKSUMS: ${{ matrix['subject-checksums'] }}
           PREDICATE_ARTIFACT_NAME: ${{ matrix['predicate-artifact-name'] }}
           PREDICATE_PATH: ${{ matrix['predicate-path'] }}
         run: |
@@ -225,6 +240,13 @@ jobs:
           if [[ -n "${SUBJECT_ARTIFACT_NAME}" ]]; then
             SUBJECT_PATH="attest-subject/*"
           fi
+          if [[ -n "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" ]]; then
+            SUBJECT_CHECKSUMS="attest-checksums/checksums.sha256"
+            if [[ ! -s "${SUBJECT_CHECKSUMS}" ]]; then
+              printf '::error::Artifact %s has no non-empty checksums.sha256 at its root.\n' "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" >&2
+              exit 1
+            fi
+          fi
           if [[ -n "${PREDICATE_ARTIFACT_NAME}" ]]; then
             PREDICATE_PATH=$(find attest-predicate -type f | sort | head -n1)
             if [[ -z "${PREDICATE_PATH}" ]]; then
@@ -235,6 +257,7 @@ jobs:
           {
             printf 'subject-digest=%s\n' "${SUBJECT_DIGEST}"
             printf 'subject-path=%s\n' "${SUBJECT_PATH}"
+            printf 'subject-checksums=%s\n' "${SUBJECT_CHECKSUMS}"
             printf 'predicate-path=%s\n' "${PREDICATE_PATH}"
           } >> "${GITHUB_OUTPUT}"
       - name: Login to GitHub Container Registry
@@ -248,7 +271,7 @@ jobs:
         uses: actions/attest@v4
         with:
           subject-path: ${{ steps.resolve.outputs.subject-path }}
-          subject-checksums: ${{ matrix['subject-checksums'] }}
+          subject-checksums: ${{ steps.resolve.outputs.subject-checksums }}
           subject-digest: ${{ steps.resolve.outputs.subject-digest }}
           subject-name: ${{ matrix['subject-name'] }}
           predicate-type: ${{ matrix['predicate-type'] }}

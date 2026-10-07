@@ -1,0 +1,120 @@
+name: Stage Release Assets
+
+on:
+  workflow_call:
+    inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
+      get_sbom:
+        required: false
+        type: boolean
+        default: false
+        description: "Include every *.cdx.json workflow artefact from this run (e.g. from generate-sbom.yml)."
+      expected_sbom_count:
+        required: false
+        type: number
+        default: 1
+        description: "Number of *.cdx.json artefacts expected when get_sbom is enabled."
+      additional_release_artifact_patterns:
+        required: false
+        type: string
+        default: ""
+        description: "Allowlist glob passed directly to actions/download-artifact's `pattern` input (supports extglob brace syntax) for additional artefacts to stage. Leave empty to skip."
+      artifact_name:
+        required: false
+        type: string
+        default: "release-assets"
+        description: "Name of the bundle artefact to upload, containing the flattened release assets and their checksums.sha256 manifest."
+    outputs:
+      artifact_name:
+        description: "Name of the uploaded bundle artefact, to pass to attest.yml (subject-checksums-artifact-name) and release-github.yml (release_assets_artifact_name)."
+        value: ${{ jobs.stage.outputs.artifact_name }}
+
+jobs:
+  # Selects, names and hashes release assets exactly once, so the manifest that
+  # gets attested and the files that get published are byte-for-byte the same.
+  stage:
+    name: "Stage release assets"
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
+    outputs:
+      artifact_name: ${{ inputs.artifact_name }}
+    steps:
+      - name: Validate inputs
+        env:
+          GET_SBOM: ${{ inputs.get_sbom }}
+          ADDITIONAL_PATTERNS: ${{ inputs.additional_release_artifact_patterns }}
+        run: |
+          set -euo pipefail
+          if [[ "${GET_SBOM}" != "true" && -z "${ADDITIONAL_PATTERNS}" ]]; then
+            printf '::error::Nothing to stage: set get_sbom and/or additional_release_artifact_patterns.\n' >&2
+            exit 1
+          fi
+      - name: Download SBOM artefacts
+        uses: actions/download-artifact@v8
+        if: inputs.get_sbom
+        with:
+          pattern: '*.cdx.json'
+          path: sboms
+          merge-multiple: true
+      - name: Validate SBOM count
+        if: inputs.get_sbom
+        env:
+          EXPECTED_SBOM_COUNT: ${{ inputs.expected_sbom_count }}
+        run: |
+          set -euo pipefail
+          sbom_count=$(find sboms -type f -name '*.cdx.json' -print 2>/dev/null | wc -l)
+          if [[ "${sbom_count}" -ne "${EXPECTED_SBOM_COUNT}" ]]; then
+            printf '::error::Expected %s SBOM artefact(s), found %s.\n' "${EXPECTED_SBOM_COUNT}" "${sbom_count}" >&2
+            exit 1
+          fi
+      - name: Download additional release artefacts
+        uses: actions/download-artifact@v8
+        if: inputs.additional_release_artifact_patterns != ''
+        with:
+          pattern: ${{ inputs.additional_release_artifact_patterns }}
+          path: additional-release-assets
+      - name: Flatten release assets
+        run: |
+          set -euo pipefail
+          shopt -s nullglob globstar
+          mkdir -p release-assets
+          stage() {
+            local src="$1" dest="release-assets/$2"
+            if [[ "$2" == "checksums.sha256" || -e "${dest}" ]]; then
+              printf '::error::Duplicate or reserved release asset name after flattening: %s. Rename the source files so each release asset name is unique.\n' "$2" >&2
+              exit 1
+            fi
+            cp "${src}" "${dest}"
+          }
+          for f in sboms/**/*.cdx.json; do
+            [[ -f "${f}" ]] || continue
+            stage "${f}" "$(basename "${f}")"
+          done
+          # Prefix each file with its artefact name, so same-named files from
+          # different artefacts (e.g. per-image Trivy reports) don't collide.
+          for f in additional-release-assets/**/*; do
+            [[ -f "${f}" ]] || continue
+            artefact_dir=$(dirname "${f}" | sed 's#^additional-release-assets/##; s#/.*##')
+            stage "${f}" "${artefact_dir}-$(basename "${f}")"
+          done
+          if [[ -z "$(ls -A release-assets)" ]]; then
+            printf '::error::No release assets were staged; check get_sbom and additional_release_artifact_patterns.\n' >&2
+            exit 1
+          fi
+      - name: Generate checksums manifest
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          sha256sum -- * > ../checksums.sha256
+          mv ../checksums.sha256 checksums.sha256
+          cat checksums.sha256
+      - name: Upload release assets bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: release-assets/
+          if-no-files-found: error

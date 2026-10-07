@@ -79,7 +79,7 @@ jobs:
 
 ### With a provenance attestation
 
-To generate a signed build provenance attestation for the SBOM file, add a job for [attest.yml](../.github/workflows/attest.yml) in your own workflow, after `generate-sbom`. This is useful when the SBOM is also being attached to a GitHub release via `release-github.yml`'s `additional_release_artifact_patterns`, so its authenticity can be independently verified. It's worth noting that this attests the SBOM file itself as an output of the workflow, rather than attesting the image the SBOM is paired with; the SBOM itself is an attestation of that.
+To generate a signed build provenance attestation for the SBOM file, add a job for [attest.yml](../.github/workflows/attest.yml) in your own workflow, after `generate-sbom`. This is useful when the SBOM is also being attached to a GitHub release via `stage-release-assets.yml` and `release-github.yml`, so its authenticity can be independently verified. It's worth noting that this attests the SBOM file itself as an output of the workflow, rather than attesting the image the SBOM is paired with; the SBOM itself is an attestation of that.
 
 ```yaml
 jobs:

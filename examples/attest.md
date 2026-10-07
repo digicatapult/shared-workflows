@@ -6,7 +6,7 @@
 
 There are three typical use cases:
 1. [Attesting a single artifact](#attesting-a-single-artifact), taking the name of the artifact
-2. [Attesting a release's checksums manifest](#attesting-a-releases-checksums-manifest), taking the name of the SHA256 checksum file
+2. [Attesting a release's checksums manifest](#attesting-a-releases-checksums-manifest), taking the name of the staged release assets artifact
 3. [Attesting images](#attesting-images), taking both the common GHCR image name(s) and the associated predicates (artifacts)
 
 Reusable workflow permission checks apply to every job defined in a called workflow file, regardless of whether an `if:` condition would skip that job at runtime. A job requesting `id-token: write` (or any other elevated permission) fails every caller that hasn't granted it, even when the step requesting it is conditional on an input the caller never sets. Embedding attestation inside the existing build/scan/release workflows would therefore break every existing caller of those workflows, whether or not they use attestation.
@@ -42,19 +42,35 @@ jobs:
 
 ### Attesting a release's checksums manifest
 
-Attesting `subject-checksums` covers every file listed in a `sha256sum`-format manifest with a single attestation - this is the recommended way to attest exactly what a GitHub release shipped (see [release-github.yml examples](release-github.md#attesting-the-releases-checksums-manifest) for a full, working example that downloads `checksums.sha256` back from the release itself).
+Attesting a checksums manifest covers every file it lists (in `sha256sum` format) with a single attestation. Use it to sign the release assets **before** they are published. [stage-release-assets.yml](../.github/workflows/stage-release-assets.yml) bundles the assets with a `checksums.sha256`. Pass that bundle's name as `subject-checksums-artifact-name`, and `attest.yml` downloads it and attests `checksums.sha256` from its root. `release-github` should depend on this job, so a failed attestation stops the release (see [release-github.yml examples](release-github.md#attest-then-release) for a full example).
 
 ```yaml
 jobs:
+  stage-release-assets:
+    uses: digicatapult/shared-workflows/.github/workflows/stage-release-assets.yml@main
+    needs: [sbom]
+    permissions:
+      actions: read
+    with:
+      get_sbom: true
+
   attest-checksums:
+    needs: [stage-release-assets]
     permissions:
       id-token: write
       attestations: write
       artifact-metadata: write
+      actions: read
     uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
     with:
-      subject-checksums: checksums.sha256
+      subject-checksums-artifact-name: ${{ needs.stage-release-assets.outputs.artifact_name }}
+
+  release-github:
+    needs: [stage-release-assets, attest-checksums]
+    # ...
 ```
+
+`subject-checksums` (a path) is still available if a manifest already exists on the runner, but in a reusable workflow it rarely does: each job starts on a fresh runner, so a file made in another job has to be passed in as an artifact.
 
 ### Attesting images
 

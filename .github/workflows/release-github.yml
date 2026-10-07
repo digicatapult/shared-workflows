@@ -11,24 +11,11 @@ on:
         required: false
         type: string
         default: "{}"
-      get_sbom:
-        required: false
-        type: boolean
-        default: false
-      expected_sbom_count:
-        required: false
-        type: number
-        default: 1
-      additional_release_artifact_patterns:
+      release_assets_artifact_name:
         required: false
         type: string
         default: ""
-        description: "Allowlist glob passed directly to actions/download-artifact's `pattern` input (supports extglob brace syntax for multiple artefacts to attach as additional release assets. Leave empty to skip."
-      generate_checksums:
-        required: false
-        type: boolean
-        default: true
-        description: "Generate a checksums.sha256 manifest of every attached release asset and attach it as a release asset itself, so hashes remain verifiable after source artefacts expire."
+        description: "Name of the bundle artefact uploaded by stage-release-assets.yml. Its files are verified against its checksums.sha256 and attached as release assets, together with the manifest. Leave empty to release without assets."
 jobs:
   release:
     name: "Release"
@@ -78,81 +65,41 @@ jobs:
           ' >> $GITHUB_OUTPUT
 
           echo "EOF" >> $GITHUB_OUTPUT
-      - name: Download SBOM artefacts
+      - name: Download release assets bundle
+        if: inputs.release_assets_artifact_name != ''
         uses: actions/download-artifact@v8
-        if: inputs.get_sbom
         with:
-          pattern: '*.cdx.json'
-          merge-multiple: true
-      - name: Validate SBOM count
-        if: inputs.get_sbom
+          name: ${{ inputs.release_assets_artifact_name }}
+          path: release-assets
+      # Publishes only what the (attested) manifest lists: every file must
+      # match its hash, and no unlisted file may ride along.
+      - name: Verify release assets against checksums manifest
+        if: inputs.release_assets_artifact_name != ''
+        working-directory: release-assets
         env:
-          EXPECTED_SBOM_COUNT: ${{ inputs.expected_sbom_count }}
-        run: |
-          sbom_count=$(find . -type f -name '*.cdx.json' -print | wc -l)
-          if [ "${sbom_count}" -ne "${EXPECTED_SBOM_COUNT}" ]; then
-            echo "Expected ${EXPECTED_SBOM_COUNT} SBOM artefact(s), found ${sbom_count}." >&2
-            exit 1
-          fi
-      - name: Download additional release artefacts
-        uses: actions/download-artifact@v8
-        if: inputs.additional_release_artifact_patterns != ''
-        with:
-          pattern: ${{ inputs.additional_release_artifact_patterns }}
-          path: additional-release-assets
-      - name: Flatten additional release artefacts
-        if: inputs.additional_release_artifact_patterns != ''
+          ARTIFACT_NAME: ${{ inputs.release_assets_artifact_name }}
         run: |
           set -euo pipefail
-          shopt -s nullglob globstar
-          mkdir -p additional-release-assets-flat
-          for f in additional-release-assets/**/*; do
-            [ -f "$f" ] || continue
-            artefact_dir=$(dirname "$f" | sed 's#^additional-release-assets/##; s#/.*##')
-            dest="additional-release-assets-flat/${artefact_dir}-$(basename "$f")"
-            if [ -e "$dest" ]; then
-              echo "::error::Duplicate release asset name after flattening: ${dest}. Two artefacts (or nested files within one artefact) produced the same filename - rename the source files so each release asset name is unique." >&2
-              exit 1
-            fi
-            cp "$f" "$dest"
-          done
-      - name: Generate release asset checksums manifest
-        id: checksums
-        if: |
-          inputs.generate_checksums &&
-          (inputs.get_sbom || inputs.additional_release_artifact_patterns != '')
-        run: |
-          set -euo pipefail
-          shopt -s nullglob globstar
-          rm -f checksums.sha256
-          for f in **/*.cdx.json additional-release-assets-flat/*; do
-            [ -f "$f" ] || continue
-            printf '%s  %s\n' "$(sha256sum "$f" | cut -d ' ' -f 1)" "$(basename "$f")" >> checksums.sha256
-          done
-          duplicates=$(awk '{print $2}' checksums.sha256 | sort | uniq -d)
-          if [ -n "${duplicates}" ]; then
-            echo "::error::Duplicate release asset name(s) in checksums.sha256: ${duplicates}" >&2
+          if [[ ! -s checksums.sha256 ]]; then
+            printf '::error::Artefact %s has no non-empty checksums.sha256 at its root; stage it with stage-release-assets.yml.\n' "${ARTIFACT_NAME}" >&2
             exit 1
           fi
-          if [ -s checksums.sha256 ]; then
-            echo "generated=true" >> "$GITHUB_OUTPUT"
-          else
-            rm -f checksums.sha256
-            echo "generated=false" >> "$GITHUB_OUTPUT"
+          sha256sum --check --strict checksums.sha256
+          listed=$(awk '{ sub(/^[^ ]+ [ *]/, ""); print }' checksums.sha256 | sort)
+          present=$(find . -type f ! -name checksums.sha256 -printf '%P\n' | sort)
+          if [[ "${listed}" != "${present}" ]]; then
+            printf '::error::Files in %s do not match checksums.sha256:\n%s\n' "${ARTIFACT_NAME}" "$(diff <(printf '%s\n' "${listed}") <(printf '%s\n' "${present}") || true)" >&2
+            exit 1
           fi
       - name: Build release files list
         id: release_files
+        env:
+          ARTIFACT_NAME: ${{ inputs.release_assets_artifact_name }}
         run: |
           {
             echo "files<<RELEASE_FILES_EOF"
-            if [ "${{ inputs.get_sbom }}" = "true" ]; then
-              echo "**/*.cdx.json"
-            fi
-            if [ "${{ inputs.additional_release_artifact_patterns }}" != "" ]; then
-              echo "additional-release-assets-flat/**"
-            fi
-            if [ "${{ steps.checksums.outputs.generated }}" = "true" ]; then
-              echo "checksums.sha256"
+            if [[ -n "${ARTIFACT_NAME}" ]]; then
+              echo "release-assets/*"
             fi
             echo "RELEASE_FILES_EOF"
           } >> "$GITHUB_OUTPUT"
