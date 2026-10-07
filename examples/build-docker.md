@@ -69,7 +69,7 @@ jobs:
 
 ### Attesting the published image and its Trivy report
 
-To get a signed, verifiable claim that *this* released image was scanned with *this* result, attest the image digest as the subject with the Trivy report as the predicate. This is done with a new job set after `build-docker` has pushed the image.
+To get a signed, verifiable claim that *this* released image was scanned with *this* result, add an [attest.yml](attest.md#attesting-images-built-by-build-docker) job after `build-docker`. With `push_ghcr: true`, `build-docker` uploads the published digest as an `<image-name>-image-digest` artifact, so you don't need to look it up yourself.
 
 ```yaml
 jobs:
@@ -87,25 +87,8 @@ jobs:
       DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
       DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
 
-  resolve-image-digest:
-    needs: build-docker
-    runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.inspect.outputs.digest }}
-    steps:
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: inspect
-        run: |
-          DIGEST=$(docker buildx imagetools inspect "ghcr.io/${{ github.repository }}:${{ github.sha }}" --format '{{json .Manifest}}' | jq -r '.digest')
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-
   attest-image:
-    needs: [build-docker, resolve-image-digest]
+    needs: build-docker
     permissions:
       id-token: write
       attestations: write
@@ -113,10 +96,10 @@ jobs:
       actions: read
     uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
     with:
-      subject-name: ghcr.io/${{ github.repository }}
-      subject-digest: ${{ needs.resolve-image-digest.outputs.digest }}
-      predicate-type: https://trivy.dev/report/v1
-      predicate-artifact-name: ${{ github.event.repository.name }}-trivy-container-report
+      image-matrix: ${{ github.event.repository.name }}
+      predicate-matrix: trivy
 ```
 
-Verify with `gh attestation verify <image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --source-ref refs/heads/<branch>`.
+`image-matrix` takes the image name, which is `image_name` if set, otherwise the repository name. The repository name must already be lowercase to pass validation. Only the `linux/amd64` image is scanned, so the Trivy attestation says nothing about the `linux/arm64` image.
+
+Verify with `gh attestation verify oci://<image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --predicate-type https://trivy.dev/report/v1 --source-ref refs/heads/<branch>`.

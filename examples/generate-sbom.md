@@ -99,3 +99,12 @@ jobs:
     with:
       subject-artifact-name: ${{ needs.generate-sbom.outputs.sbom_file }}
 ```
+
+To attach the SBOM to a published image as a predicate instead (a claim about the image itself), name the output after the image and list `sbom` in `attest.yml`'s `predicate-matrix`. See [attesting images built by build-docker](attest.md#attesting-images-built-by-build-docker).
+
+```yaml
+  generate-sbom:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    with:
+      sbom_output_file: my-image.cdx.json # <image-name>.cdx.json
+```

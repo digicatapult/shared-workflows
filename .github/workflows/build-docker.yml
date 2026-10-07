@@ -364,6 +364,26 @@ jobs:
           [ -n "${{ needs.prepare.outputs.ghcr_latest_tag }}" ] && TAGS="$TAGS -t ${{ needs.prepare.outputs.ghcr_latest_tag }}"
           docker buildx imagetools create $TAGS $(printf "$IMAGE@sha256:%s " *)
 
+      # Published manifest-list digest, consumed by attest.yml's image-matrix.
+      - name: Record GHCR image digest
+        if: ${{ inputs.push_ghcr == true }}
+        env:
+          IMAGE: ghcr.io/${{ needs.prepare.outputs.org_name }}/${{ needs.prepare.outputs.resolved_image_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/image-digest"
+          docker buildx imagetools inspect "${IMAGE}:${SHA}" --format '{{json .Manifest}}' \
+            | jq -re '.digest' > "${RUNNER_TEMP}/image-digest/digest"
+      - name: Upload GHCR image digest
+        if: ${{ inputs.push_ghcr == true }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.prepare.outputs.resolved_image_name }}-image-digest
+          path: ${{ runner.temp }}/image-digest/digest
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Create DockerHub manifest list
         if: ${{ inputs.push_dockerhub == true }}
         working-directory: /tmp/digests

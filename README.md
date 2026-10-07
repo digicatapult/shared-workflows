@@ -188,7 +188,7 @@ Each platform in `docker_platforms` is built on its own native runner where one 
 
 For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build.
 
-When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only. There is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before. To attest the published image (and/or the Trivy report) once it exists, see [Attest](#attest-examples).
+When `scan_container` is enabled, the `build` job exports the built `linux/amd64` image as a tarball artifact and a separate `scan-image` job scans it with Trivy. It runs a single comprehensive scan: the uploaded `<image-name>-trivy-container-report` artifact (and the log) contain **every** severity, fixed and unfixed, so it is a usable inventory; the build then **fails** only on `scan_fail_severity` (default `CRITICAL`, computed from that same report), excluding any vulnerabilities without a fix (`scan_ignore_unfixed`) or explicitly listed in `scan_ignore_cves`. `scan_ignore_cves` is intended for narrow, per-repo risk acceptance (e.g. a CVE with a fix that isn't consumable yet, such as one vendored inside a third-party binary release). The report is unaffected, so ignored CVEs remain visible for audit. The scan job runs least-privilege (`contents: read`, **no secrets**) and Trivy is sandboxed to the image tarball, so a compromised scanner cannot reach the build job's registry credentials. Trivy is run from a **digest-pinned image**, deliberately not the `aquasecurity/trivy-action`, which was supply-chain compromised in March 2026 (see ENG-314). Results are an uploaded artifact only. There is no GHAS/SARIF upload for the Trivy scan (unlike the Docker Scout step, which still uploads on release). The manifest-tagging (`merge`) job depends on the scan, so a CRITICAL finding **prevents the consumable `:version`/`:latest` tag from being published** to GHCR/DockerHub (the per-arch layers are still pushed by digest by the `build` job, but remain untagged and are garbage-collected). When `scan_container` is `false` the tag is published as before. When `push_ghcr` is `true`, the `merge` job also uploads the published manifest-list digest as an `<image-name>-image-digest` artifact, which [Attest](#attest-examples)'s `image-matrix` uses to attest the published image (and/or its Trivy report and SBOM).
 
 #### Permissions
 
@@ -356,7 +356,9 @@ Generates a signed [SLSA build provenance, SBOM, or custom attestation](https://
 
 | Input             | Type    | Description                                                                                                                                                     | Default | Required |
 | ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| timeout_minutes   | number  | Overrides the job's default timeout of 10 minutes                                                                                                                | `0`     | false    |
+| timeout_minutes   | number  | Overrides the default timeouts (5 minutes for validation, 10 minutes per attestation)                                                                            | `0`     | false    |
+| image-matrix      | string  | Newline-separated image names built by `build-docker.yml` with `push_ghcr: true`. One attestation per image (or per image and predicate) against `ghcr.io/<owner>/<image>`, using the digest from the `<image>-image-digest` artifact. Mutually exclusive with the single-attestation `subject-*`/`predicate-*` inputs | `""`    | false    |
+| predicate-matrix  | string  | Newline-separated predicates to attest against every image: `sbom` (`<image>.cdx.json` artifact, CycloneDX) and/or `trivy` (`<image>-trivy-container-report` artifact). Empty means plain build provenance per image. Requires `image-matrix` | `""`    | false    |
 | subject-path      | string  | Path (or newline/comma-delimited list, or glob) to the file(s) to attest as build provenance. Mutually exclusive with `subject-checksums` and `subject-digest`   | `""`    | false    |
 | subject-checksums | string  | Path to a `sha256sum`-format checksums manifest; every file it lists becomes a subject of one attestation. Mutually exclusive with `subject-path`/`subject-digest` | `""`  | false    |
 | subject-digest    | string  | SHA256 digest of an image to attest, as `sha256:<hex>`. Requires `subject-name`. Mutually exclusive with `subject-path`/`subject-checksums`                      | `""`    | false    |
@@ -364,24 +366,26 @@ Generates a signed [SLSA build provenance, SBOM, or custom attestation](https://
 | predicate-type    | string  | URI identifying the predicate type for a custom attestation (e.g. associating a Trivy report or SBOM with `subject-digest`). Requires `predicate-path`          | `""`    | false    |
 | predicate-path    | string  | Path to the file providing the predicate content. Requires `predicate-type`                                                                                      | `""`    | false    |
 | push-to-registry  | boolean | Attach the attestation to the image in the registry as well as GH attestations. Only valid with `subject-digest`; also requires the caller to log in to the registry and grant `packages: write` | `false` | false    |
+| subject-artifact-name   | string | Name of a workflow artifact from the same run to download and attest as `subject-path`                            | `""` | false |
+| predicate-artifact-name | string | Name of a workflow artifact from the same run to download and use as `predicate-path`. Requires `predicate-type` | `""` | false |
 
-Exactly one of `subject-path`, `subject-checksums`, or `subject-digest` must be set; the job fails fast with a clear error otherwise.
+Either set `image-matrix` (optionally with `predicate-matrix`), or set the single-attestation inputs. For a single attestation, exactly one of `subject-path`, `subject-checksums`, `subject-digest`, or `subject-artifact-name` must be set. Everything is validated before anything is signed. `push-to-registry` applies to every image in `image-matrix`.
 
 #### Permissions
 
 The workflow's own job declares no permissions itself - the caller's job (which invokes this workflow with `uses:`) must grant them, since that is the only point at which granting is an explicit, visible action:
 
-| Access                     | Reason                                                              | Conditions                                                        |
-| -------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `id-token: write`          | To mint an OIDC token for Sigstore signing                          | Always                                                             |
-| `attestations: write`      | To persist the signed attestation                                   | Always                                                             |
-| `artifact-metadata: write` | Required by `actions/attest` to create the artifact storage record  | Always                                                             |
-| `packages: write`          | To push the attestation to the image registry                       | `push-to-registry`                                                 |
+| Access                     | Reason                                                             | Conditions         |
+| -------------------------- | ------------------------------------------------------------------ | ------------------ |
+| `id-token: write`          | To mint an OIDC token for Sigstore signing                         | Always             |
+| `attestations: write`      | To persist the signed attestation                                  | Always             |
+| `artifact-metadata: write` | Required by `actions/attest` to create the artifact storage record | Always             |
+| `packages: write`          | To push the attestation to the image registry (GHCR only)          | `push-to-registry` |
 
 #### Workflow Description
 
-1. **Validate Subject Inputs**: Fails fast if the subject/predicate/push-to-registry inputs are combined incorrectly, rather than letting `actions/attest` fail with a less direct error.
-2. **Attest**: Calls `actions/attest@v4` with whichever subject/predicate inputs were provided.
+1. **Validate attestation requests**: Builds the list of attestations to make, either one per image (and predicate) from `image-matrix`/`predicate-matrix`, or one from the single-attestation inputs. Fails fast on unknown predicates, invalid image names, or wrongly combined inputs, rather than letting `actions/attest` fail with a less direct error.
+2. **Attest** (one matrix job per attestation, `fail-fast: false`): Downloads the image digest and any subject/predicate artifacts, then calls `actions/attest@v4`. A missing artifact fails only that attestation.
 
 #### Verifying an attestation
 
