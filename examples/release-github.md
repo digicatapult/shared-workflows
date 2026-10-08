@@ -71,7 +71,7 @@ jobs:
 
 ### Multiple images and additional artefacts
 
-For a release with multiple images, call `build-docker` and `generate-sbom` once per image with distinct image, Dockerfile and SBOM names, and set `expected_sbom_count` to the number of SBOMs the release must contain. Other artefacts (e.g. Trivy container reports, ZAP reports) are picked with `additional_release_artifact_patterns`, an allowlist glob passed directly to `actions/download-artifact`'s `pattern` input. Use the extglob brace syntax (e.g. `{a,b}`) to match more than one artefact name. These files are renamed `<artefact-name>-<filename>`, so artefacts with the same internal filename (e.g. each image's Trivy report) don't collide; any collision that remains fails the staging job.
+For a release with multiple images, call `build-docker` and `generate-sbom` once per image with distinct image, Dockerfile and SBOM names, and set `expected_sbom_count` to the number of SBOMs the release must contain. Other artefacts (e.g. Trivy container reports, ZAP reports) are picked with `additional_release_artifact_patterns`, an allowlist Bash glob that supports `*`, `?` and simple `{a,b}` alternatives. Each matching artefact is downloaded into its own named directory before staging, so these files are consistently renamed `<artefact-name>-<filename>` whether one or many artefacts match. Artefacts with the same internal filename (e.g. each image's Trivy report) therefore don't collide; any collision that remains fails the staging job.
 
 ```yaml
 jobs:

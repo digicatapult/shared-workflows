@@ -22,7 +22,7 @@ on:
         required: false
         type: string
         default: ""
-        description: "Allowlist glob passed directly to actions/download-artifact's `pattern` input (supports extglob brace syntax) for additional artefacts to stage. Leave empty to skip."
+        description: "Allowlist Bash glob for additional artefact names to stage. Supports *, ? and simple {a,b} alternatives. Leave empty to skip."
       artifact_name:
         required: false
         type: string
@@ -71,12 +71,51 @@ jobs:
             printf '::error::Expected %s SBOM artefact(s), found %s.\n' "${EXPECTED_SBOM_COUNT}" "${sbom_count}" >&2
             exit 1
           fi
-      - name: Download additional release artefacts
-        uses: actions/download-artifact@v8
+      - name: Download additional release artefacts into named directories
         if: inputs.additional_release_artifact_patterns != ''
-        with:
-          pattern: ${{ inputs.additional_release_artifact_patterns }}
-          path: additional-release-assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_PATTERN: ${{ inputs.additional_release_artifact_patterns }}
+        run: |
+          set -euo pipefail
+          # Expands simple brace alternatives without evaluating caller input as shell.
+          matches_pattern() {
+            local name="$1" pattern="$2" prefix rest alternatives suffix alternative alternatives_array
+            if [[ "${pattern}" == *"{"*"}"* ]]; then
+              prefix="${pattern%%\{*}"
+              rest="${pattern#*\{}"
+              alternatives="${rest%%\}*}"
+              suffix="${rest#*\}}"
+              IFS=',' read -r -a alternatives_array <<< "${alternatives}"
+              for alternative in "${alternatives_array[@]}"; do
+                matches_pattern "${name}" "${prefix}${alternative}${suffix}" && return 0
+              done
+              return 1
+            fi
+            [[ "${name}" == ${pattern} ]]
+          }
+
+          mapfile -t artifact_names < <(
+            gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100" \
+              --jq '.artifacts[] | select(.expired | not) | .name'
+          )
+          selected=()
+          for artifact_name in "${artifact_names[@]}"; do
+            matches_pattern "${artifact_name}" "${ARTIFACT_PATTERN}" || continue
+            [[ "${artifact_name}" != */* && "${artifact_name}" != "." && "${artifact_name}" != ".." ]] || {
+              printf '::error::Matched artefact name is not safe for a directory: %s\n' "${artifact_name}" >&2
+              exit 1
+            }
+            selected+=("${artifact_name}")
+          done
+          if (( ${#selected[@]} == 0 )); then
+            printf '::error::No workflow artefacts match additional_release_artifact_patterns: %s\n' "${ARTIFACT_PATTERN}" >&2
+            exit 1
+          fi
+          for artifact_name in "${selected[@]}"; do
+            gh run download "${GITHUB_RUN_ID}" --name "${artifact_name}" \
+              --dir "additional-release-assets/${artifact_name}"
+          done
       - name: Flatten release assets
         run: |
           set -euo pipefail

@@ -275,7 +275,7 @@ Collects the workflow artefacts that should ship with a GitHub release, gives ea
 | timeout_minutes                      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `stage` 10                                                                                | `0`              | false    |
 | get_sbom                             | boolean | Include every `*.cdx.json` artefact from the run (e.g. from `generate-sbom.yml`)                                                                                                           | `false`          | false    |
 | expected_sbom_count                  | number  | Number of `*.cdx.json` artefacts expected when `get_sbom` is enabled; set this to the number of images being released                                                                      | `1`              | false    |
-| additional_release_artifact_patterns | string  | Allowlist glob passed directly to `actions/download-artifact`'s `pattern` input (supports extglob brace syntax). Callers are responsible for ensuring matched artefacts contain no secrets | `""`             | false    |
+| additional_release_artifact_patterns | string  | Allowlist Bash glob for additional artefact names. Supports `*`, `?` and simple `{a,b}` alternatives. Callers are responsible for ensuring matched artefacts contain no secrets            | `""`             | false    |
 | artifact_name                        | string  | Name of the bundle artefact to upload                                                                                                                                                      | `release-assets` | false    |
 
 At least one of `get_sbom` or `additional_release_artifact_patterns` must be set.
@@ -295,7 +295,7 @@ At least one of `get_sbom` or `additional_release_artifact_patterns` must be set
 #### Workflow Description
 
 1. **Validate SBOMs**: When `get_sbom` is enabled, downloads every `*.cdx.json` artefact and confirms that `expected_sbom_count` were found.
-2. **Download and Flatten Assets**: Downloads artefacts matching `additional_release_artifact_patterns` into per-artefact directories, then flattens everything into one directory. SBOMs keep their file name; additional files are renamed `<artefact-name>-<filename>`, so same-named files from different artefacts (e.g. multiple images' Trivy reports, or multiple ZAP scan types) don't collide. Any remaining collision, or a file named `checksums.sha256`, fails the job, as does staging no files at all.
+2. **Download and Flatten Assets**: Resolves every non-expired workflow artefact name matching `additional_release_artifact_patterns`, then downloads each into `additional-release-assets/<artefact-name>/`. This gives the same layout for one match or many. SBOMs keep their file name; additional files are renamed `<artefact-name>-<filename>`, so same-named files from different artefacts (e.g. multiple images' Trivy reports, or multiple ZAP scan types) don't collide. Any remaining collision, a file named `checksums.sha256`, or a pattern matching no artefacts fails the job.
 3. **Generate Checksums Manifest**: Writes `checksums.sha256` (`sha256sum` format) over every staged file.
 4. **Upload Bundle**: Uploads the staged files and `checksums.sha256` as the `artifact_name` artefact.
 
