@@ -48,7 +48,7 @@ jobs:
 
 ### With container CVE scanning
 
-Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). The report is uploaded as the `<image-name>-trivy-container-report` artifact. This requires no extra permissions on top of the standard `build-docker` set.
+Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). The raw JSON report is uploaded as the `<image-name>-trivy-container-report` artifact. This requires no extra permissions on top of the standard `build-docker` set.
 
 ```yaml
 jobs:
@@ -102,4 +102,4 @@ jobs:
 
 `image-matrix` takes the image name, which is `image_name` if set, otherwise the repository name. The repository name must already be lowercase to pass validation. Only the `linux/amd64` image is scanned, so the Trivy attestation says nothing about the `linux/arm64` image.
 
-Verify with `gh attestation verify oci://<image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --predicate-type https://trivy.dev/report/v1 --source-ref refs/heads/<branch>`.
+Verify with `gh attestation verify oci://<image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --predicate-type https://trivy.digicatapult.org.uk/report/v1 --source-ref refs/heads/<branch>`.

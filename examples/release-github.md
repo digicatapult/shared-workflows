@@ -40,6 +40,8 @@ jobs:
 
 `release-github.yml` doesn't pick release assets itself. [stage-release-assets.yml](../.github/workflows/stage-release-assets.yml) collects SBOMs (`get_sbom`) and any other artefacts (`additional_release_artifact_patterns`), gives them unique names, writes `checksums.sha256` over them, and uploads all of it as one bundle artefact (`release-assets` by default). `release-github.yml` then downloads that bundle, checks every file against `checksums.sha256`, and attaches the files and the manifest.
 
+`release-github.yml` still accepts `get_sbom` and `expected_sbom_count` for compatibility, preserving its former direct-SBOM download behaviour. They are deprecated, cannot be combined with `release_assets_artifact_name`, and do not provide a manifest that can be attested. Migrate callers to `stage-release-assets.yml` before using release asset attestations.
+
 ```yaml
 jobs:
   sbom:

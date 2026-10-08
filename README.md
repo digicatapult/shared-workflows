@@ -288,7 +288,7 @@ At least one of `get_sbom` or `additional_release_artifact_patterns` must be set
 
 #### Permissions
 
-| Access          | Jobs used | Level | Reason                                         | Conditions |
+| Access          | Jobs used | Level    | Reason                                         | Conditions |
 | --------------- | --------- | -------- | ---------------------------------------------- | ---------- |
 | `actions: read` | `stage`   | Workflow | To GET workflow artefacts produced in the run  | N/A        |
 
@@ -305,31 +305,33 @@ Automates the release process on GitHub, creating a versioned release based on t
 
 #### Inputs
 
-| Input                        | Type   | Description                                                                                                                                                                                         | Default | Required |
-| ---------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| timeout_minutes              | number | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `release` 15                                                                                       | `0`     | false    |
-| env_vars                     | string | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run                                                           | `{}`    | false    |
-| release_assets_artifact_name | string | Name of the bundle artefact uploaded by [Stage Release Assets](#stage-release-assets-examples). Its files are verified against its `checksums.sha256` and attached, with the manifest, as release assets. Leave empty to release without assets | `""`    | false    |
+| Input                        | Type    | Description                                                                                                                                                                                                                                     | Default | Required |
+| ---------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes              | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `release` 15                                                                                                                                   | `0`     | false    |
+| env_vars                     | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run                                                                                                       | `{}`    | false    |
+| get_sbom                     | boolean | **Deprecated.** Download and attach every `*.cdx.json` artefact directly. Use [Stage Release Assets](#stage-release-assets-examples) and `release_assets_artifact_name` instead. Cannot be combined with `release_assets_artifact_name`         | `false` | false    |
+| expected_sbom_count          | number  | **Deprecated.** Number of SBOM artefacts expected when `get_sbom` is enabled                                                                                                                                                                    | `1`     | false    |
+| release_assets_artifact_name | string  | Name of the bundle artefact uploaded by [Stage Release Assets](#stage-release-assets-examples). Its files are verified against its `checksums.sha256` and attached, with the manifest, as release assets. Leave empty to release without assets | `""`    | false    |
 
 #### Permissions
 
-| Access                | Jobs used | Level    | Reason                                                                   | Conditions                            |
-| --------------------- | --------- | -------- | ------------------------------------------------------------------------ | ------------------------------------- |
-| `contents: write`     | `release` | Workflow | To POST release contents for both the versioned and `latest` tags        | N/A                                   |
+| Access                | Jobs used | Level    | Reason                                                                     | Conditions                            |
+| --------------------- | --------- | -------- | -------------------------------------------------------------------------- | ------------------------------------- |
+| `contents: write`     | `release` | Workflow | To POST release contents for both the versioned and `latest` tags          | N/A                                   |
 | `pull-requests: read` | `release` | Workflow | To GET the most recently merged PR, from which the release notes are built | N/A                                   |
-| `actions: read`       | `release` | Workflow | To GET the release assets bundle artefact from the run                   | `inputs.release_assets_artifact_name` |
+| `actions: read`       | `release` | Workflow | To GET the release assets bundle artefact from the run                     | `inputs.release_assets_artifact_name` |
 
 #### Workflow Description
 
-This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. It does not choose release assets itself: when `release_assets_artifact_name` is set, it downloads the bundle made by [Stage Release Assets](#stage-release-assets-examples), checks every file against `checksums.sha256` (`sha256sum --check --strict`), fails if the bundle has any file the manifest doesn't list, and attaches the files and the manifest. Attest the same bundle with [Attest](#attest-examples) in a job that this workflow `needs`, so nothing is published unless it has already been attested. The process involves:
+This GitHub Actions workflow creates a new release on GitHub. It uses the `digicatapult/check-version` action to determine the current version and then applies `softprops/action-gh-release` to create a versioned release and update the latest release tag. It does not choose release assets itself: when `release_assets_artifact_name` is set, it downloads the bundle made by [Stage Release Assets](#stage-release-assets-examples), checks every file against `checksums.sha256` (`sha256sum --check --strict`), fails if the bundle has any file the manifest doesn't list, and attaches the files and the manifest. Attest the same bundle with [Attest](#attest-examples) in a job that this workflow `needs`, so nothing is published unless it has already been attested. The deprecated `get_sbom` and `expected_sbom_count` inputs remain for existing callers and preserve their former direct SBOM download behaviour; migrate them to Stage Release Assets before using attestations. The process involves:
 
 1. **Setting Environment Variables**: Parses and sets environment variables from a JSON string.
 2. **Version Check**: Uses `digicatapult/check-version` to retrieve the current version information.
 3. **Generate Release Notes**: Creates release notes based on the PR Body used by Digital Catapult.
 4. **Verify Release Assets**: Downloads the bundle and verifies it against its `checksums.sha256`, when `release_assets_artifact_name` is set.
 5. **Build Versioned Release**: Creates a GitHub release using the version retrieved from the **Version Check** step and the verified release assets.
-6. **Clear Existing Latest Release**: Deletes the previous `latest` release and tag outright (rather than only overwriting same-named assets), so a file that stops being produced between releases (e.g. a narrowed pattern, a dropped scan, a renamed SBOM) can't linger on `latest` alongside a `checksums.sha256` that no longer lists it.
-7. **Build Latest Release**: Re-creates the `latest` tag and release pointing at the current commit, attaching the same set of release assets.
+6. **Clear Existing Latest Release**: If it exists, deletes the previous `latest` release and tag outright (rather than only overwriting same-named assets), so a file that stops being produced between releases (e.g. a narrowed pattern, a dropped scan, a renamed SBOM) can't linger on `latest` alongside a `checksums.sha256` that no longer lists it. API failures stop the workflow rather than silently retaining stale assets.
+7. **Build Latest Release**: Re-creates the `latest` tag and release pointing at the current commit, attaching the same set of release assets without changing GitHub's Latest badge from the versioned release.
 
 This workflow helps streamline the release process by automating version checks and tagging, making it easy to manage versioned releases and update the latest release reference.
 
@@ -385,23 +387,20 @@ Generates a signed [SLSA build provenance, SBOM, or custom attestation](https://
 
 #### Inputs
 
-| Input             | Type    | Description                                                                                                                                                     | Default | Required |
-| ------------------ | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
-| timeout_minutes   | number  | Overrides the default timeouts (5 minutes for validation, 10 minutes per attestation)                                                                            | `0`     | false    |
-| image-matrix      | string  | Newline-separated image names built by `build-docker.yml` with `push_ghcr: true`. One attestation per image (or per image and predicate) against `ghcr.io/<owner>/<image>`, using the digest from the `<image>-image-digest` artifact. Mutually exclusive with the single-attestation `subject-*`/`predicate-*` inputs | `""`    | false    |
-| predicate-matrix  | string  | Newline-separated predicates to attest against every image: `sbom` (`<image>.cdx.json` artifact, CycloneDX) and/or `trivy` (`<image>-trivy-container-report` artifact). Empty means plain build provenance per image. Requires `image-matrix` | `""`    | false    |
-| subject-path      | string  | Path (or newline/comma-delimited list, or glob) to the file(s) to attest as build provenance. Mutually exclusive with `subject-checksums` and `subject-digest`   | `""`    | false    |
-| subject-checksums | string  | Path to a `sha256sum`-format checksums manifest; every file it lists becomes a subject of one attestation. Mutually exclusive with `subject-path`/`subject-digest` | `""`  | false    |
-| subject-checksums-artifact-name | string | Name of a workflow artifact from the same run (e.g. the [Stage Release Assets](#stage-release-assets-examples) bundle) with a `checksums.sha256` at its root, downloaded and attested as `subject-checksums` | `""` | false |
-| subject-digest    | string  | SHA256 digest of an image to attest, as `sha256:<hex>`. Requires `subject-name`. Mutually exclusive with `subject-path`/`subject-checksums`                      | `""`    | false    |
-| subject-name      | string  | Fully-qualified image name (no tag) for `subject-digest`, e.g. `ghcr.io/org/image`. Required when `subject-digest` is set                                       | `""`    | false    |
-| predicate-type    | string  | URI identifying the predicate type for a custom attestation (e.g. associating a Trivy report or SBOM with `subject-digest`). Requires `predicate-path`          | `""`    | false    |
-| predicate-path    | string  | Path to the file providing the predicate content. Requires `predicate-type`                                                                                      | `""`    | false    |
-| push-to-registry  | boolean | Attach the attestation to the image in the registry as well as GH attestations. Only valid with `subject-digest`; also requires the caller to log in to the registry and grant `packages: write` | `false` | false    |
-| subject-artifact-name   | string | Name of a workflow artifact from the same run to download and attest as `subject-path`                            | `""` | false |
-| predicate-artifact-name | string | Name of a workflow artifact from the same run to download and use as `predicate-path`. Requires `predicate-type` | `""` | false |
+| Input                           | Type    | Description                                                                                                                                                                                                                                                                                                            | Default | Required |
+| ------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------- |
+| timeout_minutes                 | number  | Overrides the default timeouts (5 minutes for validation, 10 minutes per attestation)                                                                                                                                                                                                                                  | `0`     | false    |
+| image-matrix                    | string  | Newline-separated image names built by `build-docker.yml` with `push_ghcr: true`. One attestation per image (or per image and predicate) against `ghcr.io/<owner>/<image>`, using the digest from the `<image>-image-digest` artifact. Mutually exclusive with the single-attestation `subject-*`/`predicate-*` inputs | `""`    | false    |
+| predicate-matrix                | string  | Newline-separated predicates to attest against every image: `sbom` (`<image>.cdx.json` artifact, CycloneDX) and/or `trivy` (`<image>-trivy-container-report` artifact, raw Trivy JSON using `https://trivy.digicatapult.org.uk/report/v1`). Empty means plain build provenance per image. Requires `image-matrix`      | `""`    | false    |
+| subject-checksums-artifact-name | string  | Name of a workflow artifact from the same run (e.g. the [Stage Release Assets](#stage-release-assets-examples) bundle) with a `checksums.sha256` at its root, downloaded and attested as `subject-checksums`                                                                                                           | `""`    | false    |
+| subject-digest                  | string  | SHA256 digest of an image to attest, as `sha256:<hex>`. Requires `subject-name`. Mutually exclusive with artifact subjects                                                                                                                                                                                             | `""`    | false    |
+| subject-name                    | string  | Fully-qualified image name (no tag) for `subject-digest`, e.g. `ghcr.io/org/image`. Required when `subject-digest` is set                                                                                                                                                                                              | `""`    | false    |
+| predicate-type                  | string  | URI identifying the predicate type for a custom attestation (e.g. associating a report or SBOM with `subject-digest`). Requires `predicate-artifact-name`                                                                                                                                                              | `""`    | false    |
+| push-to-registry                | boolean | Attach the attestation to the image in the registry as well as GH attestations. Only valid with `subject-digest`; also requires the caller to log in to the registry and grant `packages: write`                                                                                                                       | `false` | false    |
+| subject-artifact-name           | string  | Name of a workflow artifact from the same run to download and attest as build provenance                                                                                                                                                                                                                               | `""`    | false    |
+| predicate-artifact-name         | string  | Name of a workflow artifact from the same run to download and use as predicate content. Requires `predicate-type`                                                                                                                                                                                                      | `""`    | false    |
 
-Either set `image-matrix` (optionally with `predicate-matrix`), or set the single-attestation inputs. For a single attestation, exactly one of `subject-path`, `subject-checksums`, `subject-checksums-artifact-name`, `subject-digest`, or `subject-artifact-name` must be set. Everything is validated before anything is signed. `push-to-registry` applies to every image in `image-matrix`.
+Either set `image-matrix` (optionally with `predicate-matrix`), or set the single-attestation inputs. For a single attestation, exactly one of `subject-checksums-artifact-name`, `subject-digest`, or `subject-artifact-name` must be set. Everything is validated before anything is signed. `push-to-registry` applies to every image in `image-matrix`.
 
 #### Permissions
 

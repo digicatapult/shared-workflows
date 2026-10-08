@@ -17,14 +17,6 @@ on:
         type: string
         default: ""
         description: "Newline-separated list of predicates to attest against every image in image-matrix. Supported: sbom (<image>.cdx.json artifact), trivy (<image>-trivy-container-report artifact). Leave empty for a plain build provenance attestation per image. Requires image-matrix."
-      subject-path:
-        required: false
-        type: string
-        description: "Path (or newline/comma-delimited list, or glob) to the file(s) to attest for build provenance. Mutually exclusive with subject-checksums and subject-digest."
-      subject-checksums:
-        required: false
-        type: string
-        description: "Path to a sha256sum-format checksums manifest. Every file it lists becomes a subject of a single attestation. Mutually exclusive with subject-path, subject-digest and subject-checksums-artifact-name."
       subject-checksums-artifact-name:
         required: false
         type: string
@@ -32,7 +24,7 @@ on:
       subject-digest:
         required: false
         type: string
-        description: "SHA256 digest of an image to attest, in the form sha256:<hex>. Requires subject-name. Mutually exclusive with subject-path and subject-checksums."
+        description: "SHA256 digest of an image to attest, in the form sha256:<hex>. Requires subject-name. Mutually exclusive with artifact subjects."
       subject-name:
         required: false
         type: string
@@ -41,10 +33,6 @@ on:
         required: false
         type: string
         description: "URI identifying the predicate type for a custom attestation. Leave empty for a plain SLSA build provenance attestation."
-      predicate-path:
-        required: false
-        type: string
-        description: "Path to the file providing the predicate content (e.g. the Trivy report or SBOM to associate with subject-digest). Requires predicate-type."
       push-to-registry:
         required: false
         type: boolean
@@ -53,11 +41,11 @@ on:
       subject-artifact-name:
         required: false
         type: string
-        description: "Name of a workflow artifact (from the same run) to download before attesting, whose content becomes subject-path. Mutually exclusive with providing subject-path directly."
+        description: "Name of a workflow artifact (from the same run) to download before attesting as build provenance."
       predicate-artifact-name:
         required: false
         type: string
-        description: "Name of a workflow artifact (from the same run) to download before attesting, whose content becomes predicate-path."
+        description: "Name of a workflow artifact (from the same run) to download and use as the predicate content."
 jobs:
   # Validates every request up front, so a mistake in one entry fails the run
   # before any attestation is signed, rather than leaving a partial set.
@@ -75,14 +63,11 @@ jobs:
           IMAGE_MATRIX: ${{ inputs.image-matrix }}
           PREDICATE_MATRIX: ${{ inputs.predicate-matrix }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
-          SUBJECT_PATH: ${{ inputs.subject-path }}
-          SUBJECT_CHECKSUMS: ${{ inputs.subject-checksums }}
           SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ inputs.subject-checksums-artifact-name }}
           SUBJECT_DIGEST: ${{ inputs.subject-digest }}
           SUBJECT_NAME: ${{ inputs.subject-name }}
           SUBJECT_ARTIFACT_NAME: ${{ inputs.subject-artifact-name }}
           PREDICATE_TYPE: ${{ inputs.predicate-type }}
-          PREDICATE_PATH: ${{ inputs.predicate-path }}
           PREDICATE_ARTIFACT_NAME: ${{ inputs.predicate-artifact-name }}
           PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
         run: |
@@ -95,7 +80,7 @@ jobs:
             printf '::error::%s\n' "$@" >&2
             exit 1
           }
-          scalars="${SUBJECT_PATH}${SUBJECT_CHECKSUMS}${SUBJECT_CHECKSUMS_ARTIFACT_NAME}${SUBJECT_DIGEST}${SUBJECT_NAME}${SUBJECT_ARTIFACT_NAME}${PREDICATE_TYPE}${PREDICATE_PATH}${PREDICATE_ARTIFACT_NAME}"
+          scalars="${SUBJECT_CHECKSUMS_ARTIFACT_NAME}${SUBJECT_DIGEST}${SUBJECT_NAME}${SUBJECT_ARTIFACT_NAME}${PREDICATE_TYPE}${PREDICATE_ARTIFACT_NAME}"
           mapfile -t images < <(read_list "${IMAGE_MATRIX}")
           mapfile -t predicates < <(read_list "${PREDICATE_MATRIX}")
 
@@ -120,7 +105,7 @@ jobs:
               --argjson push "${PUSH_TO_REGISTRY}" \
               'def predicate($image; $name):
                   if $name == "sbom" then {type: "https://cyclonedx.org/bom", artifact: "\($image).cdx.json"}
-                  else {type: "https://trivy.dev/report/v1", artifact: "\($image)-trivy-container-report"} end;
+                  else {type: "https://trivy.digicatapult.org.uk/report/v1", artifact: "\($image)-trivy-container-report"} end;
               [ $images[] as $image
                 | {
                     "subject-name": "\($registry)/\($image)",
@@ -141,39 +126,32 @@ jobs:
           else
             # Single-attestation mode: one matrix entry built from the scalar inputs.
             count=0
-            for value in "${SUBJECT_PATH}" "${SUBJECT_CHECKSUMS}" "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" "${SUBJECT_DIGEST}" "${SUBJECT_ARTIFACT_NAME}"; do
+            for value in "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" "${SUBJECT_DIGEST}" "${SUBJECT_ARTIFACT_NAME}"; do
               [[ -n "${value}" ]] && count=$((count + 1))
             done
-            (( count == 1 )) || fail "Exactly one of image-matrix, subject-path, subject-checksums, subject-checksums-artifact-name, subject-digest or subject-artifact-name must be set (got ${count} single-attestation subjects)."
+            (( count == 1 )) || fail "Exactly one of image-matrix, subject-checksums-artifact-name, subject-digest or subject-artifact-name must be set (got ${count} single-attestation subjects)."
             [[ -z "${SUBJECT_DIGEST}" || -n "${SUBJECT_NAME}" ]] || fail "subject-name is required when subject-digest is set."
             [[ -n "${SUBJECT_DIGEST}" || "${PUSH_TO_REGISTRY}" != "true" ]] || fail "push-to-registry is only valid with subject-digest or image-matrix."
-            if [[ -n "${PREDICATE_TYPE}" && -z "${PREDICATE_PATH}" && -z "${PREDICATE_ARTIFACT_NAME}" ]]; then
-              fail "predicate-path or predicate-artifact-name is required when predicate-type is set."
+            if [[ -n "${PREDICATE_TYPE}" && -z "${PREDICATE_ARTIFACT_NAME}" ]]; then
+              fail "predicate-artifact-name is required when predicate-type is set."
             fi
-            if [[ -z "${PREDICATE_TYPE}" && ( -n "${PREDICATE_PATH}" || -n "${PREDICATE_ARTIFACT_NAME}" ) ]]; then
-              fail "predicate-type is required when predicate-path or predicate-artifact-name is set."
+            if [[ -z "${PREDICATE_TYPE}" && -n "${PREDICATE_ARTIFACT_NAME}" ]]; then
+              fail "predicate-type is required when predicate-artifact-name is set."
             fi
-            [[ -z "${PREDICATE_PATH}" || -z "${PREDICATE_ARTIFACT_NAME}" ]] || fail "predicate-path and predicate-artifact-name are mutually exclusive."
             manifest=$(jq -cn \
-              --arg subject_path "${SUBJECT_PATH}" \
-              --arg subject_checksums "${SUBJECT_CHECKSUMS}" \
               --arg subject_checksums_artifact_name "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" \
               --arg subject_digest "${SUBJECT_DIGEST}" \
               --arg subject_name "${SUBJECT_NAME}" \
               --arg subject_artifact_name "${SUBJECT_ARTIFACT_NAME}" \
               --arg predicate_type "${PREDICATE_TYPE}" \
-              --arg predicate_path "${PREDICATE_PATH}" \
               --arg predicate_artifact_name "${PREDICATE_ARTIFACT_NAME}" \
               --argjson push "${PUSH_TO_REGISTRY}" \
               '[{
-                "subject-path": $subject_path,
-                "subject-checksums": $subject_checksums,
                 "subject-checksums-artifact-name": $subject_checksums_artifact_name,
                 "subject-digest": $subject_digest,
                 "subject-name": $subject_name,
                 "subject-artifact-name": $subject_artifact_name,
                 "predicate-type": $predicate_type,
-                "predicate-path": $predicate_path,
                 "predicate-artifact-name": $predicate_artifact_name,
                 "push-to-registry": $push
               } | with_entries(select(.value != "" and .value != false))]')
@@ -222,13 +200,13 @@ jobs:
           DIGEST_ARTIFACT_NAME: ${{ matrix['digest-artifact-name'] }}
           SUBJECT_DIGEST: ${{ matrix['subject-digest'] }}
           SUBJECT_ARTIFACT_NAME: ${{ matrix['subject-artifact-name'] }}
-          SUBJECT_PATH: ${{ matrix['subject-path'] }}
           SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ matrix['subject-checksums-artifact-name'] }}
-          SUBJECT_CHECKSUMS: ${{ matrix['subject-checksums'] }}
           PREDICATE_ARTIFACT_NAME: ${{ matrix['predicate-artifact-name'] }}
-          PREDICATE_PATH: ${{ matrix['predicate-path'] }}
         run: |
           set -euo pipefail
+          SUBJECT_PATH=""
+          SUBJECT_CHECKSUMS=""
+          PREDICATE_PATH=""
           if [[ -n "${DIGEST_ARTIFACT_NAME}" ]]; then
             digest_file=$(find attest-digest -type f | sort | head -n1)
             SUBJECT_DIGEST=$(tr -d '[:space:]' < "${digest_file:-/dev/null}")

@@ -70,20 +70,18 @@ jobs:
     # ...
 ```
 
-`subject-checksums` (a path) is still available if a manifest already exists on the runner, but in a reusable workflow it rarely does: each job starts on a fresh runner, so a file made in another job has to be passed in as an artifact.
-
 ### Attesting images
 
 To attest one or more images published by [build-docker.yml](build-docker.md), list them in `image-matrix`, and list the predicates to attach to each one in `predicate-matrix`. Both inputs are newline-separated strings (`|` block strings), because reusable workflow inputs cannot be YAML lists.
 
 `attest.yml` makes one attestation per image and predicate pair, each in its own matrix job (e.g. `worker - trivy`). For each image it works out the rest:
 
-| Value             | Mapping source                                                                                                                    |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Subject name      | `ghcr.io/<owner>/<image>`                                                                                                         |
-| Subject digest    | the `<image>-image-digest` artifact, uploaded by `build-docker` when `push_ghcr: true`                                            |
-| `trivy` predicate | the `<image>-trivy-container-report` artifact (`scan_container: true`), type `https://trivy.dev/report/v1`                        |
-| `sbom` predicate  | the `<image>.cdx.json` artifact from `generate-sbom` (set `sbom_output_file: <image>.cdx.json`), type `https://cyclonedx.org/bom` |
+| Value             | Mapping source                                                                                                                                            |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subject name      | `ghcr.io/<owner>/<image>`                                                                                                                                 |
+| Subject digest    | the `<image>-image-digest` artifact, uploaded by `build-docker` when `push_ghcr: true`                                                                    |
+| `trivy` predicate | the `<image>-trivy-container-report` artifact (`scan_container: true`), containing raw Trivy JSON with type `https://trivy.digicatapult.org.uk/report/v1` |
+| `sbom` predicate  | the `<image>.cdx.json` artifact from `generate-sbom` (set `sbom_output_file: <image>.cdx.json`), type `https://cyclonedx.org/bom`                         |
 
 If `predicate-matrix` is empty, each image gets a plain build provenance attestation rather than an error or warning.
 
@@ -151,6 +149,9 @@ The image names and predicate names are checked before anything is signed. Once 
 
 > [!NOTE]
 > The Trivy scan covers only the `linux/amd64` image, but the attestation is made against the multi-arch manifest-list digest. The `linux/arm64` image is **not** scanned, so a `trivy` attestation is limited in coverage to AMD64 only.
+
+> [!NOTE]
+> The `sbom` predicate is a source/dependency SBOM generated from the repository, not an image SBOM. It does not include base-image or operating-system packages. Only associate it with an image when that source-to-image relationship is intended; separate source SBOMs should be generated for images with different application dependencies.
 
 ### Verifying an attestation
 
