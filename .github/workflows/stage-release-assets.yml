@@ -114,6 +114,7 @@ jobs:
           fi
           for artifact_name in "${selected[@]}"; do
             gh run download "${GITHUB_RUN_ID}" --name "${artifact_name}" \
+              --repo "${GITHUB_REPOSITORY}" \
               --dir "additional-release-assets/${artifact_name}"
           done
       - name: Flatten release assets
