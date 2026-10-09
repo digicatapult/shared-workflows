@@ -76,3 +76,35 @@ jobs:
       DTRACK_HOSTNAME: ${{ secrets.DTRACK_HOSTNAME }}
       DTRACK_PARENT_GUID: ${{ secrets.DTRACK_PARENT_GUID }}
 ```
+
+### With a provenance attestation
+
+To generate a signed build provenance attestation for the SBOM file, add a job for [attest.yml](../.github/workflows/attest.yml) in your own workflow, after `generate-sbom`. This is useful when the SBOM is also being attached to a GitHub release via `stage-release-assets.yml` and `release-github.yml`, so its authenticity can be independently verified. It's worth noting that this attests the SBOM file itself as an output of the workflow, rather than attesting the image the SBOM is paired with; the SBOM itself is an attestation of that.
+
+```yaml
+jobs:
+  generate-sbom:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    permissions:
+      contents: read
+
+  attest-sbom:
+    needs: generate-sbom
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      actions: read
+    uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
+    with:
+      subject-artifact-name: ${{ needs.generate-sbom.outputs.sbom_file }}
+```
+
+To attach the SBOM to a published image as a predicate instead (a claim about the image itself), name the output after the image and list `sbom` in `attest.yml`'s `predicate-matrix`. See [attesting images built by build-docker](attest.md#attesting-images-built-by-build-docker).
+
+```yaml
+  generate-sbom:
+    uses: digicatapult/shared-workflows/.github/workflows/generate-sbom.yml@main
+    with:
+      sbom_output_file: my-image.cdx.json # <image-name>.cdx.json
+```

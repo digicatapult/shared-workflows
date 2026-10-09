@@ -1,0 +1,257 @@
+name: Attest
+
+on:
+  workflow_call:
+    inputs:
+      timeout_minutes:
+        required: false
+        type: number
+        default: 0
+      image-matrix:
+        required: false
+        type: string
+        default: ""
+        description: "Newline-separated list of image names built by build-docker.yml with push_ghcr (e.g. worker, monolith). Each image's digest is read from the <image>-image-digest artifact. Mutually exclusive with the single-attestation subject/predicate inputs."
+      predicate-matrix:
+        required: false
+        type: string
+        default: ""
+        description: "Newline-separated list of predicates to attest against every image in image-matrix. Supported: sbom (<image>.cdx.json artifact), trivy (<image>-trivy-container-report artifact). Leave empty for a plain build provenance attestation per image. Requires image-matrix."
+      subject-checksums-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run, e.g. the stage-release-assets.yml bundle) containing a checksums.sha256 manifest at its root, to download and attest as subject-checksums. Mutually exclusive with the other subject inputs."
+      subject-digest:
+        required: false
+        type: string
+        description: "SHA256 digest of an image to attest, in the form sha256:<hex>. Requires subject-name. Mutually exclusive with artifact subjects."
+      subject-name:
+        required: false
+        type: string
+        description: "Fully-qualified image name (no tag) for subject-digest, e.g. ghcr.io/org/image."
+      predicate-type:
+        required: false
+        type: string
+        description: "URI identifying the predicate type for a custom attestation. Leave empty for a plain SLSA build provenance attestation."
+      push-to-registry:
+        required: false
+        type: boolean
+        default: false
+        description: "Attach the attestation to the image in the registry as well as GH attestations. Only valid with subject-digest or image-matrix (applies to every image)."
+      subject-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run) to download before attesting as build provenance."
+      predicate-artifact-name:
+        required: false
+        type: string
+        description: "Name of a workflow artifact (from the same run) to download and use as the predicate content."
+jobs:
+  # Validates every request up front, so a mistake in one entry fails the run
+  # before any attestation is signed, rather than leaving a partial set.
+  validate:
+    name: "Validate attestation requests"
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 5 }}
+    outputs:
+      matrix: ${{ steps.manifest.outputs.matrix }}
+    steps:
+      - name: Build and validate attestation manifest
+        id: manifest
+        shell: bash
+        env:
+          IMAGE_MATRIX: ${{ inputs.image-matrix }}
+          PREDICATE_MATRIX: ${{ inputs.predicate-matrix }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+          SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ inputs.subject-checksums-artifact-name }}
+          SUBJECT_DIGEST: ${{ inputs.subject-digest }}
+          SUBJECT_NAME: ${{ inputs.subject-name }}
+          SUBJECT_ARTIFACT_NAME: ${{ inputs.subject-artifact-name }}
+          PREDICATE_TYPE: ${{ inputs.predicate-type }}
+          PREDICATE_ARTIFACT_NAME: ${{ inputs.predicate-artifact-name }}
+          PUSH_TO_REGISTRY: ${{ inputs.push-to-registry }}
+        run: |
+          set -euo pipefail
+          # Trims each line, drops blanks and duplicates, keeps first-seen order.
+          read_list() {
+            printf '%s\n' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | awk 'NF && !seen[$0]++'
+          }
+          fail() {
+            printf '::error::%s\n' "$@" >&2
+            exit 1
+          }
+          scalars="${SUBJECT_CHECKSUMS_ARTIFACT_NAME}${SUBJECT_DIGEST}${SUBJECT_NAME}${SUBJECT_ARTIFACT_NAME}${PREDICATE_TYPE}${PREDICATE_ARTIFACT_NAME}"
+          mapfile -t images < <(read_list "${IMAGE_MATRIX}")
+          mapfile -t predicates < <(read_list "${PREDICATE_MATRIX}")
+
+          if (( ${#images[@]} > 0 || ${#predicates[@]} > 0 )); then
+            [[ -z "${scalars}" ]] || fail "image-matrix/predicate-matrix are mutually exclusive with the single-attestation subject-*/predicate-* inputs."
+            (( ${#images[@]} > 0 )) || fail "predicate-matrix requires image-matrix."
+            errors=()
+            for image in "${images[@]}"; do
+              # Same naming rule build-docker.yml enforces for image_name.
+              [[ "${image}" =~ ^[a-z0-9]+((\.|_|__|-+)[a-z0-9]+)*$ ]] || errors+=("image-matrix: invalid image name \"${image}\".")
+            done
+            for predicate in "${predicates[@]}"; do
+              [[ "${predicate}" == "sbom" || "${predicate}" == "trivy" ]] || errors+=("predicate-matrix: unsupported predicate \"${predicate}\" (supported: sbom, trivy).")
+            done
+            (( ${#errors[@]} == 0 )) || fail "${errors[@]}"
+
+            to_json() { if (( $# > 0 )); then printf '%s\n' "$@" | jq -R . | jq -sc .; else printf '[]'; fi; }
+            manifest=$(jq -cn \
+              --argjson images "$(to_json "${images[@]}")" \
+              --argjson predicates "$(to_json "${predicates[@]}")" \
+              --arg registry "ghcr.io/${REPOSITORY_OWNER,,}" \
+              --argjson push "${PUSH_TO_REGISTRY}" \
+              'def predicate($image; $name):
+                  if $name == "sbom" then {type: "https://cyclonedx.org/bom", artifact: "\($image).cdx.json"}
+                  else {type: "https://trivy.digicatapult.org.uk/report/v1", artifact: "\($image)-trivy-container-report"} end;
+              [ $images[] as $image
+                | {
+                    "subject-name": "\($registry)/\($image)",
+                    "digest-artifact-name": "\($image)-image-digest",
+                    "push-to-registry": $push
+                  } as $base
+                | if ($predicates | length) == 0 then
+                    $base + {name: "\($image) - provenance"}
+                  else
+                    $predicates[] as $name
+                    | predicate($image; $name) as $p
+                    | $base + {
+                        name: "\($image) - \($name)",
+                        "predicate-type": $p.type,
+                        "predicate-artifact-name": $p.artifact
+                      }
+                  end ]')
+          else
+            # Single-attestation mode: one matrix entry built from the scalar inputs.
+            count=0
+            for value in "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" "${SUBJECT_DIGEST}" "${SUBJECT_ARTIFACT_NAME}"; do
+              [[ -n "${value}" ]] && count=$((count + 1))
+            done
+            (( count == 1 )) || fail "Exactly one of image-matrix, subject-checksums-artifact-name, subject-digest or subject-artifact-name must be set (got ${count} single-attestation subjects)."
+            [[ -z "${SUBJECT_DIGEST}" || -n "${SUBJECT_NAME}" ]] || fail "subject-name is required when subject-digest is set."
+            [[ -n "${SUBJECT_DIGEST}" || "${PUSH_TO_REGISTRY}" != "true" ]] || fail "push-to-registry is only valid with subject-digest or image-matrix."
+            if [[ -n "${PREDICATE_TYPE}" && -z "${PREDICATE_ARTIFACT_NAME}" ]]; then
+              fail "predicate-artifact-name is required when predicate-type is set."
+            fi
+            if [[ -z "${PREDICATE_TYPE}" && -n "${PREDICATE_ARTIFACT_NAME}" ]]; then
+              fail "predicate-type is required when predicate-artifact-name is set."
+            fi
+            manifest=$(jq -cn \
+              --arg subject_checksums_artifact_name "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" \
+              --arg subject_digest "${SUBJECT_DIGEST}" \
+              --arg subject_name "${SUBJECT_NAME}" \
+              --arg subject_artifact_name "${SUBJECT_ARTIFACT_NAME}" \
+              --arg predicate_type "${PREDICATE_TYPE}" \
+              --arg predicate_artifact_name "${PREDICATE_ARTIFACT_NAME}" \
+              --argjson push "${PUSH_TO_REGISTRY}" \
+              '[{
+                "subject-checksums-artifact-name": $subject_checksums_artifact_name,
+                "subject-digest": $subject_digest,
+                "subject-name": $subject_name,
+                "subject-artifact-name": $subject_artifact_name,
+                "predicate-type": $predicate_type,
+                "predicate-artifact-name": $predicate_artifact_name,
+                "push-to-registry": $push
+              } | with_entries(select(.value != "" and .value != false))]')
+          fi
+          printf 'matrix=%s\n' "${manifest}" >> "${GITHUB_OUTPUT}"
+
+  attest:
+    name: ${{ matrix.name || 'Attest' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.validate.outputs.matrix) }}
+    steps:
+      # A missing artifact fails the download, and so fails this entry only.
+      - name: Download image digest
+        if: matrix['digest-artifact-name']
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix['digest-artifact-name'] }}
+          path: attest-digest
+      - name: Download subject artifact
+        if: matrix['subject-artifact-name']
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix['subject-artifact-name'] }}
+          path: attest-subject
+      - name: Download checksums manifest artifact
+        if: matrix['subject-checksums-artifact-name']
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix['subject-checksums-artifact-name'] }}
+          path: attest-checksums
+      - name: Download predicate artifact
+        if: matrix['predicate-artifact-name']
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix['predicate-artifact-name'] }}
+          path: attest-predicate
+      - name: Resolve subject and predicate
+        id: resolve
+        shell: bash
+        env:
+          DIGEST_ARTIFACT_NAME: ${{ matrix['digest-artifact-name'] }}
+          SUBJECT_DIGEST: ${{ matrix['subject-digest'] }}
+          SUBJECT_ARTIFACT_NAME: ${{ matrix['subject-artifact-name'] }}
+          SUBJECT_CHECKSUMS_ARTIFACT_NAME: ${{ matrix['subject-checksums-artifact-name'] }}
+          PREDICATE_ARTIFACT_NAME: ${{ matrix['predicate-artifact-name'] }}
+        run: |
+          set -euo pipefail
+          SUBJECT_PATH=""
+          SUBJECT_CHECKSUMS=""
+          PREDICATE_PATH=""
+          if [[ -n "${DIGEST_ARTIFACT_NAME}" ]]; then
+            digest_file=$(find attest-digest -type f | sort | head -n1)
+            SUBJECT_DIGEST=$(tr -d '[:space:]' < "${digest_file:-/dev/null}")
+            if [[ ! "${SUBJECT_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              printf '::error::Artifact %s does not contain a sha256:<hex> digest.\n' "${DIGEST_ARTIFACT_NAME}" >&2
+              exit 1
+            fi
+          fi
+          if [[ -n "${SUBJECT_ARTIFACT_NAME}" ]]; then
+            SUBJECT_PATH="attest-subject/*"
+          fi
+          if [[ -n "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" ]]; then
+            SUBJECT_CHECKSUMS="attest-checksums/checksums.sha256"
+            if [[ ! -s "${SUBJECT_CHECKSUMS}" ]]; then
+              printf '::error::Artifact %s has no non-empty checksums.sha256 at its root.\n' "${SUBJECT_CHECKSUMS_ARTIFACT_NAME}" >&2
+              exit 1
+            fi
+          fi
+          if [[ -n "${PREDICATE_ARTIFACT_NAME}" ]]; then
+            PREDICATE_PATH=$(find attest-predicate -type f | sort | head -n1)
+            if [[ -z "${PREDICATE_PATH}" ]]; then
+              printf '::error::Predicate artifact %s contained no files.\n' "${PREDICATE_ARTIFACT_NAME}" >&2
+              exit 1
+            fi
+          fi
+          {
+            printf 'subject-digest=%s\n' "${SUBJECT_DIGEST}"
+            printf 'subject-path=%s\n' "${SUBJECT_PATH}"
+            printf 'subject-checksums=%s\n' "${SUBJECT_CHECKSUMS}"
+            printf 'predicate-path=%s\n' "${PREDICATE_PATH}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Login to GitHub Container Registry
+        if: matrix['push-to-registry'] && startsWith(matrix['subject-name'], 'ghcr.io/')
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Attest
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ steps.resolve.outputs.subject-path }}
+          subject-checksums: ${{ steps.resolve.outputs.subject-checksums }}
+          subject-digest: ${{ steps.resolve.outputs.subject-digest }}
+          subject-name: ${{ matrix['subject-name'] }}
+          predicate-type: ${{ matrix['predicate-type'] }}
+          predicate-path: ${{ steps.resolve.outputs.predicate-path }}
+          push-to-registry: ${{ matrix['push-to-registry'] || false }}

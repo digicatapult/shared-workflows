@@ -15,10 +15,17 @@ on:
         required: false
         type: boolean
         default: false
+        description: "Deprecated: download and attach *.cdx.json artefacts directly. Use stage-release-assets.yml and release_assets_artifact_name instead."
       expected_sbom_count:
         required: false
         type: number
         default: 1
+        description: "Deprecated: expected number of SBOM artefacts when get_sbom is enabled."
+      release_assets_artifact_name:
+        required: false
+        type: string
+        default: ""
+        description: "Name of the bundle artefact uploaded by stage-release-assets.yml. Its files are verified against its checksums.sha256 and attached as release assets, together with the manifest. Leave empty to release without assets."
 jobs:
   release:
     name: "Release"
@@ -68,22 +75,74 @@ jobs:
           ' >> $GITHUB_OUTPUT
 
           echo "EOF" >> $GITHUB_OUTPUT
-      - name: Download SBOM artefacts
-        uses: actions/download-artifact@v8
+      - name: Validate release asset inputs
+        env:
+          GET_SBOM: ${{ inputs.get_sbom }}
+          RELEASE_ASSETS_ARTIFACT_NAME: ${{ inputs.release_assets_artifact_name }}
+        run: |
+          set -euo pipefail
+          if [[ "${GET_SBOM}" == "true" && -n "${RELEASE_ASSETS_ARTIFACT_NAME}" ]]; then
+            printf '::error::get_sbom is deprecated and cannot be combined with release_assets_artifact_name. Stage SBOMs with stage-release-assets.yml instead.\n' >&2
+            exit 1
+          fi
+      - name: Download legacy SBOM artefacts
         if: inputs.get_sbom
+        uses: actions/download-artifact@v8
         with:
           pattern: '*.cdx.json'
           merge-multiple: true
-      - name: Validate SBOM count
+      - name: Validate legacy SBOM count
         if: inputs.get_sbom
         env:
           EXPECTED_SBOM_COUNT: ${{ inputs.expected_sbom_count }}
         run: |
+          set -euo pipefail
           sbom_count=$(find . -type f -name '*.cdx.json' -print | wc -l)
-          if [ "${sbom_count}" -ne "${EXPECTED_SBOM_COUNT}" ]; then
-            echo "Expected ${EXPECTED_SBOM_COUNT} SBOM artefact(s), found ${sbom_count}." >&2
+          if [[ "${sbom_count}" -ne "${EXPECTED_SBOM_COUNT}" ]]; then
+            printf '::error::Expected %s SBOM artefact(s), found %s.\n' "${EXPECTED_SBOM_COUNT}" "${sbom_count}" >&2
             exit 1
           fi
+      - name: Download release assets bundle
+        if: inputs.release_assets_artifact_name != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ inputs.release_assets_artifact_name }}
+          path: release-assets
+      # Publishes only what the (attested) manifest lists: every file must
+      # match its hash, and no unlisted file may ride along.
+      - name: Verify release assets against checksums manifest
+        if: inputs.release_assets_artifact_name != ''
+        working-directory: release-assets
+        env:
+          ARTIFACT_NAME: ${{ inputs.release_assets_artifact_name }}
+        run: |
+          set -euo pipefail
+          if [[ ! -s checksums.sha256 ]]; then
+            printf '::error::Artefact %s has no non-empty checksums.sha256 at its root; stage it with stage-release-assets.yml.\n' "${ARTIFACT_NAME}" >&2
+            exit 1
+          fi
+          sha256sum --check --strict checksums.sha256
+          listed=$(awk '{ sub(/^[^ ]+ [ *]/, ""); print }' checksums.sha256 | sort)
+          present=$(find . -type f ! -name checksums.sha256 -printf '%P\n' | sort)
+          if [[ "${listed}" != "${present}" ]]; then
+            printf '::error::Files in %s do not match checksums.sha256:\n%s\n' "${ARTIFACT_NAME}" "$(diff <(printf '%s\n' "${listed}") <(printf '%s\n' "${present}") || true)" >&2
+            exit 1
+          fi
+      - name: Build release files list
+        id: release_files
+        env:
+          ARTIFACT_NAME: ${{ inputs.release_assets_artifact_name }}
+        run: |
+          {
+            echo "files<<RELEASE_FILES_EOF"
+            if [[ "${{ inputs.get_sbom }}" == "true" ]]; then
+              echo "**/*.cdx.json"
+            fi
+            if [[ -n "${ARTIFACT_NAME}" ]]; then
+              echo "release-assets/*"
+            fi
+            echo "RELEASE_FILES_EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Create GitHub release version
         uses: softprops/action-gh-release@v3
         with:
@@ -94,8 +153,21 @@ jobs:
           make_latest: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
-          files: |
-            **/*.cdx.json
+          files: ${{ steps.release_files.outputs.files }}
+      - name: Clear existing latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Deletes the previous `latest` release (and its tag) outright,
+          # rather than overwriting only same-named assets, so a file that
+          # stops being produced (narrowed pattern, dropped scan, renamed
+          # SBOM) can't linger on `latest` next to a checksums.sha256 that no
+          # longer lists it.
+          release_id=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --paginate --jq '.[] | select(.tag_name == "latest") | .id')
+          if [[ -n "${release_id}" ]]; then
+            gh release delete latest --yes --cleanup-tag
+          fi
       - name: Update latest tag
         run: |
           git config user.name github-actions
@@ -110,6 +182,8 @@ jobs:
           name: Latest Release ${{ steps.get_version.outputs.version }}
           draft: false
           prerelease: false
+          make_latest: false
           generate_release_notes: true
           body: ${{ steps.release_notes.outputs.body }}
           token: ${{ secrets.GITHUB_TOKEN }}
+          files: ${{ steps.release_files.outputs.files }}

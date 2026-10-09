@@ -134,3 +134,30 @@ jobs:
       target: "http://localhost:3000"
       rules_file_name: ".zap/rules.tsv"
 ```
+
+### With a provenance attestation
+
+To generate a signed build provenance attestation for the report file(s) of a scan type, add a job for [attest.yml](../.github/workflows/attest.yml) in your own workflow, after `scan-zap`. This lets the ZAP report be attached to a GitHub release (see [release-github.yml](release-github.md)) with its authenticity independently verifiable. Callers remain responsible for ensuring that secrets via `docker_env_vars`/`pre_scan_command` aren't captured in the scanned target or report.
+
+```yaml
+jobs:
+  scan-zap:
+    uses: digicatapult/shared-workflows/.github/workflows/scan-zap.yml@main
+    permissions:
+      contents: read
+    with:
+      docker_name: "ghcr.io/zaproxy/zaproxy:2.17.0"
+      docker_compose_file: docker-compose.yml
+      target: "http://localhost:3000"
+
+  attest-zap-report:
+    needs: scan-zap
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      actions: read
+    uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
+    with:
+      subject-artifact-name: zap_scan-baseline
+```

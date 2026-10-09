@@ -45,3 +45,61 @@ jobs:
       DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
       DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
 ```
+
+### With container CVE scanning
+
+Setting `scan_container: true` runs an isolated, least-privilege Trivy scan of the built `linux/amd64` image and fails the build on `scan_fail_severity` (default `CRITICAL`). The raw JSON report is uploaded as the `<image-name>-trivy-container-report` artifact. This requires no extra permissions on top of the standard `build-docker` set.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    with:
+      push_dockerhub: true
+      push_ghcr: true
+      scan_container: true
+    secrets:
+      DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
+      DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
+```
+
+### Attesting the published image and its Trivy report
+
+To get a signed, verifiable claim that *this* released image was scanned with *this* result, add an [attest.yml](attest.md#attesting-images-built-by-build-docker) job after `build-docker`. With `push_ghcr: true`, `build-docker` uploads the published digest as an `<image-name>-image-digest` artifact, so you don't need to look it up yourself.
+
+```yaml
+jobs:
+  build-docker:
+    uses: digicatapult/shared-workflows/.github/workflows/build-docker.yml@main
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+    with:
+      push_dockerhub: false
+      push_ghcr: true
+      scan_container: true
+    secrets:
+      DOCKERHUB_USERNAME: DOCKERHUB_USERNAME
+      DOCKERHUB_TOKEN: DOCKERHUB_TOKEN
+
+  attest-image:
+    needs: build-docker
+    permissions:
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+      actions: read
+    uses: digicatapult/shared-workflows/.github/workflows/attest.yml@main
+    with:
+      image-matrix: ${{ github.event.repository.name }}
+      predicate-matrix: trivy
+```
+
+`image-matrix` takes the image name, which is `image_name` if set, otherwise the repository name. The repository name must already be lowercase to pass validation. Only the `linux/amd64` image is scanned, so the Trivy attestation says nothing about the `linux/arm64` image.
+
+Verify with `gh attestation verify oci://<image-ref> --repo <owner>/<repo> --signer-repo digicatapult/shared-workflows --predicate-type https://trivy.digicatapult.org.uk/report/v1 --source-ref refs/heads/<branch>`.
