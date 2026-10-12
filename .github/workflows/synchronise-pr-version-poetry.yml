@@ -67,7 +67,7 @@ jobs:
           ref: ${{ steps.pr-details.outputs.pr_branch }}
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
           check-latest: true
       - name: Install poetry
         run: |
