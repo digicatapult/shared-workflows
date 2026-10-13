@@ -69,8 +69,8 @@
     },
     {
       "description": "Asset SHA256s cannot be updated automatically; the reviewer must copy them from the release checksums.txt",
-      "matchPackageNames": ["csnp/cryptoscan", "csnp/tls-analyzer"],
-      "prBodyNotes": ["Update the matching `*_SHA256` in `scan-post-quantum-cryptography.yml` from this release's `checksums.txt` before merging; the install step fails until it is updated."]
+      "matchPackageNames": ["csnp/cryptoscan"],
+      "prBodyNotes": ["Update `CRYPTOSCAN_SHA256` in `scan-post-quantum-cryptography.yml` from this release's `checksums.txt` before merging; the install step fails until it is updated."]
     }
   ]
 }

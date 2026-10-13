@@ -932,49 +932,36 @@ Inventories cryptography that is at risk from quantum computers (RSA, ECC, DH, D
 
 #### Inputs
 
-| Input                   | Type    | Description                                                                                                                                                                                                         | Default               | Required |
-| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | -------- |
-| timeout_minutes         | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `pqc-repository-scan` 15, `pqc-semgrep-scan` 15, `pqc-codeql-inventory` 30, `pqc-tls-analysis` 20, `pqc-report` 10 | `0`                   | false    |
-| upload_type             | string  | `sarif` uploads `pqc-security.sarif` to code scanning and keeps the reports as an artefact, `artefact` only keeps the artefact, and `none` skips both                                                               | `sarif`               | false    |
-| scan_baseline_file      | string  | cryptoscan baseline JSON in the caller repository; used only if the file exists                                                                                                                                     | `baseline.json`       | false    |
-| scan_exclude            | string  | Comma-separated path globs skipped by cryptoscan and Semgrep                                                                                                                                                        | `""`                  | false    |
-| semgrep_extra_args      | string  | Extra arguments appended to the pqc-rules Semgrep scan                                                                                                                                                              | `""`                  | false    |
-| enable_codeql_inventory | boolean | Run CodeQL's experimental cryptography inventory queries as an extra source                                                                                                                                         | `false`               | false    |
-| codeql_languages        | string  | JSON list of CodeQL inventory languages; only `python` and `java` are supported                                                                                                                                     | `'["python"]'`        | false    |
-| enable_tls_analysis     | boolean | Probe TLS endpoints started inside the job with tls-analyzer                                                                                                                                                        | `false`               | false    |
-| tls_targets             | string  | JSON list of `host:port` targets; only `localhost` and `127.x.x.x` are accepted                                                                                                                                     | `'["localhost:443"]'` | false    |
-| tls_policy              | string  | Optional tls-analyzer policy, e.g. `cnsa-2.0-2027`; an unsatisfied policy is a warning only                                                                                                                         | `""`                  | false    |
-| docker_compose_file     | string  | Docker Compose file started before the TLS scan                                                                                                                                                                     | `""`                  | false    |
-| pull_ghcr               | boolean | Log in to `ghcr.io` before starting the Docker Compose file                                                                                                                                                         | `false`               | false    |
-| pre_scan_command        | string  | Command run before the TLS scan, e.g. to start the service                                                                                                                                                          | `""`                  | false    |
-| env_vars                | string  | JSON object of environment variables for the TLS job                                                                                                                                                                | `{}`                  | false    |
-| target_wait_timeout     | number  | Seconds to wait for each TLS target to accept a handshake                                                                                                                                                           | `60`                  | false    |
-| correlation_line_window | number  | Maximum line distance at which findings from different sources count as the same finding                                                                                                                            | `3`                   | false    |
-| allowlist_extra         | string  | Comma-separated `SOURCE:RULE_ID` globs reported to code scanning even when only one source found them                                                                                                               | `""`                  | false    |
-| allowlist_disable       | boolean | Drop the default allowlist, so only findings corroborated by two or more sources reach code scanning                                                                                                                | `false`               | false    |
+| Input                   | Type    | Description                                                                                                                                                       | Default         | Required |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| timeout_minutes         | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `pqc-repository-scan` 15, `pqc-semgrep-scan` 15, `pqc-report` 10 | `0`             | false    |
+| upload_type             | string  | `sarif` uploads `pqc-security.sarif` to code scanning and keeps the reports as an artefact, `artefact` only keeps the artefact, and `none` skips both             | `sarif`         | false    |
+| scan_baseline_file      | string  | cryptoscan baseline JSON in the caller repository; used only if the file exists                                                                                   | `baseline.json` | false    |
+| scan_exclude            | string  | Comma-separated path globs skipped by cryptoscan and Semgrep                                                                                                      | `""`            | false    |
+| semgrep_extra_args      | string  | Extra arguments appended to the pqc-rules Semgrep scan                                                                                                            | `""`            | false    |
+| correlation_line_window | number  | Maximum line distance at which findings from different sources count as the same finding                                                                          | `3`             | false    |
+| allowlist_extra         | string  | Comma-separated `SOURCE:RULE_ID` globs reported to code scanning even when only one source found them                                                             | `""`            | false    |
+| allowlist_disable       | boolean | Drop the default allowlist, so only findings corroborated by two or more sources reach code scanning                                                              | `false`         | false    |
 
 #### Permissions
 
-| Access                   | Jobs used          | Level | Reason                                                | Conditions                                       |
-| ------------------------ | ------------------ | ----- | ----------------------------------------------------- | ------------------------------------------------ |
-| `contents: read`         | All jobs           | Job   | To GET repository contents to scan                    | N/A                                              |
-| `packages: read`         | `pqc-tls-analysis` | Job   | To pull images from GHCR for the Docker Compose stack | `inputs.enable_tls_analysis`, `inputs.pull_ghcr` |
-| `security-events: write` | `pqc-report`       | Job   | To POST the correlated SARIF report to code scanning  | `inputs.upload_type: sarif`                      |
+| Access                   | Jobs used    | Level | Reason                                               | Conditions                                                 |
+| ------------------------ | ------------ | ----- | ---------------------------------------------------- | ---------------------------------------------------------- |
+| `contents: read`         | All jobs     | Job   | To GET repository contents to scan                   | N/A                                                        |
+| `security-events: write` | `pqc-report` | Job   | To POST the correlated SARIF report to code scanning | Always granted; only used when `inputs.upload_type: sarif` |
 
 #### Workflow Description
 
 1. **`pqc-repository-scan`**: Runs [cryptoscan](https://github.com/csnp/cryptoscan) (release archive verified by SHA256) over the repository, applying `scan_baseline_file` when it exists.
 2. **`pqc-semgrep-scan`**: Runs Semgrep CE with the [pqc-rules](https://github.com/digicatapult/pqc-rules) ruleset, checked out at a pinned commit. This is separate from [Scan Vulnerabilities](#scan-vulnerabilities-examples); both pin the same Semgrep version.
-3. **`pqc-codeql-inventory`** (opt-in): Runs GitHub's experimental CodeQL cryptography inventory queries per language, without uploading them.
-4. **`pqc-tls-analysis`** (opt-in): Starts the caller's stack, waits for each localhost target, and runs [tls-analyzer](https://github.com/csnp/tls-analyzer) (release archive verified by SHA256) against it.
-5. **`pqc-report`**: Correlates every source with the pqc-rules correlator. Findings in the same file, within `correlation_line_window` lines and in the same algorithm family, are merged. Findings corroborated by two or more sources, plus allowlisted single-source findings (committed private keys and localhost TLS results by default), go to code scanning under the `pqc` category. The `pqc-report` artefact holds `pqc-all.json` (every finding), `pqc-cbom.cdx.json` (CycloneDX CBOM), `pqc-summary.md` (also written to the job summary) and `pqc-security.sarif`.
+3. **`pqc-report`**: Correlates both sources with the pqc-rules correlator. Findings in the same file, within `correlation_line_window` lines and in the same algorithm family, are merged. Findings corroborated by two or more sources, plus allowlisted single-source findings (committed private keys by default), go to code scanning under the `pqc` category. The `pqc-report` artefact holds `pqc-all.json` (every finding), `pqc-cbom.cdx.json` (CycloneDX CBOM), `pqc-summary.md` (also written to the job summary) and `pqc-security.sarif`.
 
 #### Limitations
 
 - New tools may need adding and others deprecating before we reach Q Day (2029, approximately).
 - cryptoscan has no pull-request-only mode, so every run scans the whole working tree; use `scan_baseline_file` to report only new findings.
-- CodeQL's cryptography inventory queries only exist for Python and Java, and are experimental. Extending it to cover JavaScript and TypeScript may be impractical.
-- tls-analyzer only probes the `X25519MLKEM768` hybrid group, so other post-quantum groups are reported as classical.
+- CodeQL's cryptography inventory queries were evaluated and left out: they are explicitly experimental and only exist for Python and Java.
+- TLS analysis (tls-analyzer) was evaluated and left out: it only recognises the `X25519MLKEM768` hybrid group, so endpoints using other post-quantum groups are misreported as classical.
 - Dependency scanning (cryptodeps) was not included, as its [v1.3.0 release](https://github.com/csnp/cryptodeps/releases?page=2#release-v1.3.0) indicates, under "Known limitations", there is a credible risk of database entries and the shipped cryptographic algorithms in dependencies not aligning correctly.
 
 ### [Scan Secrets](.github/workflows/scan-secrets.yml) ([examples](examples/scan-secrets.md))

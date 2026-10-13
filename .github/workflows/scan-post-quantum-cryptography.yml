@@ -25,54 +25,6 @@ on:
         description: Extra arguments appended to the pqc-rules Semgrep scan, split on whitespace.
         required: false
         type: string
-      enable_codeql_inventory:
-        description: Run CodeQL's experimental cryptography inventory queries as an extra correlation source.
-        required: false
-        type: boolean
-        default: false
-      codeql_languages:
-        description: JSON list of languages for the CodeQL inventory. Only "python" and "java" have cryptography inventory queries.
-        required: false
-        type: string
-        default: '["python"]'
-      enable_tls_analysis:
-        description: Probe TLS endpoints started inside the job with tls-analyzer.
-        required: false
-        type: boolean
-        default: false
-      tls_targets:
-        description: JSON list of host:port targets for tls-analyzer. Only localhost and 127.x.x.x are accepted.
-        required: false
-        type: string
-        default: '["localhost:3000"]'
-      tls_policy:
-        description: Optional tls-analyzer built-in policy, e.g. "cnsa-2.0-2027". An unsatisfied policy is reported, never fails the job.
-        required: false
-        type: string
-      docker_compose_file:
-        description: Docker Compose file started before the TLS scan.
-        required: false
-        type: string
-      pull_ghcr:
-        description: Authentication via ghcr.io to retrieve images.
-        required: false
-        type: boolean
-        default: false
-      pre_scan_command:
-        description: Shell command run before the TLS scan, e.g. to start the service.
-        required: false
-        type: string
-        default: ""
-      env_vars:
-        description: JSON object of environment variables exported for the TLS job.
-        required: false
-        type: string
-        default: "{}"
-      target_wait_timeout:
-        description: Seconds to wait for every TLS target to accept a handshake.
-        required: false
-        type: number
-        default: 60
       correlation_line_window:
         description: Maximum line distance at which findings from different sources are treated as the same finding.
         required: false
@@ -94,10 +46,6 @@ env:
   CRYPTOSCAN_VERSION: "v1.4.0"
   # Renovate cannot update this: copy the linux_amd64.tar.gz line from the release's checksums.txt.
   CRYPTOSCAN_SHA256: "49aa043bd3f46927efa8ee89a2344d30f2ec351ae9e0cf2791ac8206b45be19d"
-  # renovate: datasource=github-releases depName=csnp/tls-analyzer
-  TLS_ANALYZER_VERSION: "v0.4.1"
-  # Renovate cannot update this: copy the linux-amd64.tar.gz line from the release's checksums.txt.
-  TLS_ANALYZER_SHA256: "d88eb299b26d785748311d96c4584915ebc4f57ac9dfa01bf1841e6b04e0d1b0"
   # renovate: datasource=pypi depName=semgrep
   SEMGREP_VERSION: "1.180.0"
   PQC_RULES_REPOSITORY: "digicatapult/pqc-rules"
@@ -169,6 +117,16 @@ jobs:
           python-version: "3.14"
       - name: Install Semgrep
         run: pip install "semgrep==${SEMGREP_VERSION}"
+      - name: Check pqc-rules loads
+        run: |
+          set -euo pipefail
+          # An empty or unparseable ruleset would otherwise scan cleanly and report nothing.
+          summary=$(semgrep --validate --metrics=off --config .pqc-rules/rules 2>&1 | grep -E 'Configuration is (in)?valid' || true)
+          printf '%s\n' "$summary"
+          if [[ ! "$summary" =~ ^Configuration\ is\ valid\ -\ found\ 0\ configuration\ error\(s\),\ and\ ([1-9][0-9]*)\ rule ]]; then
+            printf '::error::pqc-rules at %s did not load any valid rules\n' "$PQC_RULES_REF"
+            exit 1
+          fi
       - name: Run Semgrep with pqc-rules
         env:
           SCAN_EXCLUDE: ${{ inputs.scan_exclude }}
@@ -194,165 +152,11 @@ jobs:
           path: pqc-raw/semgrep.json
           retention-days: 7
 
-  pqc-codeql-inventory:
-    name: PQC CodeQL inventory (${{ matrix.language }})
-    if: inputs.enable_codeql_inventory == true
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: ${{ fromJson(inputs.codeql_languages) }}
-    steps:
-      - name: Select inventory queries
-        id: queries
-        env:
-          LANGUAGE: ${{ matrix.language }}
-        run: |
-          set -euo pipefail
-          case "$LANGUAGE" in
-            python) queries="codeql/python-queries:experimental/cryptography/inventory/new_models" ;;
-            java) queries="codeql/java-queries:experimental/quantum/InventorySlices" ;;
-            *)
-              printf '::error::codeql_languages: %s has no cryptography inventory queries; use python and/or java\n' "$LANGUAGE"
-              exit 1
-              ;;
-          esac
-          printf 'queries=%s\n' "$queries" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@v7
-      - uses: github/codeql-action/init@v4
-        with:
-          languages: ${{ matrix.language }}
-          build-mode: none
-          queries: ${{ steps.queries.outputs.queries }}
-      - uses: github/codeql-action/analyze@v4
-        with:
-          category: pqc-inventory-${{ matrix.language }}
-          output: pqc-raw
-          upload: never
-      - name: Upload CodeQL inventory results
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: pqc-raw-codeql-${{ matrix.language }}
-          path: pqc-raw/*.sarif
-          retention-days: 7
-
-  pqc-tls-analysis:
-    name: PQC TLS analysis (tls-analyzer)
-    if: inputs.enable_tls_analysis == true
-    runs-on: ubuntu-latest
-    timeout-minutes: ${{ inputs.timeout_minutes || 20 }}
-    permissions:
-      contents: read
-      packages: read
-    steps:
-      - name: Validate TLS targets
-        env:
-          TLS_TARGETS: ${{ inputs.tls_targets }}
-        run: |
-          set -euo pipefail
-          if ! jq -e 'type == "array" and length > 0 and all(type == "string")' <<< "$TLS_TARGETS" > /dev/null; then
-            printf '::error::tls_targets must be a non-empty JSON list of host:port strings\n'
-            exit 1
-          fi
-          while IFS= read -r target; do
-            if [[ ! "$target" =~ ^(localhost|127\.[0-9]+\.[0-9]+\.[0-9]+)(:[0-9]{1,5})?$ ]]; then
-              printf '::error::tls_targets entries must be localhost or 127.x.x.x with an optional port (got %s)\n' "$target"
-              exit 1
-            fi
-          done < <(jq -r '.[]' <<< "$TLS_TARGETS")
-      - uses: actions/checkout@v7
-      - name: Set environment variables from JSON
-        env:
-          ENV_VARS_JSON: ${{ inputs.env_vars }}
-        run: jq -r 'to_entries|map("\(.key)=\(.value|tostring)")|.[]' <<< "$ENV_VARS_JSON" >> "$GITHUB_ENV"
-      - name: Login to GitHub Container Registry
-        if: inputs.pull_ghcr == true
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup dependencies
-        if: inputs.docker_compose_file != ''
-        env:
-          DOCKER_COMPOSE_FILE: ${{ inputs.docker_compose_file }}
-        run: docker compose -f "$DOCKER_COMPOSE_FILE" up -d --quiet-pull
-      - name: Run pre-scan command
-        if: inputs.pre_scan_command != ''
-        run: ${{ inputs.pre_scan_command }}
-      - name: Install tls-analyzer
-        run: |
-          set -euo pipefail
-          archive="tlsanalyzer-linux-amd64.tar.gz"
-          curl -fsSL -o "$RUNNER_TEMP/$archive" \
-            "https://github.com/csnp/tls-analyzer/releases/download/${TLS_ANALYZER_VERSION}/${archive}"
-          printf '%s  %s\n' "$TLS_ANALYZER_SHA256" "$RUNNER_TEMP/$archive" | sha256sum -c -
-          mkdir -p "$RUNNER_TEMP/bin"
-          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/bin" tlsanalyzer
-          printf '%s\n' "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - name: Wait for TLS targets to be ready
-        env:
-          TLS_TARGETS: ${{ inputs.tls_targets }}
-          TIMEOUT: ${{ inputs.target_wait_timeout }}
-        run: |
-          set -euo pipefail
-          while IFS= read -r target; do
-            elapsed=0
-            # -k: the probe only checks the handshake completes; the certificate is what is being assessed.
-            until curl -sk -o /dev/null "https://${target}"; do
-              if (( elapsed >= TIMEOUT )); then
-                printf '::error::Timed out waiting for %s after %ss\n' "$target" "$TIMEOUT"
-                exit 1
-              fi
-              sleep 2
-              elapsed=$((elapsed + 2))
-            done
-            printf 'Target %s is ready (waited %ss)\n' "$target" "$elapsed"
-          done < <(jq -r '.[]' <<< "$TLS_TARGETS")
-      - name: Run tls-analyzer
-        env:
-          TLS_TARGETS: ${{ inputs.tls_targets }}
-          TLS_POLICY: ${{ inputs.tls_policy }}
-        run: |
-          set -euo pipefail
-          mkdir -p pqc-raw
-          policy_args=()
-          if [[ -n "$TLS_POLICY" ]]; then
-            policy_args=(--policy "$TLS_POLICY")
-          fi
-          index=0
-          while IFS= read -r target; do
-            index=$((index + 1))
-            status=0
-            tlsanalyzer "$target" --format json --no-color --output "pqc-raw/tls-${index}.json" "${policy_args[@]}" || status=$?
-            case "$status" in
-              0) ;;
-              2) printf '::warning::%s does not satisfy TLS policy %s\n' "$target" "$TLS_POLICY" ;;
-              *)
-                printf '::error::tls-analyzer could not scan %s (exit %s)\n' "$target" "$status"
-                exit "$status"
-                ;;
-            esac
-          done < <(jq -r '.[]' <<< "$TLS_TARGETS")
-      - name: Upload tls-analyzer results
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: pqc-raw-tls
-          path: pqc-raw/tls-*.json
-          retention-days: 7
-
   pqc-report:
     name: PQC correlated report
     needs:
       - pqc-repository-scan
       - pqc-semgrep-scan
-      - pqc-codeql-inventory
-      - pqc-tls-analysis
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
@@ -378,27 +182,19 @@ jobs:
           merge-multiple: true
       - name: Correlate findings
         env:
-          ENABLE_CODEQL: ${{ inputs.enable_codeql_inventory }}
-          ENABLE_TLS: ${{ inputs.enable_tls_analysis }}
           LINE_WINDOW: ${{ inputs.correlation_line_window }}
           ALLOWLIST_EXTRA: ${{ inputs.allowlist_extra }}
           ALLOWLIST_DISABLE: ${{ inputs.allowlist_disable }}
         run: |
           set -euo pipefail
-          expected=(cryptoscan semgrep)
-          if [[ "$ENABLE_CODEQL" == "true" ]]; then expected+=(codeql); fi
-          if [[ "$ENABLE_TLS" == "true" ]]; then expected+=(tls-analyzer); fi
-
           args=(--root "$GITHUB_WORKSPACE" --out pqc-report --window "$LINE_WINDOW")
           args+=(--allowlist-extra "$ALLOWLIST_EXTRA")
-          args+=(--expected "$(IFS=,; printf '%s' "${expected[*]}")")
+          args+=(--expected "cryptoscan,semgrep")
           if [[ "$ALLOWLIST_DISABLE" == "true" ]]; then args+=(--allowlist-disable); fi
 
           shopt -s nullglob
           for file in pqc-raw/cryptoscan.json; do args+=(--cryptoscan "$file"); done
           for file in pqc-raw/semgrep.json; do args+=(--semgrep "$file"); done
-          for file in pqc-raw/*.sarif; do args+=(--codeql "$file"); done
-          for file in pqc-raw/tls-*.json; do args+=(--tls "$file"); done
 
           PYTHONPATH=.pqc-rules/correlate python -m pqc_correlate "${args[@]}"
           cat pqc-report/pqc-summary.md >> "$GITHUB_STEP_SUMMARY"
