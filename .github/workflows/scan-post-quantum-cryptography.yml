@@ -8,7 +8,7 @@ on:
         type: number
         default: 0
       upload_type:
-        description: The upload format for the correlated results - "sarif" uploads pqc-security.sarif to GitHub code scanning and keeps every report as an artefact, "artefact" only keeps the artefacts, and "none" uploads neither.
+        description: Where the correlated results go - "sarif" sends pqc-security.sarif to GitHub code scanning (via the SARIF uploader, no CodeQL analysis runs) and keeps every report as an artefact, "artefact" only keeps the artefacts, and "none" uploads neither.
         required: false
         type: string
         default: "sarif"
@@ -36,7 +36,7 @@ on:
         type: string
         default: ""
       allowlist_disable:
-        description: Drop the default allowlist so only findings corroborated by two or more sources reach code scanning.
+        description: Drop the default allowlist (committed private keys, plus the Semgrep-only JWT and TLS rules) so only findings corroborated by both sources reach code scanning. allowlist_extra still applies.
         required: false
         type: boolean
         default: false
@@ -49,8 +49,11 @@ env:
   # renovate: datasource=pypi depName=semgrep
   SEMGREP_VERSION: "1.180.0"
   PQC_RULES_REPOSITORY: "digicatapult/pqc-rules"
+  # Semgrep-only findings that cryptoscan cannot detect, so they would never be corroborated.
+  # Added to the correlator's own defaults (committed private keys) unless allowlist_disable is set.
+  PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
   # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
-  PQC_RULES_REF: "a1f5a206765817917dd9963b27a8f89da55a3d71"
+  PQC_RULES_REF: "aaf7098d9f07db8e43148f3d2eaf8534dc2dad7b"
 
 jobs:
   pqc-repository-scan:
@@ -89,7 +92,19 @@ jobs:
           if [[ -n "$SCAN_EXCLUDE" ]]; then
             args+=(--exclude "$SCAN_EXCLUDE")
           fi
-          cryptoscan "${args[@]}"
+          # cryptoscan v1.4.0 exits 1 whenever it reports a finding, even without --fail-on.
+          # This workflow only reports, so exit 1 with a valid report is treated as success.
+          status=0
+          cryptoscan "${args[@]}" || status=$?
+          if (( status == 0 )); then
+            exit 0
+          fi
+          if (( status == 1 )) && jq -e '.findings | type == "array"' pqc-raw/cryptoscan.json > /dev/null 2>&1; then
+            printf 'cryptoscan reported %s finding(s)\n' "$(jq '.findings | length' pqc-raw/cryptoscan.json)"
+            exit 0
+          fi
+          printf '::error::cryptoscan failed (exit %s) without writing a valid JSON report\n' "$status"
+          exit "$status"
       - name: Upload cryptoscan results
         uses: actions/upload-artifact@v7
         if: always()
@@ -188,7 +203,11 @@ jobs:
         run: |
           set -euo pipefail
           args=(--root "$GITHUB_WORKSPACE" --out pqc-report --window "$LINE_WINDOW")
-          args+=(--allowlist-extra "$ALLOWLIST_EXTRA")
+          allowlist="$ALLOWLIST_EXTRA"
+          if [[ "$ALLOWLIST_DISABLE" != "true" ]]; then
+            allowlist="${PQC_DEFAULT_ALLOWLIST}${ALLOWLIST_EXTRA:+,$ALLOWLIST_EXTRA}"
+          fi
+          args+=(--allowlist-extra "$allowlist")
           args+=(--expected "cryptoscan,semgrep")
           if [[ "$ALLOWLIST_DISABLE" == "true" ]]; then args+=(--allowlist-disable); fi
 

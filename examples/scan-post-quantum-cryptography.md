@@ -45,16 +45,22 @@ The workflow uses `baseline.json` automatically when it exists; set `scan_baseli
 
 ## How findings reach code scanning
 
-Findings from different tools are merged when they are in the same file, within `correlation_line_window` lines (default 3), and in the same algorithm family. A merged finding is uploaded when:
+Every Semgrep finding is kept as its own finding, so distinct calls on neighbouring lines (for example an RSA key and an RS256 JWT) stay separate. A cryptoscan finding corroborates the nearest Semgrep finding in the same file and algorithm family, within `correlation_line_window` lines (default 3). A finding is uploaded when:
 
 - both sources agree on it (`corroborated`, reported as a warning), or
 - it matches the allowlist (reported as a note).
 
-The default allowlist always reports committed private keys (`cryptoscan:KEY-00*`), which Semgrep cannot detect. Add more with `allowlist_extra`; use `allowlist_disable: true` to report corroborated findings only.
+The default allowlist reports findings that only one tool can detect, so they could never be corroborated:
+
+- committed private keys (`cryptoscan:KEY-00*`)
+- JWT signing with RSA or ECC (`semgrep:pqc.*.jwt-*`)
+- legacy TLS versions and classical-only key exchange groups (`semgrep:pqc.*.tls-legacy-version`, `semgrep:pqc.*.tls-classical-groups`)
+
+Add more with `allowlist_extra`; it extends the defaults rather than replacing them. Use `allowlist_disable: true` to drop the defaults, leaving only corroborated findings and `allowlist_extra`.
 
 ```yaml
 with:
-  allowlist_extra: "semgrep:pqc.javascript.jwt-*,semgrep:pqc.python.jwt-*"
+  allowlist_extra: "semgrep:pqc.javascript.webcrypto-*,semgrep:pqc.javascript.forge-*"
 ```
 
 Every finding, reported or not, is in `pqc-all.json` and `pqc-summary.md` in the `pqc-report` artefact.
