@@ -53,7 +53,7 @@ env:
   # Added to the correlator's own defaults (committed private keys) unless allowlist_disable is set.
   PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
   # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
-  PQC_RULES_REF: "aaf7098d9f07db8e43148f3d2eaf8534dc2dad7b"
+  PQC_RULES_REF: "2037586add56e4241271005e9f9ebf14d3683f73"
 
 jobs:
   pqc-repository-scan:
