@@ -97,7 +97,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.15"
+          python-version: "3.14"
       - name: Install Semgrep
         run: pip install semgrep
       - name: Semgrep CE scan
