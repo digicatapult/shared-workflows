@@ -140,7 +140,7 @@ jobs:
         working-directory: ${{ inputs.root }}
         run: npm ci --ignore-scripts
       - name: Audit code
-        uses: fallow-rs/fallow@71369f80d099e25726ad04382f15aef14a251abc # v3
+        uses: fallow-rs/fallow@fccff887da0d83db1711379e0a3696dfc2460fdd # v3
         with:
           version: ${{ inputs.fallow_version }}
           command: ${{ steps.settings.outputs.command }}
