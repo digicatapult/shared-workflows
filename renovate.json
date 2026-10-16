@@ -37,6 +37,40 @@
       ],
       "depNameTemplate": "fallow",
       "datasourceTemplate": "npm"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "^\\.github/workflows/scan-vulns\\.yml$",
+        "^\\.github/workflows/scan-post-quantum-cryptography\\.yml$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>github-releases|pypi) depName=(?<depName>\\S+)\\s+[A-Z_]+: \"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "{{{datasource}}}"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "^\\.github/workflows/scan-post-quantum-cryptography\\.yml$"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=git-refs depName=(?<depName>\\S+) currentValue=(?<currentValue>\\S+)\\s+[A-Z_]+: \"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "datasourceTemplate": "git-refs"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Bump Semgrep in scan-vulns and scan-post-quantum-cryptography together",
+      "matchDatasources": ["pypi"],
+      "matchPackageNames": ["semgrep"],
+      "groupName": "semgrep"
+    },
+    {
+      "description": "Asset SHA256s cannot be updated automatically; the reviewer must copy them from the release checksums.txt",
+      "matchPackageNames": ["csnp/cryptoscan"],
+      "prBodyNotes": ["Update `CRYPTOSCAN_SHA256` in `scan-post-quantum-cryptography.yml` from this release's `checksums.txt` before merging; the install step fails until it is updated."]
     }
   ]
 }

@@ -27,6 +27,9 @@ on:
         type: string
         default: "sarif"
         description: The upload format for the SARIF results - "sarif" uploads the SARIF report directly via CodeQL, "artefact" uploads the report as a PR artefact, and "none" skips the upload step altogether.
+env:
+  # renovate: datasource=pypi depName=semgrep
+  SEMGREP_VERSION: "1.180.0"
 jobs:
   semgrep:
     if: |
@@ -43,7 +46,7 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install Semgrep
-        run: pip install semgrep
+        run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Semgrep CE scan
         run: |
           semgrep ${{ inputs.extra_args }} --sarif --sarif-output=${{ inputs.sarif_path }}

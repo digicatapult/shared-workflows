@@ -36,6 +36,7 @@ Shared github workflows created by the `digicatapult` organisation.
 
 - [Generate SBOM](#generate-sbom-examples)
 - [Generate Security Scorecard](#generate-security-scorecard-examples)
+- [Scan Post-Quantum Cryptography](#scan-post-quantum-cryptography-examples)
 - [Scan Secrets](#scan-secrets-examples)
 - [Scan Vulnerabilities](#scan-vulnerabilities-examples)
 - [ZAP Scan](#zap-scan-examples)
@@ -924,6 +925,46 @@ Works on both `pull_request` and `push` callers, the same way as the NPM variant
 | Access           | Jobs used                                                | Level    | Reason                                                            | Conditions |
 | ---------------- | -------------------------------------------------------- | -------- | ----------------------------------------------------------------- | ---------- |
 | `contents: read` | `lint-migrations`, `migrate-roundtrip`, `seeded-upgrade` | Workflow | To GET repository contents and check out the base ref and PR head | N/A        |
+
+### [Scan Post-Quantum Cryptography](.github/workflows/scan-post-quantum-cryptography.yml) ([examples](examples/scan-post-quantum-cryptography.md))
+
+Inventories cryptography that is at risk from quantum computers (RSA, ECC, DH, DSA) or already classically weak (MD5, SHA-1, DES, RC4), using several independent scanners. A correlation step merges their findings and sends only the credible ones to GitHub code scanning; every finding stays available in the artefacts. Given the timeframe until Google's own Q Day, its internal deadline on completing its own PQC migrations, in 2029, it seems reasonable to skip errors and warnings from scan results for now. As that window closes, the need to error on weak and vulnerable findings will become more pressing.
+
+#### Inputs
+
+| Input                   | Type    | Description                                                                                                                                                                                           | Default         | Required |
+| ----------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------- |
+| timeout_minutes         | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `pqc-repository-scan` 15, `pqc-semgrep-scan` 15, `pqc-report` 10                                     | `0`             | false    |
+| upload_type             | string  | `sarif` sends `pqc-security.sarif` to code scanning with the SARIF uploader (no CodeQL analysis runs) and keeps the reports as an artefact, `artefact` only keeps the artefact, and `none` skips both | `sarif`         | false    |
+| scan_baseline_file      | string  | cryptoscan baseline JSON in the caller repository; used only if the file exists                                                                                                                       | `baseline.json` | false    |
+| scan_exclude            | string  | Comma-separated path globs skipped by cryptoscan and Semgrep                                                                                                                                          | `""`            | false    |
+| semgrep_extra_args      | string  | Extra arguments appended to the pqc-rules Semgrep scan                                                                                                                                                | `""`            | false    |
+| correlation_line_window | number  | Maximum line distance at which findings from different sources count as the same finding                                                                                                              | `3`             | false    |
+| allowlist_extra         | string  | Comma-separated `SOURCE:RULE_ID` globs reported to code scanning even when only one source found them                                                                                                 | `""`            | false    |
+
+#### Permissions
+
+| Access                   | Jobs used    | Level | Reason                                               | Conditions                                                 |
+| ------------------------ | ------------ | ----- | ---------------------------------------------------- | ---------------------------------------------------------- |
+| `contents: read`         | All jobs     | Job   | To GET repository contents to scan                   | N/A                                                        |
+| `security-events: write` | `pqc-report` | Job   | To POST the correlated SARIF report to code scanning | Always granted; only used when `inputs.upload_type: sarif` |
+
+#### Workflow Description
+
+1. **`pqc-repository-scan`**: Runs [cryptoscan](https://github.com/csnp/cryptoscan) (release archive verified by SHA256) over the repository, applying `scan_baseline_file` when it exists.
+2. **`pqc-semgrep-scan`**: Runs Semgrep CE with the [pqc-rules](https://github.com/digicatapult/pqc-rules) ruleset, checked out at a pinned commit. This is separate from [Scan Vulnerabilities](#scan-vulnerabilities-examples); both pin the same Semgrep version.
+3. **`pqc-report`**: Correlates both sources with the pqc-rules correlator. Each Semgrep finding stays a separate finding; a cryptoscan finding corroborates the nearest Semgrep finding in the same file and algorithm family within `correlation_line_window` lines. Corroborated findings, plus allowlisted single-source findings, go to code scanning under the `pqc` category. The `pqc-report` artefact holds `pqc-all.json` (every finding), `pqc-cbom.cdx.json` (CycloneDX CBOM), `pqc-summary.md` (also written to the job summary) and `pqc-security.sarif`.
+
+#### Limitations
+
+- New tools may need adding and others deprecating before we reach Q Day (2029, approximately).
+- cryptoscan has no pull-request-only mode, so every run scans the whole working tree; use `scan_baseline_file` to report only new findings.
+- CodeQL's cryptography inventory queries were evaluated and left out: they are explicitly experimental and only exist for Python and Java.
+- TLS analysis (tls-analyzer) was evaluated and left out: it only recognises the `X25519MLKEM768` hybrid group, so endpoints using other post-quantum groups are misreported as classical.
+- Symmetric ciphers with keys of 128 bits or more (e.g. AES-128) are out of scope: [NIST](https://csrc.nist.gov/Projects/post-quantum-cryptography/faqs) expects Grover's algorithm to give little or no practical advantage against them. Classical weaknesses such as CBC mode belong to [Scan Vulnerabilities](#scan-vulnerabilities-examples).
+- cryptoscan matches algorithm names as whole words, so identifiers, return values and imports (e.g. `md5` in a `return` statement, `from ... import rsa`) produce pattern-matching false positives. Correlation absorbs most of them; those with no Semgrep finding nearby stay single-source and only appear in the artefacts.
+- cryptoscan v1.4.0 exits non-zero whenever it reports a finding; the workflow treats that as success when the JSON report is valid.
+- Dependency scanning (cryptodeps) was not included, as its [v1.3.0 release](https://github.com/csnp/cryptodeps/releases?page=2#release-v1.3.0) indicates, under "Known limitations", there is a credible risk of database entries and the shipped cryptographic algorithms in dependencies not aligning correctly.
 
 ### [Scan Secrets](.github/workflows/scan-secrets.yml) ([examples](examples/scan-secrets.md))
 
