@@ -52,11 +52,12 @@ Every Semgrep finding is kept as its own finding, so distinct calls on neighbour
 
 The default allowlist reports findings that only one tool can detect, so they could never be corroborated:
 
-- committed private keys (`cryptoscan:KEY-00*`)
 - JWT signing with RSA or ECC (`semgrep:pqc.*.jwt-*`)
 - legacy TLS versions and classical-only key exchange groups (`semgrep:pqc.*.tls-legacy-version`, `semgrep:pqc.*.tls-classical-groups`)
 
-Add more with `allowlist_extra`; it extends the defaults rather than replacing them. Use `allowlist_disable: true` to drop the defaults, leaving only corroborated findings and `allowlist_extra`.
+Add more with `allowlist_extra`; it extends the defaults rather than replacing them.
+
+Committed private keys (`cryptoscan:KEY-00*`) are not reported by default. cryptoscan matches only the PEM header, so it also flags code and tests that handle PEM strings; GitHub secret scanning detects real keys. Add `cryptoscan:KEY-00*` to `allowlist_extra` to report cryptoscan's matches as well.
 
 ```yaml
 with:

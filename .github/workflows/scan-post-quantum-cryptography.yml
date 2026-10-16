@@ -35,11 +35,6 @@ on:
         required: false
         type: string
         default: ""
-      allowlist_disable:
-        description: Drop the default allowlist (committed private keys, plus the Semgrep-only JWT and TLS rules) so only findings corroborated by both sources reach code scanning. allowlist_extra still applies.
-        required: false
-        type: boolean
-        default: false
 
 env:
   # renovate: datasource=github-releases depName=csnp/cryptoscan
@@ -50,10 +45,10 @@ env:
   SEMGREP_VERSION: "1.180.0"
   PQC_RULES_REPOSITORY: "digicatapult/pqc-rules"
   # Semgrep-only findings that cryptoscan cannot detect, so they would never be corroborated.
-  # Added to the correlator's own defaults (committed private keys) unless allowlist_disable is set.
+  # The correlator has no default allowlist, so these are always passed, followed by allowlist_extra.
   PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
   # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
-  PQC_RULES_REF: "2037586add56e4241271005e9f9ebf14d3683f73"
+  PQC_RULES_REF: "d1cb60a5a09238ce173ac0b727d7298b83f536a2"
 
 jobs:
   pqc-repository-scan:
@@ -199,17 +194,11 @@ jobs:
         env:
           LINE_WINDOW: ${{ inputs.correlation_line_window }}
           ALLOWLIST_EXTRA: ${{ inputs.allowlist_extra }}
-          ALLOWLIST_DISABLE: ${{ inputs.allowlist_disable }}
         run: |
           set -euo pipefail
           args=(--root "$GITHUB_WORKSPACE" --out pqc-report --window "$LINE_WINDOW")
-          allowlist="$ALLOWLIST_EXTRA"
-          if [[ "$ALLOWLIST_DISABLE" != "true" ]]; then
-            allowlist="${PQC_DEFAULT_ALLOWLIST}${ALLOWLIST_EXTRA:+,$ALLOWLIST_EXTRA}"
-          fi
-          args+=(--allowlist-extra "$allowlist")
+          args+=(--allowlist-extra "${PQC_DEFAULT_ALLOWLIST}${ALLOWLIST_EXTRA:+,$ALLOWLIST_EXTRA}")
           args+=(--expected "cryptoscan,semgrep")
-          if [[ "$ALLOWLIST_DISABLE" == "true" ]]; then args+=(--allowlist-disable); fi
 
           shopt -s nullglob
           for file in pqc-raw/cryptoscan.json; do args+=(--cryptoscan "$file"); done

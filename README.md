@@ -941,7 +941,6 @@ Inventories cryptography that is at risk from quantum computers (RSA, ECC, DH, D
 | semgrep_extra_args      | string  | Extra arguments appended to the pqc-rules Semgrep scan                                                                                                                                                | `""`            | false    |
 | correlation_line_window | number  | Maximum line distance at which findings from different sources count as the same finding                                                                                                              | `3`             | false    |
 | allowlist_extra         | string  | Comma-separated `SOURCE:RULE_ID` globs reported to code scanning even when only one source found them                                                                                                 | `""`            | false    |
-| allowlist_disable       | boolean | Drop the default allowlist (committed private keys, Semgrep-only JWT and TLS rules), so only corroborated findings and `allowlist_extra` reach code scanning                                          | `false`         | false    |
 
 #### Permissions
 
@@ -954,7 +953,7 @@ Inventories cryptography that is at risk from quantum computers (RSA, ECC, DH, D
 
 1. **`pqc-repository-scan`**: Runs [cryptoscan](https://github.com/csnp/cryptoscan) (release archive verified by SHA256) over the repository, applying `scan_baseline_file` when it exists.
 2. **`pqc-semgrep-scan`**: Runs Semgrep CE with the [pqc-rules](https://github.com/digicatapult/pqc-rules) ruleset, checked out at a pinned commit. This is separate from [Scan Vulnerabilities](#scan-vulnerabilities-examples); both pin the same Semgrep version.
-3. **`pqc-report`**: Correlates both sources with the pqc-rules correlator. Each Semgrep finding stays a separate finding; a cryptoscan finding corroborates the nearest Semgrep finding in the same file and algorithm family within `correlation_line_window` lines. Corroborated findings, plus allowlisted single-source findings (committed private keys and the Semgrep-only JWT and TLS rules by default), go to code scanning under the `pqc` category. The `pqc-report` artefact holds `pqc-all.json` (every finding), `pqc-cbom.cdx.json` (CycloneDX CBOM), `pqc-summary.md` (also written to the job summary) and `pqc-security.sarif`.
+3. **`pqc-report`**: Correlates both sources with the pqc-rules correlator. Each Semgrep finding stays a separate finding; a cryptoscan finding corroborates the nearest Semgrep finding in the same file and algorithm family within `correlation_line_window` lines. Corroborated findings, plus allowlisted single-source findings, go to code scanning under the `pqc` category. The `pqc-report` artefact holds `pqc-all.json` (every finding), `pqc-cbom.cdx.json` (CycloneDX CBOM), `pqc-summary.md` (also written to the job summary) and `pqc-security.sarif`.
 
 #### Limitations
 
