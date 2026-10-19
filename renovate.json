@@ -3,6 +3,10 @@
   "extends": [
     "local>digicatapult/renovate-config"
   ],
+  "enabledManagers": [
+    "github-actions",
+    "custom.regex"
+  ],
   "customManagers": [
     {
       "customType": "regex",

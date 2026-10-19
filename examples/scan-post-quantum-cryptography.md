@@ -2,7 +2,7 @@
 
 ## Using [scan-post-quantum-cryptography.yml](../.github/workflows/scan-post-quantum-cryptography.yml) in callers
 
-Callers must grant `contents: read` and `security-events: write`. Only the `pqc-report` job uses `security-events: write`, to upload the correlated SARIF report; GitHub code scanning must be enabled on the repository when `upload_type` is `sarif`.
+Callers must grant `actions: read`, `contents: read` and `security-events: write`. Only the `pqc-report` job uses `actions: read` and `security-events: write`, to upload the correlated SARIF report; `actions: read` is only needed for that upload in private repositories. GitHub code scanning must be enabled on the repository when `upload_type` is `sarif`.
 
 ### Minimal
 
@@ -13,6 +13,7 @@ jobs:
   scan-pqc:
     uses: digicatapult/shared-workflows/.github/workflows/scan-post-quantum-cryptography.yml@main
     permissions:
+      actions: read
       contents: read
       security-events: write
 ```
@@ -26,22 +27,55 @@ jobs:
   scan-pqc:
     uses: digicatapult/shared-workflows/.github/workflows/scan-post-quantum-cryptography.yml@main
     permissions:
+      actions: read
       contents: read
       security-events: write
     with:
       upload_type: artefact
 ```
 
+### Calling more than once in a run
+
+Artefact names and the code scanning category must be unique within a workflow run. Give each call its own `artifact_suffix`; it is appended to every artefact name (`pqc-raw-cryptoscan-sarif`, `pqc-report-sarif`, ...) and to the code scanning category (`pqc-sarif`).
+
+```yaml
+jobs:
+  scan-pqc-sarif:
+    uses: digicatapult/shared-workflows/.github/workflows/scan-post-quantum-cryptography.yml@main
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      artifact_suffix: "-sarif"
+  scan-pqc-artefact:
+    uses: digicatapult/shared-workflows/.github/workflows/scan-post-quantum-cryptography.yml@main
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      upload_type: artefact
+      artifact_suffix: "-artefact"
+```
+
+Changing `artifact_suffix` on an existing `sarif` caller moves its results to a new category; alerts under the old category stay open until they are dismissed or the category is deleted.
+
 ## Creating a baseline
 
-cryptoscan can suppress findings that already exist so that only new ones are reported. Generate the baseline once on `main` and commit it:
+cryptoscan can suppress findings that already exist so that only new ones are reported. Generate the baseline in CI, not locally: cryptoscan records absolute file paths and matches baseline entries on path, line and pattern, so a baseline generated on a laptop never matches the runner's paths and would commit local paths to the repository.
+
+Run the workflow on `main`, then commit its raw cryptoscan output as the baseline:
 
 ```sh
-cryptoscan scan . --format json --output baseline.json
+gh run download <run-id> --name pqc-raw-cryptoscan --dir pqc-baseline
+mv pqc-baseline/cryptoscan.json baseline.json
 git add baseline.json
 ```
 
-The workflow uses `baseline.json` automatically when it exists; set `scan_baseline_file` to use another path. The baseline only filters cryptoscan, so Semgrep findings in baselined code become single-source: they stay in the artefacts but no longer reach code scanning.
+Add your `artifact_suffix` to the artefact name if you set one.
+
+The workflow uses `baseline.json` automatically when it exists; set `scan_baseline_file` to use another path. Because the line number is part of the match, any edit that moves a baselined finding (for example adding lines above it) makes it a new finding again; regenerate the baseline when that becomes noisy. The baseline only filters cryptoscan, so Semgrep findings in baselined code become single-source: they stay in the artefacts but no longer reach code scanning.
 
 ## How findings reach code scanning
 

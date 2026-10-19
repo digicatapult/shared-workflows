@@ -35,6 +35,11 @@ on:
         required: false
         type: string
         default: ""
+      artifact_suffix:
+        description: Appended to every artefact name and to the code scanning category (pqc). Set a different value on each call when this workflow is called more than once in the same run, e.g. "-sarif".
+        required: false
+        type: string
+        default: ""
 
 env:
   # renovate: datasource=github-releases depName=csnp/cryptoscan
@@ -48,7 +53,7 @@ env:
   # The correlator has no default allowlist, so these are always passed, followed by allowlist_extra.
   PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
   # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
-  PQC_RULES_REF: "d1cb60a5a09238ce173ac0b727d7298b83f536a2"
+  PQC_RULES_REF: "0028d9834d02ec1b3a44dc19994c4fd50af1e1bf"
 
 jobs:
   pqc-repository-scan:
@@ -57,6 +62,8 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     permissions:
       contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
       - name: Install cryptoscan
@@ -101,10 +108,11 @@ jobs:
           printf '::error::cryptoscan failed (exit %s) without writing a valid JSON report\n' "$status"
           exit "$status"
       - name: Upload cryptoscan results
+        id: upload
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: pqc-raw-cryptoscan
+          name: pqc-raw-cryptoscan${{ inputs.artifact_suffix }}
           path: pqc-raw/cryptoscan.json
           retention-days: 7
 
@@ -114,6 +122,8 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
     permissions:
       contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/checkout@v7
@@ -155,10 +165,11 @@ jobs:
           read -ra extra <<< "$SEMGREP_EXTRA_ARGS"
           semgrep "${args[@]}" "${extra[@]}"
       - name: Upload Semgrep results
+        id: upload
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: pqc-raw-semgrep
+          name: pqc-raw-semgrep${{ inputs.artifact_suffix }}
           path: pqc-raw/semgrep.json
           retention-days: 7
 
@@ -171,6 +182,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
     permissions:
+      actions: read
       contents: read
       security-events: write
     steps:
@@ -184,10 +196,28 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
+      - name: Collect raw scan artefact IDs
+        id: raw-artifacts
+        env:
+          CRYPTOSCAN_ARTIFACT_ID: ${{ needs.pqc-repository-scan.outputs.artifact-id }}
+          SEMGREP_ARTIFACT_ID: ${{ needs.pqc-semgrep-scan.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          # A scan job that failed before uploading has no ID. Download by ID rather than by
+          # name so that another call of this workflow in the same run cannot be picked up.
+          ids=()
+          for id in "$CRYPTOSCAN_ARTIFACT_ID" "$SEMGREP_ARTIFACT_ID"; do
+            if [[ -n "$id" ]]; then
+              ids+=("$id")
+            fi
+          done
+          printf 'ids=%s\n' "$(IFS=','; printf '%s' "${ids[*]}")" >> "$GITHUB_OUTPUT"
       - name: Download raw scan results
         uses: actions/download-artifact@v8
+        # An empty artifact-ids downloads every artefact in the run, so skip when there are none.
+        if: steps.raw-artifacts.outputs.ids != ''
         with:
-          pattern: pqc-raw-*
+          artifact-ids: ${{ steps.raw-artifacts.outputs.ids }}
           path: pqc-raw
           merge-multiple: true
       - name: Correlate findings
@@ -208,14 +238,19 @@ jobs:
           cat pqc-report/pqc-summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Upload correlated SARIF to GitHub code scanning
         uses: github/codeql-action/upload-sarif@v4
-        if: inputs.upload_type == 'sarif' && github.actor != 'dependabot[bot]'
+        # Only upload when both scans succeeded: a new upload replaces the category's results,
+        # and a single source cannot corroborate anything, so every corroborated alert would close.
+        if: >-
+          inputs.upload_type == 'sarif' && github.actor != 'dependabot[bot]' &&
+          needs.pqc-repository-scan.result == 'success' &&
+          needs.pqc-semgrep-scan.result == 'success'
         with:
           sarif_file: pqc-report/pqc-security.sarif
-          category: pqc
+          category: pqc${{ inputs.artifact_suffix }}
       - name: Upload correlated reports as an artifact
         uses: actions/upload-artifact@v7
         if: always() && inputs.upload_type != 'none'
         with:
-          name: pqc-report
+          name: pqc-report${{ inputs.artifact_suffix }}
           path: pqc-report/
           retention-days: 30
