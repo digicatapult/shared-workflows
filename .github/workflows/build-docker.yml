@@ -47,7 +47,7 @@ on:
       arm64_runner:
         required: false
         type: string
-        default: "ubuntu-24.04-arm"
+        default: "ubuntu-26.04-arm"
         description: "Runner label used for native linux/arm64 builds. Must exist as a GitHub-hosted runner in the org before this is used - see ENG-309."
       scan_container:
         required: false
