@@ -75,7 +75,18 @@ git add baseline.json
 
 Add your `artifact_suffix` to the artefact name if you set one.
 
-The workflow uses `baseline.json` automatically when it exists; set `scan_baseline_file` to use another path. Because the line number is part of the match, any edit that moves a baselined finding (for example adding lines above it) makes it a new finding again; regenerate the baseline when that becomes noisy. The baseline only filters cryptoscan, so Semgrep findings in baselined code become single-source: they stay in the artefacts but no longer reach code scanning.
+The workflow uses `baseline.json` automatically when it exists; set `scan_baseline_file` to use another path. Because the line number is part of the match, any edit that moves a baselined finding (for example adding lines above it) makes it a new finding again; regenerate the baseline when that becomes noisy using the process described below. The baseline only filters cryptoscan, so Semgrep findings in baselined code become single-source: they stay in the artefacts but no longer reach code scanning.
+
+### Regenerating the baseline
+
+Any runs you regenerate from must not iterate on the existing baseline; they need to replace the baseline afresh. Cryptoscan leaves the baselined findings out of its output, so an already-filtered run holds only new findings. Committing _that_ as the baseline then allows any earlier, previously known findings to reappear on subsequent runs.
+
+On a branch, do one of the following:
+
+1. Set `scan_baseline_file` in the caller to a path that does not exist, e.g. 'null.json' or "", or
+2. Delete `baseline.json` (or the file `scan_baseline_file` is currently pointing at).
+
+Run the workflow on that branch and check that the cryptoscan step logs `No cryptoscan baseline found; reporting every finding`. Download its output and commit it as the baseline, as above, and undo any other temporary changes on the caller before merging.
 
 ## How findings reach code scanning
 
