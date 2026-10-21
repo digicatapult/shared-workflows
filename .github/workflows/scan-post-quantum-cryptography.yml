@@ -1,0 +1,256 @@
+name: Scan for post-quantum cryptography risks
+on:
+  workflow_call:
+    inputs:
+      timeout_minutes:
+        description: "Overrides the timeout of every job in this workflow. Leave at 0 to use each job's own default, listed below"
+        required: false
+        type: number
+        default: 0
+      upload_type:
+        description: Where the correlated results go - "sarif" sends pqc-security.sarif to GitHub code scanning (via the SARIF uploader, no CodeQL analysis runs) and keeps every report as an artefact, "artefact" only keeps the artefacts, and "none" uploads neither.
+        required: false
+        type: string
+        default: "sarif"
+      scan_baseline_file:
+        description: A cryptoscan baseline JSON in the caller repository. When the file exists, only new findings (postdating the baseline) are reported by cryptoscan.
+        required: false
+        type: string
+        default: "baseline.json"
+      scan_exclude:
+        description: Comma-separated path globs that cryptoscan and Semgrep should skip, e.g. "vendor/*,test/fixtures/*".
+        required: false
+        type: string
+      semgrep_extra_args:
+        description: Extra arguments appended to the pqc-rules Semgrep scan, split on whitespace.
+        required: false
+        type: string
+      correlation_line_window:
+        description: Maximum line distance at which findings from different sources are treated as the same finding.
+        required: false
+        type: number
+        default: 3
+      allowlist_extra:
+        description: Comma-separated SOURCE:RULE_ID globs reported to code scanning even when only one source found them, e.g. "semgrep:pqc.javascript.jwt-*".
+        required: false
+        type: string
+        default: ""
+      artifact_suffix:
+        description: Appended to every artefact name and to the code scanning category (pqc). Set a different value on each call when this workflow is called more than once in the same run, e.g. "-sarif".
+        required: false
+        type: string
+        default: ""
+
+env:
+  # renovate: datasource=github-releases depName=csnp/cryptoscan
+  CRYPTOSCAN_VERSION: "v1.4.0"
+  # Renovate cannot update this: copy the linux_amd64.tar.gz line from the release's checksums.txt.
+  CRYPTOSCAN_SHA256: "49aa043bd3f46927efa8ee89a2344d30f2ec351ae9e0cf2791ac8206b45be19d"
+  # renovate: datasource=pypi depName=semgrep
+  SEMGREP_VERSION: "1.180.0"
+  PQC_RULES_REPOSITORY: "digicatapult/pqc-rules"
+  # Semgrep-only findings that cryptoscan cannot detect, so they would never be corroborated.
+  # The correlator has no default allowlist, so these are always passed, followed by allowlist_extra.
+  PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
+  # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
+  PQC_RULES_REF: "0028d9834d02ec1b3a44dc19994c4fd50af1e1bf"
+
+jobs:
+  pqc-repository-scan:
+    name: PQC repository scan (cryptoscan)
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install cryptoscan
+        run: |
+          set -euo pipefail
+          version="${CRYPTOSCAN_VERSION#v}"
+          archive="cryptoscan_${version}_linux_amd64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/csnp/cryptoscan/releases/download/${CRYPTOSCAN_VERSION}/${archive}"
+          printf '%s  %s\n' "$CRYPTOSCAN_SHA256" "$RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/bin" cryptoscan
+          printf '%s\n' "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Run cryptoscan
+        env:
+          BASELINE_FILE: ${{ inputs.scan_baseline_file }}
+          SCAN_EXCLUDE: ${{ inputs.scan_exclude }}
+        run: |
+          set -euo pipefail
+          mkdir -p pqc-raw
+          args=(scan . --format json --no-color --output pqc-raw/cryptoscan.json)
+          if [[ -n "$BASELINE_FILE" && -f "$BASELINE_FILE" ]]; then
+            printf 'Using cryptoscan baseline %s\n' "$BASELINE_FILE"
+            args+=(--baseline "$BASELINE_FILE")
+          else
+            printf 'No cryptoscan baseline found; reporting every finding\n'
+          fi
+          if [[ -n "$SCAN_EXCLUDE" ]]; then
+            args+=(--exclude "$SCAN_EXCLUDE")
+          fi
+          # cryptoscan v1.4.0 exits 1 whenever it reports a finding, even without --fail-on.
+          # This workflow only reports, so exit 1 with a valid report is treated as success.
+          status=0
+          cryptoscan "${args[@]}" || status=$?
+          if (( status == 0 )); then
+            exit 0
+          fi
+          if (( status == 1 )) && jq -e '.findings | type == "array"' pqc-raw/cryptoscan.json > /dev/null 2>&1; then
+            printf 'cryptoscan reported %s finding(s)\n' "$(jq '.findings | length' pqc-raw/cryptoscan.json)"
+            exit 0
+          fi
+          printf '::error::cryptoscan failed (exit %s) without writing a valid JSON report\n' "$status"
+          exit "$status"
+      - name: Upload cryptoscan results
+        id: upload
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pqc-raw-cryptoscan${{ inputs.artifact_suffix }}
+          path: pqc-raw/cryptoscan.json
+          retention-days: 7
+
+  pqc-semgrep-scan:
+    name: PQC Semgrep scan (pqc-rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 15 }}
+    permissions:
+      contents: read
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.PQC_RULES_REPOSITORY }}
+          ref: ${{ env.PQC_RULES_REF }}
+          path: .pqc-rules
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Install Semgrep
+        run: pip install "semgrep==${SEMGREP_VERSION}"
+      - name: Check pqc-rules loads
+        run: |
+          set -euo pipefail
+          # An empty or unparseable ruleset would otherwise scan cleanly and report nothing.
+          summary=$(semgrep --validate --metrics=off --config .pqc-rules/rules 2>&1 | grep -E 'Configuration is (in)?valid' || true)
+          printf '%s\n' "$summary"
+          if [[ ! "$summary" =~ ^Configuration\ is\ valid\ -\ found\ 0\ configuration\ error\(s\),\ and\ ([1-9][0-9]*)\ rule ]]; then
+            printf '::error::pqc-rules at %s did not load any valid rules\n' "$PQC_RULES_REF"
+            exit 1
+          fi
+      - name: Run Semgrep with pqc-rules
+        env:
+          SCAN_EXCLUDE: ${{ inputs.scan_exclude }}
+          SEMGREP_EXTRA_ARGS: ${{ inputs.semgrep_extra_args }}
+        run: |
+          set -euo pipefail
+          mkdir -p pqc-raw
+          args=(scan --metrics=off --config .pqc-rules/rules --exclude .pqc-rules --json --output pqc-raw/semgrep.json)
+          IFS=',' read -ra excludes <<< "$SCAN_EXCLUDE"
+          for pattern in "${excludes[@]}"; do
+            pattern="${pattern// /}"
+            if [[ -n "$pattern" ]]; then
+              args+=(--exclude "$pattern")
+            fi
+          done
+          read -ra extra <<< "$SEMGREP_EXTRA_ARGS"
+          semgrep "${args[@]}" "${extra[@]}"
+      - name: Upload Semgrep results
+        id: upload
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: pqc-raw-semgrep${{ inputs.artifact_suffix }}
+          path: pqc-raw/semgrep.json
+          retention-days: 7
+
+  pqc-report:
+    name: PQC correlated report
+    needs:
+      - pqc-repository-scan
+      - pqc-semgrep-scan
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.timeout_minutes || 10 }}
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ env.PQC_RULES_REPOSITORY }}
+          ref: ${{ env.PQC_RULES_REF }}
+          path: .pqc-rules
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - name: Collect raw scan artefact IDs
+        id: raw-artifacts
+        env:
+          CRYPTOSCAN_ARTIFACT_ID: ${{ needs.pqc-repository-scan.outputs.artifact-id }}
+          SEMGREP_ARTIFACT_ID: ${{ needs.pqc-semgrep-scan.outputs.artifact-id }}
+        run: |
+          set -euo pipefail
+          # A scan job that failed before uploading has no ID. Download by ID rather than by
+          # name so that another call of this workflow in the same run cannot be picked up.
+          ids=()
+          for id in "$CRYPTOSCAN_ARTIFACT_ID" "$SEMGREP_ARTIFACT_ID"; do
+            if [[ -n "$id" ]]; then
+              ids+=("$id")
+            fi
+          done
+          printf 'ids=%s\n' "$(IFS=','; printf '%s' "${ids[*]}")" >> "$GITHUB_OUTPUT"
+      - name: Download raw scan results
+        uses: actions/download-artifact@v8
+        # An empty artifact-ids downloads every artefact in the run, so skip when there are none.
+        if: steps.raw-artifacts.outputs.ids != ''
+        with:
+          artifact-ids: ${{ steps.raw-artifacts.outputs.ids }}
+          path: pqc-raw
+          merge-multiple: true
+      - name: Correlate findings
+        env:
+          LINE_WINDOW: ${{ inputs.correlation_line_window }}
+          ALLOWLIST_EXTRA: ${{ inputs.allowlist_extra }}
+        run: |
+          set -euo pipefail
+          args=(--root "$GITHUB_WORKSPACE" --out pqc-report --window "$LINE_WINDOW")
+          args+=(--allowlist-extra "${PQC_DEFAULT_ALLOWLIST}${ALLOWLIST_EXTRA:+,$ALLOWLIST_EXTRA}")
+          args+=(--expected "cryptoscan,semgrep")
+
+          shopt -s nullglob
+          for file in pqc-raw/cryptoscan.json; do args+=(--cryptoscan "$file"); done
+          for file in pqc-raw/semgrep.json; do args+=(--semgrep "$file"); done
+
+          PYTHONPATH=.pqc-rules/correlate python -m pqc_correlate "${args[@]}"
+          cat pqc-report/pqc-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload correlated SARIF to GitHub code scanning
+        uses: github/codeql-action/upload-sarif@v4
+        # Only upload when both scans succeeded: a new upload replaces the category's results,
+        # and a single source cannot corroborate anything, so every corroborated alert would close.
+        if: >-
+          inputs.upload_type == 'sarif' && github.actor != 'dependabot[bot]' &&
+          needs.pqc-repository-scan.result == 'success' &&
+          needs.pqc-semgrep-scan.result == 'success'
+        with:
+          sarif_file: pqc-report/pqc-security.sarif
+          category: pqc${{ inputs.artifact_suffix }}
+      - name: Upload correlated reports as an artifact
+        uses: actions/upload-artifact@v7
+        if: always() && inputs.upload_type != 'none'
+        with:
+          name: pqc-report${{ inputs.artifact_suffix }}
+          path: pqc-report/
+          retention-days: 30
