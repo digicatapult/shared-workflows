@@ -9,19 +9,21 @@
   ],
   "customManagers": [
     {
+      "description": "Container images in workflow input defaults. The digest is optional and the line is rebuilt, so docker:pinDigests can add one and tag and digest update together",
       "customType": "regex",
       "managerFilePatterns": [
-        "^\\.github/workflows/scan-secrets\\.yml$"
+        "/^\\.github/workflows/(scan-secrets|build-docker)\\.yml$/"
       ],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+default: \"[^:\"]+:(?<currentValue>[^\"]+)\""
+        "# renovate: datasource=docker depName=(?<depName>\\S+)\\n(?<indentation>[ \\t]*)default: \"[^\"@]+:(?<currentValue>[^\"@]+)(?:@(?<currentDigest>sha256:[a-f0-9]{64}))?\""
       ],
-      "datasourceTemplate": "{{{datasource}}}"
+      "autoReplaceStringTemplate": "# renovate: datasource=docker depName={{{depName}}}\n{{{indentation}}}default: \"{{{depName}}}:{{{newValue}}}{{#if newDigest}}@{{{newDigest}}}{{/if}}\"",
+      "datasourceTemplate": "docker"
     },
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^\\.github/workflows/fallow-npm\\.yml$"
+        "/^\\.github/workflows/fallow-npm\\.yml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+default: \"(?<currentValue>[^\"]+)\""
@@ -31,8 +33,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^README\\.md$",
-        "^examples/fallow-npm\\.md$"
+        "/^README\\.md$/",
+        "/^examples/fallow-npm\\.md$/"
       ],
       "matchStrings": [
         "\\| fallow_version\\s+\\|[^|]+\\|[^|]+\\| `(?<currentValue>[^`]+)`",
@@ -45,8 +47,8 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^\\.github/workflows/scan-vulns\\.yml$",
-        "^\\.github/workflows/scan-post-quantum-cryptography\\.yml$"
+        "/^\\.github/workflows/scan-vulns\\.yml$/",
+        "/^\\.github/workflows/scan-post-quantum-cryptography\\.yml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>github-releases|pypi) depName=(?<depName>\\S+)\\s+[A-Z_]+: \"(?<currentValue>[^\"]+)\""
@@ -56,7 +58,7 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "^\\.github/workflows/scan-post-quantum-cryptography\\.yml$"
+        "/^\\.github/workflows/scan-post-quantum-cryptography\\.yml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=git-refs depName=(?<depName>\\S+) currentValue=(?<currentValue>\\S+)\\s+[A-Z_]+: \"(?<currentDigest>[0-9a-f]{40})\""

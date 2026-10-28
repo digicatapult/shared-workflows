@@ -110,6 +110,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.branch }}
+      - name: Skip Azure apt mirror
+        # azure.archive.ubuntu.com can stall apt for many minutes (actions/runner-images#14823).
+        # apt re-reads this list on every run, so apt inside caller commands skips it too.
+        run: |
+          if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+            sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+          else
+            echo "::notice::/etc/apt/apt-mirrors.txt not found; apt mirrors left unchanged"
+          fi
       - name: Set environment variables from JSON
         env:
           ENV_VARS_JSON: "${{ inputs.env_vars }}"

@@ -62,6 +62,7 @@ on:
       trivy_image:
         required: false
         type: string
+        # renovate: datasource=docker depName=aquasec/trivy
         default: "aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
         description: "Trivy scanner image, pinned by digest (renovate-updatable). Deliberately not the aquasecurity/trivy-action, which was supply-chain compromised in March 2026 - see ENG-314."
       scan_fail_severity:

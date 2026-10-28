@@ -631,7 +631,7 @@ Runs unit/integration tests for Poetry projects using pytest and compares covera
 This GitHub Actions workflow runs pytest in a matrix strategy and, when enabled, compares coverage between the current branch and `main`.
 
 1. **Setup**: Determines whether the run is on `main`, builds the branch matrix (current branch plus `main` for comparison when coverage is enabled), and generates a unique artifact prefix.
-2. **Tests**: For each test path and branch, sets up Python, installs Poetry and dependencies, sets environment variables from `env_vars`, optionally logs in to GHCR and brings up Docker Compose dependencies, runs an optional `pre_test_command`, then runs pytest (under `coverage` when enabled) and uploads the coverage JSON per test group.
+2. **Tests**: For each test path and branch, removes `azure.archive.ubuntu.com` from the runner's apt mirror list (so any apt call in a later step, including inside `pre_test_command`, uses `archive.ubuntu.com`), sets up Python, installs Poetry and dependencies, sets environment variables from `env_vars`, optionally logs in to GHCR and brings up Docker Compose dependencies, runs an optional `pre_test_command`, then runs pytest (under `coverage` when enabled) and uploads the coverage JSON per test group.
 3. **Coverage**: Downloads the current-branch and `main` coverage summaries, builds a per-group comparison table in the job summary, and fails the run if any group is below `coverage_fail_under` or drops by more than `coverage_max_drop` relative to `main`.
 
 ### [Poetry E2E tests](.github/workflows/tests-e2e-poetry.yml) ([examples](examples/tests-e2e-poetry.md))
@@ -665,11 +665,12 @@ Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `
 
 This GitHub Actions workflow runs end-to-end tests for a Poetry project within a Dockerised environment.
 
-1. **Set Environment Variables**: Parses `env_vars` from JSON and applies them to the workflow environment.
-2. **Container Setup (Optional)**: Optionally logs in to GHCR, then configures Docker Buildx and builds the E2E containers with Docker Bake from the provided Docker Compose file.
-3. **Toolchain Setup**: Optionally sets up Node.js (when `setup_node` is `true`), then sets up Python and installs Poetry and the project dependencies.
-4. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
-5. **Run E2E Tests**: Executes `test_command`.
+1. **Skip Azure apt mirror**: Removes `azure.archive.ubuntu.com` from the runner's apt mirror list, so any apt call in a later step, including inside `pre_test_command`, uses `archive.ubuntu.com`.
+2. **Set Environment Variables**: Parses `env_vars` from JSON and applies them to the workflow environment.
+3. **Container Setup (Optional)**: Optionally logs in to GHCR, then configures Docker Buildx and builds the E2E containers with Docker Bake from the provided Docker Compose file.
+4. **Toolchain Setup**: Optionally sets up Node.js (when `setup_node` is `true`), then sets up Python and installs Poetry and the project dependencies.
+5. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
+6. **Run E2E Tests**: Executes `test_command`.
 
 ### [NPM Static Checks](.github/workflows/static-checks-npm.yml) ([examples](examples/static-checks.md))
 
@@ -804,14 +805,15 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 
 This GitHub Actions workflow is tailored for running end-to-end tests within a Dockerized environment, with customizable build and test steps. The workflow supports conditional handling for specific repositories that require additional environment variables or secrets during test execution.
 
-1. **Set Environment Variables**: Parses and applies environment variables from a JSON string to the workflow environment.
-2. **Docker Buildx Setup**: Configures Docker Buildx for advanced Docker build support.
-3. **Build E2E Containers**: Uses Docker Bake to build containers based on the provided Docker Compose file.
-4. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
-5. **Pre-Test Command (Optional)**: Executes `pre_test_command` before running tests if specified.
-6. **Run E2E Tests**: Executes the test command with repository-specific environment variables injected as needed.
-7. **Upload Playwright Report**: Saves the Playwright report as an artifact, accessible for 90 days.
-8. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for comprehensive reporting.
+1. **Skip Azure apt mirror**: Removes `azure.archive.ubuntu.com` from the runner's apt mirror list, so any apt call in a later step, including `npx playwright install-deps` inside `pre_test_command`, uses `archive.ubuntu.com`.
+2. **Set Environment Variables**: Parses and applies environment variables from a JSON string to the workflow environment.
+3. **Docker Buildx Setup**: Configures Docker Buildx for advanced Docker build support.
+4. **Build E2E Containers**: Uses Docker Bake to build containers based on the provided Docker Compose file.
+5. **Build Step (Optional)**: Runs the specified `npm_build_command` if provided.
+6. **Pre-Test Command (Optional)**: Executes `pre_test_command` before running tests if specified.
+7. **Run E2E Tests**: Executes the test command with repository-specific environment variables injected as needed.
+8. **Upload Playwright Report**: Saves the Playwright report as an artifact, accessible for 90 days.
+9. **Publish CTRF Test Summary**: Publishes a summary of the test results in CTRF format for comprehensive reporting.
 
 This workflow is designed to accommodate different testing needs, offering flexibility with custom commands and environment-specific configurations for robust E2E testing.
 
@@ -851,18 +853,19 @@ This GitHub Actions workflow runs a series of NPM test commands in a matrix stra
 
 **Tests Job:**
 
-1. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
-2. **Node Setup**: Installs the specified Node.js version.
-3. **Node Modules Caching**: Caches `node_modules` based on `package-lock.json` for faster dependency installation.
-4. **Install Packages**: Installs project dependencies using `npm ci`.
-5. **Get Coverage Temp Directory**: Determines the coverage temporary directory from the provided config file or uses the default `coverage/tmp`.
-6. **Build Step (Optional)**: Executes `npm_build_command` if it is provided.
-7. **Environment File Creation**: Creates a `.env` file for environment configuration.
-8. **Setup Docker Dependencies**: Brings up services defined in the specified Docker Compose file to support test dependencies.
-9. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
-10. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
-11. **Run Tests**: Executes each test command using c8 for coverage collection (e.g., `npx c8 npm run test:unit`).
-12. **Upload Coverage**: If `coverage` is enabled, uploads coverage data from each test job, tagged by branch and test command.
+1. **Skip Azure apt mirror**: Removes `azure.archive.ubuntu.com` from the runner's apt mirror list, so any apt call in a later step, including inside `npm_build_command` or `pre_test_command`, uses `archive.ubuntu.com`.
+2. **Set Environment Variables**: Parses `env_vars` from JSON and sets them in the workflow environment.
+3. **Node Setup**: Installs the specified Node.js version.
+4. **Node Modules Caching**: Caches `node_modules` based on `package-lock.json` for faster dependency installation.
+5. **Install Packages**: Installs project dependencies using `npm ci`.
+6. **Get Coverage Temp Directory**: Determines the coverage temporary directory from the provided config file or uses the default `coverage/tmp`.
+7. **Build Step (Optional)**: Executes `npm_build_command` if it is provided.
+8. **Environment File Creation**: Creates a `.env` file for environment configuration.
+9. **Setup Docker Dependencies**: Brings up services defined in the specified Docker Compose file to support test dependencies.
+10. **Wait for Initialization**: Adds a delay to ensure all Docker services are ready.
+11. **Pre-Test Command (Optional)**: Runs `pre_test_command` if provided.
+12. **Run Tests**: Executes each test command using c8 for coverage collection (e.g., `npx c8 npm run test:unit`).
+13. **Upload Coverage**: If `coverage` is enabled, uploads coverage data from each test job, tagged by branch and test command.
 
 **Coverage Job:**
 
