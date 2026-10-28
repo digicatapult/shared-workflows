@@ -44,6 +44,11 @@ on:
         type: string
         default: "npm"
         description: "Package manager for version detection (passed to check-version). Options: npm, poetry"
+      amd64_runner:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+        description: "Runner label used for native linux/amd64 builds. Use a larger runner such as ubuntu-latest-m for large images."
       arm64_runner:
         required: false
         type: string
@@ -171,6 +176,7 @@ jobs:
         id: build-matrix
         env:
           DOCKER_PLATFORMS: ${{ inputs.docker_platforms }}
+          AMD64_RUNNER: ${{ inputs.amd64_runner }}
           ARM64_RUNNER: ${{ inputs.arm64_runner }}
         run: |
           IFS=',' read -ra PLATS <<< "$DOCKER_PLATFORMS"
@@ -178,7 +184,7 @@ jobs:
           for raw in "${PLATS[@]}"; do
             p=$(echo "$raw" | xargs)
             case "$p" in
-              linux/amd64) runner="ubuntu-latest"; native=true ;;
+              linux/amd64) runner="$AMD64_RUNNER"; native=true ;;
               linux/arm64) runner="$ARM64_RUNNER"; native=true ;;
               *) runner="ubuntu-latest"; native=false ;;
             esac
