@@ -180,6 +180,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | docker_file         | string  | Dockerfile to be used for building the container                                                                                                       | `Dockerfile`                          | false    |
 | image_name          | string  | Image repository name without registry or organisation; empty uses the repository name                                                                 | `''`                                  | false    |
 | package_manager     | string  | Package manager for version detection, passed to `check-version`. Options: `npm`, `poetry`                                                             | `"npm"`                               | false    |
+| amd64_runner        | string  | Runner label used for native `linux/amd64` builds. Use a larger runner such as `ubuntu-latest-m` for large images                                      | `"ubuntu-latest"`                     | false    |
 | arm64_runner        | string  | Runner label used for native `linux/arm64` builds. Must already exist as a GitHub-hosted runner in the org/repo                                        | `"ubuntu-26.04-arm"`                  | false    |
 | scan_container      | boolean | Scan the built `linux/amd64` image for CVEs with Trivy and fail on `scan_fail_severity`. Runs on any event (PR and release).                           | `false`                               | false    |
 | trivy_image         | string  | Trivy scanner image, pinned by digest (renovate-updatable)                                                                                             | `aquasec/trivy:0.72.0@sha256:cffe3f…` | false    |
@@ -187,7 +188,7 @@ Builds a Docker container and optionally pushes it to GitHub Container Registry 
 | scan_ignore_unfixed | boolean | When gating, ignore vulnerabilities with no fix available so the gate stays actionable (does not affect the report)                                    | `true`                                | false    |
 | scan_ignore_cves    | string  | Comma-separated CVE IDs to exclude from the gate (e.g. known issues with no consumable upstream fix yet)                                               | `""`                                  | false    |
 
-Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `ubuntu-latest`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
+Each platform in `docker_platforms` is built on its own native runner where one is known (`linux/amd64` → `amd64_runner`, `linux/arm64` → `arm64_runner`), falling back to `ubuntu-latest` with QEMU emulation for anything else. Per-platform images are pushed by digest and merged into a single multi-arch manifest, avoiding QEMU emulation for the common amd64/arm64 case.
 
 For multiple images, call this workflow once per image with a distinct `image_name` and `docker_file`. The build context remains the repository root, artefacts are prefixed by image name, and release or deployment jobs should depend on every image build.
 
@@ -600,6 +601,7 @@ Runs unit/integration tests for Poetry projects using pytest and compares covera
 | Input               | Type    | Description                                                                                                                               | Default                               | Required |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------- |
 | timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `setup` 10, `tests` 30, `coverage` 15    | `0`                                   | false    |
+| runner              | string  | Runner label for the `tests` job. Use a larger runner such as `ubuntu-latest-m` for stacks with large images                              | `"ubuntu-latest"`                     | false    |
 | env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                  | false    |
 | pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                  | false    |
 | pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                               | false    |
@@ -641,6 +643,7 @@ Runs end-to-end tests for Poetry projects (optionally using `docker-compose` / `
 | Input               | Type    | Description                                                                                                                               | Default                             | Required |
 | ------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | -------- |
 | timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `e2e-tests` 45                           | `0`                                 | false    |
+| runner              | string  | Runner label for the `e2e-tests` job. Use a larger runner such as `ubuntu-latest-m` for stacks with large images                          | `"ubuntu-latest"`                   | false    |
 | env_vars            | string  | A JSON string representing environment variables in the format `key:value`; parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                                | false    |
 | pre_test_command    | string  | Optional command to execute before the main test command                                                                                  | `""`                                | false    |
 | pull_ghcr           | boolean | Whether to login to GitHub Container Registry before docker compose                                                                       | `false`                             | false    |
@@ -782,6 +785,7 @@ Executes end-to-end (E2E) tests for an NPM project using Docker Compose, support
 | Input               | Type    | Description                                                                                                               | Default              | Required |
 | ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------- |
 | timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `e2e-tests` 45           | `0`                  | false    |
+| runner              | string  | Runner label for the `e2e-tests` job. Use a larger runner such as `ubuntu-latest-m` for stacks with large images          | `"ubuntu-latest"`    | false    |
 | env_vars            | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the beginning of the run | `{}`                 | false    |
 | npm_build_command   | string  | Optional command to build the application before running tests                                                            | `""`                 | false    |
 | pre_test_command    | string  | Optional command to execute before running the main test command                                                          | `""`                 | false    |
@@ -822,6 +826,7 @@ Runs specified NPM tests (e.g., unit and integration tests) with optional build 
 | Input                | Type    | Description                                                                                                                            | Default                            | Required |
 | -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
 | timeout_minutes      | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `setup` 10, `tests` 30, `coverage` 15 | `0`                                | false    |
+| runner               | string  | Runner label for the `tests` job. Use a larger runner such as `ubuntu-latest-m` for stacks with large images                           | `"ubuntu-latest"`                  | false    |
 | env_vars             | string  | JSON string of environment variables in `key:value` format, parsed and added to `$GITHUB_ENV` at the start of the run                  | `{}`                               | false    |
 | npm_build_command    | string  | Optional command to build the application before running tests                                                                         | `""`                               | false    |
 | pre_test_command     | string  | Optional command to execute before the main test command                                                                               | `""`                               | false    |
@@ -1041,6 +1046,7 @@ Runs OWASP ZAP Dynamic Application Security Testing (DAST) scans against a runni
 | Input               | Type    | Description                                                                                                                  | Default                            | Required |
 | ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
 | timeout_minutes     | number  | Overrides the timeout of every job in this workflow. Leave at `0` to use each job's own default: `zap-scan` 60               | `0`                                | false    |
+| runner              | string  | Runner label for the scan job. Use a larger runner such as `ubuntu-latest-m` for stacks with large images                    | `"ubuntu-latest"`                  | false    |
 | matrix_scans        | string  | JSON array of ZAP scan types to run: `baseline`, `full`, `api`, `automation-framework`                                       | `'["baseline"]'`                   | false    |
 | target              | string  | URL of the web application to scan (used by `baseline`, `full`, and `api` scan types)                                        | `http://localhost:3000`            | false    |
 | env_vars            | string  | JSON object of extra environment variables to inject                                                                         | `{}`                               | false    |

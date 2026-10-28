@@ -7,6 +7,11 @@ on:
         required: false
         type: number
         default: 0
+      runner:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+        description: "Runner label for the tests job. Use a larger runner such as ubuntu-latest-m for stacks with large images."
       env_vars:
         required: false
         type: string
@@ -88,7 +93,7 @@ jobs:
       matrix:
         command: ${{ fromJson(inputs.tests) }}
         branch: ${{ fromJson(needs.setup.outputs.branches) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes || 30 }}
     steps:
       - uses: actions/checkout@v7

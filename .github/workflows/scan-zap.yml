@@ -7,6 +7,11 @@ on:
         required: false
         type: number
         default: 0
+      runner:
+        required: false
+        type: string
+        default: "ubuntu-latest"
+        description: "Runner label for the scan job. Use a larger runner such as ubuntu-latest-m for stacks with large images."
       matrix_scans:
         required: false
         type: string
@@ -77,7 +82,7 @@ jobs:
       fail-fast: false
       matrix:
         scan_type: ${{ fromJson(inputs.matrix_scans) }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes || 60 }}
     steps:
       - uses: actions/checkout@v7
