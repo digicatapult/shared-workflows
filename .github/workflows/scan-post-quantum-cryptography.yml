@@ -53,7 +53,7 @@ env:
   # The correlator has no default allowlist, so these are always passed, followed by allowlist_extra.
   PQC_DEFAULT_ALLOWLIST: "semgrep:pqc.*.jwt-*,semgrep:pqc.*.tls-legacy-version,semgrep:pqc.*.tls-classical-groups"
   # renovate: datasource=git-refs depName=https://github.com/digicatapult/pqc-rules currentValue=main
-  PQC_RULES_REF: "0028d9834d02ec1b3a44dc19994c4fd50af1e1bf"
+  PQC_RULES_REF: "a2221df38916a6e67f65a77b9291edd028378f19"
 
 jobs:
   pqc-repository-scan:
