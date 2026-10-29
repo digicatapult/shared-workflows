@@ -21,7 +21,7 @@ on:
         required: false
         type: string
         # renovate: datasource=npm depName=fallow
-        default: "3.31.0"
+        default: "3.37.0"
       root:
         description: Project root directory to analyse and install dependencies in. Must contain the package-lock.json; use `workspace` to narrow to an npm workspace member.
         required: false
