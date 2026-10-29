@@ -43,7 +43,7 @@ on:
 
 env:
   # renovate: datasource=github-releases depName=csnp/cryptoscan
-  CRYPTOSCAN_VERSION: "v1.4.0"
+  CRYPTOSCAN_VERSION: "v1.5.0"
   # Renovate cannot update this: copy the linux_amd64.tar.gz line from the release's checksums.txt.
   CRYPTOSCAN_SHA256: "49aa043bd3f46927efa8ee89a2344d30f2ec351ae9e0cf2791ac8206b45be19d"
   # renovate: datasource=pypi depName=semgrep
