@@ -47,7 +47,7 @@ env:
   # Renovate cannot update this: copy the linux_amd64.tar.gz line from the release's checksums.txt.
   CRYPTOSCAN_SHA256: "49aa043bd3f46927efa8ee89a2344d30f2ec351ae9e0cf2791ac8206b45be19d"
   # renovate: datasource=pypi depName=semgrep
-  SEMGREP_VERSION: "1.180.0"
+  SEMGREP_VERSION: "1.182.1"
   PQC_RULES_REPOSITORY: "digicatapult/pqc-rules"
   # Semgrep-only findings that cryptoscan cannot detect, so they would never be corroborated.
   # The correlator has no default allowlist, so these are always passed, followed by allowlist_extra.
