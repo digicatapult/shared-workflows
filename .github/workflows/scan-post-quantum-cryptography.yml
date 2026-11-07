@@ -134,7 +134,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Install Semgrep
         run: pip install "semgrep==${SEMGREP_VERSION}"
       - name: Check pqc-rules loads
@@ -195,7 +195,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       - name: Collect raw scan artefact IDs
         id: raw-artifacts
         env:
