@@ -455,6 +455,9 @@ For backwards compatibility, the legacy filename [.github/workflows/generate-sbo
 | node_version           | string  | The node version to use                                                                                                                   | `24.x`                                | false    |
 | python_version         | string  | The Python version to use (for Poetry / `cdxgen` SBOMs)                                                                                   | `3.14`                                | false    |
 | sbom_tool              | string  | SBOM generation tool to use. Options: `@cyclonedx/cyclonedx-npm`, `@cyclonedx/cdxgen`                                                     | `@cyclonedx/cyclonedx-npm`            | false    |
+| cyclonedx_npm_version  | string  | Version of `@cyclonedx/cyclonedx-npm` to run when `sbom_tool` is `@cyclonedx/cyclonedx-npm`; Renovate keeps it current                    | `6.0.1`                               | false    |
+| cdxgen_version         | string  | Version of `@cyclonedx/cdxgen` to run when `sbom_tool` is `@cyclonedx/cdxgen`; Renovate keeps it current                                  | `12.9.1`                              | false    |
+| spec_version           | string  | CycloneDX spec version to generate. Dependency-Track 5.0.x rejects anything newer than `1.6`                                              | `1.6`                                 | false    |
 | sbom_format            | string  | SBOM output format. Options: `json`, `xml`                                                                                                | `json`                                | false    |
 | sbom_output_file       | string  | Custom output filename. Defaults to `{repo-name}.cdx.{format}`                                                                            | `""`                                  | false    |
 | npm_build_command      | string  | Optional build command to run before generating SBOM                                                                                      | `""`                                  | false    |
@@ -491,7 +494,7 @@ This GitHub Actions workflow generates an SBOM for a project. It allows flexibil
 2. **Node Setup**: Configures the Node.js environment.
 3. **Install Packages**: Installs project dependencies.
 4. **Build (Optional)**: Runs a build command if specified, useful for projects that need compilation before SBOM generation.
-5. **Generate SBOM**: Uses the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate the SBOM.
+5. **Generate SBOM**: Runs the pinned version of the selected tool (`@cyclonedx/cyclonedx-npm` or `@cyclonedx/cdxgen`) to generate a CycloneDX `spec_version` SBOM. The versions are pinned because an unpinned `npx` picks up new major releases unannounced: `@cyclonedx/cyclonedx-npm` 7.0.0 switched to CycloneDX 1.7, which Dependency-Track 5.0.x rejects with a 400. Renovate raises a PR for each new tool version; raise `spec_version` only once Dependency-Track accepts the newer spec.
 6. **Upload Artifact**: Optionally uploads the generated SBOM file as a workflow artifact.
 7. **Upload SBOM to Dependency Track**: Optionally uploads the CycloneDX SBOM to a DT server. Docker Scout SBOMs are currently incompatible with DT due to inaccuracies in the CycloneDX spec implementation; CycloneDX-NPM is a more faithful implementation. To upload successfully, the step must have a DT hostname via the `DTRACK_HOSTNAME` secret, a parent project GUID (`DTRACK_PARENT_GUID`), and an API key (`DTRACK_APIKEY`) with both the `BOM_UPLOAD` and `PROJECT_CREATION_UPLOAD` permissions.
 

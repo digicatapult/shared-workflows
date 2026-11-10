@@ -45,6 +45,23 @@ on:
         type: string
         default: "@cyclonedx/cyclonedx-npm"
         description: "SBOM generation tool to use.  Options: @cyclonedx/cyclonedx-npm, @cyclonedx/cdxgen"
+      cyclonedx_npm_version:
+        required: false
+        type: string
+        # renovate: datasource=npm depName=@cyclonedx/cyclonedx-npm
+        default: "6.0.1"
+        description: "Version of @cyclonedx/cyclonedx-npm to run when sbom_tool is @cyclonedx/cyclonedx-npm"
+      cdxgen_version:
+        required: false
+        type: string
+        # renovate: datasource=npm depName=@cyclonedx/cdxgen
+        default: "12.9.1"
+        description: "Version of @cyclonedx/cdxgen to run when sbom_tool is @cyclonedx/cdxgen"
+      spec_version:
+        required: false
+        type: string
+        default: "1.6"
+        description: "CycloneDX spec version to generate. Dependency-Track 5.0.x rejects anything newer than 1.6"
       sbom_format:
         required: false
         type: string
@@ -167,26 +184,32 @@ jobs:
           fi
       - name: Generate SBOM with CycloneDX NPM
         if: inputs.sbom_tool == '@cyclonedx/cyclonedx-npm'
+        env:
+          TOOL_VERSION: ${{ inputs.cyclonedx_npm_version }}
+          SPEC_VERSION: ${{ inputs.spec_version }}
         run: |
-          ARGS="--output-file ${{ steps.set-filename.outputs.filename }}"
+          ARGS="--output-file ${{ steps.set-filename.outputs.filename }} --spec-version $SPEC_VERSION"
           if [ "${{ inputs.sbom_format }}" = "xml" ]; then
             ARGS="$ARGS --output-format XML"
           fi
           if [ -n "${{ inputs.additional_args }}" ]; then
             ARGS="$ARGS ${{ inputs.additional_args }}"
           fi
-          npx @cyclonedx/cyclonedx-npm $ARGS
+          npx "@cyclonedx/cyclonedx-npm@$TOOL_VERSION" $ARGS
       - name: Generate SBOM with cdxgen
         if: inputs.sbom_tool == '@cyclonedx/cdxgen'
+        env:
+          TOOL_VERSION: ${{ inputs.cdxgen_version }}
+          SPEC_VERSION: ${{ inputs.spec_version }}
         run: |
-          ARGS="-o ${{ steps.set-filename.outputs.filename }}"
+          ARGS="-o ${{ steps.set-filename.outputs.filename }} --spec-version $SPEC_VERSION"
           if [ "${{ inputs.sbom_format }}" = "xml" ]; then
             ARGS="$ARGS --format xml"
           fi
           if [ -n "${{ inputs.additional_args }}" ]; then
             ARGS="$ARGS ${{ inputs.additional_args }}"
           fi
-          npx @cyclonedx/cdxgen $ARGS
+          npx "@cyclonedx/cdxgen@$TOOL_VERSION" $ARGS
       - name: Upload SBOM artifact
         if: inputs.upload_artifact
         uses: actions/upload-artifact@v7
