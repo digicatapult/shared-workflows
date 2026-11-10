@@ -31,7 +31,7 @@ on:
       node_version:
         required: false
         type: string
-        default: 24.x
+        default: 26.x
       sbom_tool:
         required: false
         type: string

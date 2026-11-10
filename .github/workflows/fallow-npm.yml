@@ -10,7 +10,7 @@ on:
       node_version:
         required: false
         type: string
-        default: 24.x
+        default: 26.x
       install_dependencies:
         description: Run `npm ci` before the audit so module resolution and type-aware analysis can use node_modules.
         required: false
