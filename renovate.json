@@ -23,12 +23,24 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/^\\.github/workflows/fallow-npm\\.yml$/"
+        "/^\\.github/workflows/fallow-npm\\.yml$/",
+        "/^\\.github/workflows/generate-sbom\\.yml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+default: \"(?<currentValue>[^\"]+)\""
       ],
       "datasourceTemplate": "{{{datasource}}}"
+    },
+    {
+      "description": "SBOM tool versions in the generate-sbom inputs table, so README and workflow move in one PR per tool",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^README\\.md$/"
+      ],
+      "matchStrings": [
+        "\\| (?:cyclonedx_npm|cdxgen)_version\\s+\\|[^|]+\\| Version of `(?<depName>[^`]+)`[^|]*\\| `(?<currentValue>[^`]+)`"
+      ],
+      "datasourceTemplate": "npm"
     },
     {
       "customType": "regex",
@@ -77,6 +89,13 @@
       "description": "Asset SHA256s cannot be updated automatically; the reviewer must copy them from the release checksums.txt",
       "matchPackageNames": ["csnp/cryptoscan"],
       "prBodyNotes": ["Update `CRYPTOSCAN_SHA256` in `scan-post-quantum-cryptography.yml` from this release's `checksums.txt` before merging; the install step fails until it is updated."]
+    },
+    {
+      "description": "cyclonedx-npm 7 drops the optional dependencies that XML output and BOM validation need",
+      "matchPackageNames": ["@cyclonedx/cyclonedx-npm"],
+      "matchCurrentVersion": "<7.0.0",
+      "matchUpdateTypes": ["major"],
+      "prBodyNotes": ["From 7.0.0, `--output-format XML` and BOM validation need optional peer dependencies that `npx` does not install, so check callers using `sbom_format: xml` before merging. 7.0.0 also defaults to CycloneDX 1.7; the `spec_version` input keeps uploads at 1.6, which is the newest Dependency-Track 5.0.x accepts."]
     }
   ]
 }
