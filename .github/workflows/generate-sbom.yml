@@ -49,7 +49,7 @@ on:
         required: false
         type: string
         # renovate: datasource=npm depName=@cyclonedx/cyclonedx-npm
-        default: "6.0.1"
+        default: "7.0.1"
         description: "Version of @cyclonedx/cyclonedx-npm to run when sbom_tool is @cyclonedx/cyclonedx-npm"
       cdxgen_version:
         required: false
