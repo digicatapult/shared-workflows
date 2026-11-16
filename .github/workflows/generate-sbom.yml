@@ -55,7 +55,7 @@ on:
         required: false
         type: string
         # renovate: datasource=npm depName=@cyclonedx/cdxgen
-        default: "12.9.1"
+        default: "12.9.2"
         description: "Version of @cyclonedx/cdxgen to run when sbom_tool is @cyclonedx/cdxgen"
       spec_version:
         required: false
