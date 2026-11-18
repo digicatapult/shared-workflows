@@ -22,7 +22,7 @@ on:
       node_version:
         required: false
         type: string
-        default: 24.x
+        default: 26.x
       matrix_commands:
         required: false
         type: string
