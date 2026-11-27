@@ -32,6 +32,22 @@ jobs:
       scope: all
 ```
 
+### Report only new findings
+
+Runs `fallow audit` without failing, so the PR comment lists only the findings the pull request introduces compared with its base.
+
+```yaml
+jobs:
+  fallow:
+    uses: digicatapult/shared-workflows/.github/workflows/fallow-npm.yml@main
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+    with:
+      audit: true
+```
+
 ### Block on new error-severity findings
 
 Fails only on findings the pull request introduces that have `error` severity in `.fallowrc.json`; set a rule to `warn` to report it without blocking. Pin `fallow_version` so a new Fallow release cannot start failing pull requests.

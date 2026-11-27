@@ -47,6 +47,11 @@ on:
         required: false
         type: string
         default: none
+      audit:
+        description: Run `fallow audit`, which reports only findings the pull request introduces. Requires scope 'changed'; implied by fail_on 'new'. With fail_on 'none' it reports without failing.
+        required: false
+        type: boolean
+        default: false
       analyses:
         description: Comma-separated analyses to run (dead-code, dupes, health). Empty runs all. Not supported with fail_on 'new'.
         required: false
@@ -92,18 +97,24 @@ jobs:
         env:
           SCOPE: ${{ inputs.scope }}
           FAIL_ON: ${{ inputs.fail_on }}
+          AUDIT: ${{ inputs.audit }}
           ANALYSES: ${{ inputs.analyses }}
           BASELINE: ${{ inputs.baseline }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           case "$SCOPE" in changed|all) ;; *) echo "::error::scope must be 'changed' or 'all', got: ${SCOPE}"; exit 1 ;; esac
           case "$FAIL_ON" in none|new|any) ;; *) echo "::error::fail_on must be 'none', 'new' or 'any', got: ${FAIL_ON}"; exit 1 ;; esac
-          if [[ "$FAIL_ON" == "new" && "$SCOPE" != "changed" ]]; then
-            echo "::error::fail_on 'new' compares against the pull request base and requires scope 'changed'. To gate the whole codebase use fail_on 'any' with a baseline."
+          [[ "$FAIL_ON" == "new" ]] && AUDIT=true
+          if [[ "$AUDIT" == "true" && "$SCOPE" != "changed" ]]; then
+            echo "::error::audit and fail_on 'new' compare against the pull request base and require scope 'changed'. To gate the whole codebase use fail_on 'any' with a baseline."
             exit 1
           fi
-          if [[ "$FAIL_ON" == "new" && ( -n "$ANALYSES" || -n "$BASELINE" ) ]]; then
-            echo "::error::analyses and baseline are not supported with fail_on 'new'."
+          if [[ "$AUDIT" == "true" && "$FAIL_ON" == "any" ]]; then
+            echo "::error::fail_on 'any' is not supported with audit; use fail_on 'new' to block on findings the pull request introduces."
+            exit 1
+          fi
+          if [[ "$AUDIT" == "true" && ( -n "$ANALYSES" || -n "$BASELINE" ) ]]; then
+            echo "::error::analyses and baseline are not supported with audit or fail_on 'new'."
             exit 1
           fi
 
@@ -111,14 +122,18 @@ jobs:
             # Without a PR base Fallow analyses the whole codebase, so do not gate on it.
             echo "::notice::scope '${SCOPE}' only applies to pull requests; this ${EVENT_NAME} run reports the whole codebase without failing."
             FAIL_ON=none
+            AUDIT=false
           fi
 
           command=""
           gate=""
           fail_on_issues=false
+          if [[ "$AUDIT" == "true" ]]; then
+            command=audit
+            gate=new-only
+          fi
           case "$FAIL_ON" in
-            new) command=audit; gate=new-only; fail_on_issues=true ;;
-            any) fail_on_issues=true ;;
+            new|any) fail_on_issues=true ;;
           esac
           {
             echo "command=${command}"
