@@ -735,6 +735,7 @@ Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to rep
 | config               | string  | Path to the Fallow config file; empty uses Fallow's auto-discovery (e.g. `.fallowrc.json`)                                                                                             | `""`      | false    |
 | scope                | string  | `changed` or `all`; see [Scope and blocking](#scope-and-blocking)                                                                                                                       | `changed` | false    |
 | fail_on              | string  | `none`, `new` or `any`; see [Scope and blocking](#scope-and-blocking)                                                                                                                  | `none`    | false    |
+| audit                | boolean | Run `fallow audit` to report only findings the pull request introduces; requires `scope: changed` and is implied by `fail_on: new`                                                     | `false`   | false    |
 | analyses             | string  | Comma-separated analyses to run (`dead-code`, `dupes`, `health`); empty runs all. Not supported with `fail_on: new`                                                                    | `""`      | false    |
 | baseline             | string  | Path to a committed Fallow baseline; findings already in it are not reported. Not supported with `fail_on: new`                                                                        | `""`      | false    |
 | comment              | boolean | Post a sticky PR comment and Fallow check run                                                                                                                                          | `true`    | false    |
@@ -757,6 +758,8 @@ Runs [Fallow](https://github.com/fallow-rs/fallow) against an NPM project to rep
 - `new`: runs `fallow audit` with `gate: new-only`. The job fails only on findings the pull request introduces and that have `error` severity in the Fallow config; findings with `warn` severity are reported without failing. Findings that already existed are excluded. Requires `scope: changed`.
 - `any`: fails on every finding in scope, whatever its severity, including file-level findings that the pull request did not introduce.
 
+Set `audit: true` with `fail_on: none` to run `fallow audit` without failing, so the PR comment lists only the findings the pull request introduces compared with its base. Like `fail_on: new`, it requires `scope: changed` and does not support `analyses` or `baseline`.
+
 To gate dead code across the whole codebase, including files a pull request orphans, use `scope: all`, `analyses: dead-code`, `fail_on: any` and a committed `baseline`, so that only findings missing from the baseline fail. In a combined run the baseline only covers dead code, which is why `analyses` should be limited to `dead-code`.
 
 Blocking callers should pin `fallow_version`: the default is bumped centrally by Renovate, and a new Fallow release can add or tighten rules. Callers should refer to the workflow's `fallow_version` in their own documentation rather than repeating the number.
@@ -773,11 +776,11 @@ The caller must always grant all three permissions. Job permissions in a reusabl
 
 #### Workflow Description
 
-1. **Resolve Settings**: Validates `scope` and `fail_on`, and turns off blocking when a PR-scoped run is triggered by a non-pull-request event.
+1. **Resolve Settings**: Validates `scope`, `fail_on` and `audit`, and turns off blocking when a PR-scoped run is triggered by a non-pull-request event.
 2. **Checkout**: Checks out the full history so Fallow can compute PR diffs and history-based metrics. Git credentials are not persisted.
 3. **Node Setup (Optional)**: Configures Node.js with npm caching when `install_dependencies` is enabled.
 4. **Install Packages (Optional)**: Runs `npm ci --ignore-scripts` in `root` when `install_dependencies` is enabled.
-5. **Audit Code**: Runs the `fallow-rs/fallow` action with the pinned `fallow_version`, using `fallow audit` when `fail_on` is `new`. Results are posted as a PR comment and either inline review comments (`scope: changed`) or annotations.
+5. **Audit Code**: Runs the `fallow-rs/fallow` action with the pinned `fallow_version`, using `fallow audit` when `audit` is enabled or `fail_on` is `new`. Results are posted as a PR comment and either inline review comments (`scope: changed`) or annotations.
 
 ### [NPM E2E Tests](.github/workflows/tests-e2e-npm.yml) ([examples](examples/tests-e2e.md))
 
